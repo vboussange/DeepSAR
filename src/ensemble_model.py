@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from src.MLP import MLP
+from src.mlp import MLP
     
 class EnsembleModel(nn.Module):
     def __init__(self, models):

@@ -13,7 +13,7 @@ import math
 from tqdm import tqdm
 import seaborn as sns
 
-from src.generate_SAR_data_EVA import clip_EVA_SR_gpu
+from src.generate_sar_data_eva import clip_EVA_SR_gpu
 from src.generate_SAR_data_GBIF import generate_random_boxes
 from src.data_processing.utils_eva import EVADataset
 from src.data_processing.utils_env_pred import CHELSADataset

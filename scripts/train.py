@@ -9,16 +9,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.MLP import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.EnsembleModel import EnsembleModel
-from src.dataset import SpeciesAreaEnvDataset, create_dataloader
+from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
+from src.ensemble_model import EnsembleModel
+from src.dataset import create_dataloader
+from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-import sys
-sys.path.append(str(Path(__file__).parent / Path("../eva_processing/")))
-from preprocess_eva_CHELSA_EUNIS_plot_megaplot_ratio_1_1 import load_preprocessed_data
 
 MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
@@ -193,7 +190,7 @@ class Trainer:
     
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda"
+        device = "cuda:0"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -202,7 +199,7 @@ if __name__ == "__main__":
     # Create Config instance
     config = Config(device=device)
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
-    config.run_folder.mkdir(exist_ok=True)
+    config.run_folder.mkdir(exist_ok=True, parents=True)
 
     results_all = {}
     for hab in config.habitats:

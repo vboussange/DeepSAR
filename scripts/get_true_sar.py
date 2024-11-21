@@ -13,9 +13,9 @@ import pandas as pd
 from src.utils import save_to_pickle
 from src.data_processing.utils_env_pred import CHELSADataset
 
-from src.MLP import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
-from MLP_fit_torch_all_habs_ensemble import Config
-from src.EnsembleModel import initialize_ensemble_model
+from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
+from scripts.train import Config
+from src.ensemble_model import initialize_ensemble_model
 
 from pathlib import Path
 from pyproj import Transformer

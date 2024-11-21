@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from src.generate_SAR_data_EVA import (generate_SAR_data, 
+from src.generate_sar_data_eva import (generate_SAR_data, 
                                    generate_SAR_data_SA,
                                    read_CLM5_data, 
                                    get_splot_bio_dfs, 

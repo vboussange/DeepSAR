@@ -30,11 +30,11 @@ from sklearn.preprocessing import MaxAbsScaler, StandardScaler
 
 
 from src.plotting import COLOR_PALETTE
-from src.MLP import get_gradient, inverse_transform_scale_feature_tensor, scale_feature_tensor
+from src.mlp import get_gradient, inverse_transform_scale_feature_tensor, scale_feature_tensor
 from src.utils import save_to_pickle
 from src.data_processing.utils_env_pred import CHELSADataset, CHELSA_PATH
-from MLP_fit_torch_all_habs_ensemble import Config
-import get_true_SAR_ensemble
+from scripts.train import Config
+import scripts.get_true_sar as get_true_sar
 
 from pathlib import Path
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     results_path = Path(f"./results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
     result_all = torch.load(checkpoint_path, map_location="cpu")
     results_fit_split = result_all["all"]
-    model = get_true_SAR_ensemble.load_model(results_fit_split, result_all["config"], "cuda")
+    model = get_true_sar.load_model(results_fit_split, result_all["config"], "cuda")
     
 
     predictors = results_fit_split["predictors"]
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     
     
     if True:
-        climate_dataset, res_climate_pixel = get_true_SAR_ensemble.load_chelsa_and_reproject(predictors)
+        climate_dataset, res_climate_pixel = get_true_sar.load_chelsa_and_reproject(predictors)
 
     print("Loading X_map data...")
     if not xmap_dict_path.is_file():
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         X_map_dict = {}
         for ncells in 2**np.array(range(7)):
             print(f"Calculating X_map for ncells: {ncells}")
-            X_map_dict[ncells] = get_true_SAR_ensemble.create_X_map(predictors, ncells, climate_dataset, res_climate_pixel, ref)
+            X_map_dict[ncells] = get_true_sar.create_X_map(predictors, ncells, climate_dataset, res_climate_pixel, ref)
             save_to_pickle(xmap_dict_path, X_map_dict=X_map_dict)
     else:
         with open(xmap_dict_path, 'rb') as pickle_file:
@@ -107,8 +107,8 @@ if __name__ == "__main__":
     print("Calculating SR and dlogSR/dlogA...")
     for res_sr_map in [1e3, 1e4]:
         print(f"Calculating SR, dSR and stdSR for resolution {res_sr_map}")
-        log_SR, dlogSR_dlogA = get_true_SAR_ensemble.get_SR_dSR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
-        std_log_SR = get_true_SAR_ensemble.get_std_SR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
+        log_SR, dlogSR_dlogA = get_true_sar.get_SR_dSR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
+        std_log_SR = get_true_sar.get_std_SR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
 
         print("Projection predictions on map.")
         log_SR_rast = create_raster(X_map_dict[1], log_SR)

@@ -10,24 +10,22 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split, GroupKFold
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.MLP import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.SAR import SAR
+from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
+from src.sar import SAR
 from src.dataset import create_dataloader, scale_features_targets
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import sys
-sys.path.append(str(Path(__file__).parent / Path("../eva_processing/")))
-from preprocess_eva_CHELSA_EUNIS_plot_megaplot_ratio_1_1 import load_preprocessed_data
+from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 
 MODEL_ARCHITECTURE = {
                       "small":[16, 16, 16],
                       "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4],
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
-MODEL = "medium"
+MODEL = "large"
 HASH = "71f9fc7"
 @dataclass
 class Config:
@@ -238,7 +236,7 @@ class Trainer:
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda"
+        device = "cuda:1"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:

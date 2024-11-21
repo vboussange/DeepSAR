@@ -22,8 +22,8 @@ import torch
 from sklearn.preprocessing import StandardScaler
 
 from src.plotting import COLOR_PALETTE
-from src.MLP import MLP, scale_feature_tensor, get_gradient
-from src.EnsembleModel import initialize_ensemble_model
+from src.mlp import MLP, scale_feature_tensor, get_gradient
+from src.ensemble_model import initialize_ensemble_model
 
 import sys
 from pathlib import Path

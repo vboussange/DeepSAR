@@ -23,7 +23,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
 from src.plotting import COLOR_PALETTE
-from src.MLP import MLP, scale_feature_tensor, get_gradient
+from src.mlp import MLP, scale_feature_tensor, get_gradient
 from src.utils import save_to_pickle
 
 from captum.attr import ShapleyValueSampling

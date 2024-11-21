@@ -7,7 +7,12 @@ import pandas as pd
 import os
 import socket
 
-from src.data_processing.utils_landcover import EXTENT_DATASET
+EXTENT_DATASET = (
+    -10.624685732460263,
+    34.562189098269386,
+    34.587857096739995,
+    71.17876083332953,
+)
 
 CHELSA_PATH = Path(Path(__file__).parent, '../../../data/CHELSA/').resolve() if socket.gethostname() == 'macbook-pro.home' else Path('/lud11/boussang/data/chelsa/') # 1km res
 FILE_PATH = os.path.dirname(os.path.abspath(__file__))

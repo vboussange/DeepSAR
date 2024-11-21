@@ -28,7 +28,7 @@ import sys
 sys.path.append(str(Path(__file__).parent / Path("../../../scripts/MLP3/")))
 from MLP_fit_torch_SBCV import Config
 import MLP_fit_torch_SBCV as MLP_fit
-from src.MLP import MLP
+from src.mlp import MLP
 
 def load_model_checkpoint(model_state, predictors):
         """Load the model and scalers from the saved checkpoint."""

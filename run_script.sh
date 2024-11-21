@@ -12,8 +12,12 @@ if [ -n "$prefix" ]; then
     namesim="${prefix}_${namesim}"
 fi
 
+# Ensure required directories exist
+mkdir -p stdout
+
 echo "Launching script for $namesim"
 chmod +x $file
-source /home/boussang/miniforge3/bin/activate /home/boussang/SAR_modelling/.env-torch
+# source /home/boussang/miniforge3/bin/activate /home/boussang/SAR_modelling/.env-torch
+
 nohup python $file > "stdout/${namesim}.out" 2>&1 &
 echo $! > "stdout/${namesim}_save_pid.txt"

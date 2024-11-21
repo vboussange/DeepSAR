@@ -93,3 +93,58 @@ def stats_min_pairwise_distance(multipoint):
     
     return average_distance, std_distance
 
+
+def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
+    """
+    Generates a specified number of random rectangular boxes within a given
+    area, ensuring that each box's area and side lengths fall within specified
+    ranges.
+    The generated rectangles are assigned the partition number of the candidate point 
+    that has served as the lower left corner of the box.
+    
+    TODO: While lower left corner will fall within `candidate_points` total bounds, the rest of the box may fall outside. 
+    TODO: The box should be cropped given a certain bounding box (to be added as an argument).
+
+    Parameters:
+    - candidate_points: A GeoDataFrame containing points that are
+    considered as lower-left corners for boxes.
+    - num_boxes: The number of boxes to generate.
+    - area_range: A tuple specifying the minimum and maximum area
+    for each box, in same units than geometry of `candidate_points`
+    - side_range: A tuple specifying the minimum and maximum side
+    length for each box, in same units than geometry of `candidate_points`.
+
+    Returns:
+    - A GeoDataFrame containing the generated boxes with the same CRS
+    as `candidate_points`.
+    """
+
+    boxes = []
+    partitions = []
+    log_area_range = np.log(area_range)
+    log_side_range = np.log(side_range)
+    for idx in np.random.choice(candidate_points.index, num_boxes):
+        point = candidate_points.geometry[idx]
+        log_length = np.random.uniform(*log_side_range)
+        log_height_min = max(
+            log_side_range[0], log_area_range[0] - log_length
+        )  # log of a fraction is the difference of the log of the numerator and the log of the denominator
+        log_height_max = min(log_side_range[1], log_area_range[1] - log_length)
+        log_height = np.random.uniform(log_height_min, log_height_max)
+        height = np.exp(log_height)
+        length = np.exp(log_length)
+        # Create the box and add it to the list.
+        new_box = box(point.x - 1.0, point.y - 1.0, point.x + length, point.y + height)
+        boxes.append(new_box)
+        partitions.append(candidate_points.partition[idx])
+
+    return gpd.GeoDataFrame(
+        data={"partition": partitions}, geometry=boxes, crs=candidate_points.crs
+    )
+
+
+def crop_raster(lc_binary, geom):
+    assert lc_binary.rio.crs == "EPSG:3035"
+    minx, miny, maxx, maxy = geom.bounds
+    cropped_lcb = lc_binary.sel(x=slice(minx, maxx), y=slice(miny, maxy))
+    return cropped_lcb

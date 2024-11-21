@@ -1,6 +1,6 @@
 from src.data_processing.utils_eva import EVADataset
 from src.data_processing.utils_env_pred import CHELSADataset
-from src.generate_SAR_data_EVA import read_CLM5_data, compile_SAR, compile_SAR_gpu, compile_SEAM
+from src.generate_sar_data_eva import read_CLM5_data, compile_SAR, compile_SAR_gpu, compile_SEAM
 from pathlib import Path
 import pandas as pd
 import geopandas as gpd

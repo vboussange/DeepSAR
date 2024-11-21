@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import numpy as np
-from src.SAR import FullyConnectedBatchNormBlock
 from skorch import NeuralNetRegressor
 from skorch.utils import to_tensor
 from skorch.callbacks import LRScheduler,EarlyStopping
@@ -12,7 +11,20 @@ from skorch.callbacks import LRScheduler,EarlyStopping
 from torch.autograd import grad
 # https://github.com/jlager/BINNs/blob/master/Modules/Utils/Gradient.py
 
-# Define the basic neural network model
+
+class FullyConnectedBatchNormBlock(nn.Module):
+    def __init__(self, in_features, out_features, **kwargs):
+        super(FullyConnectedBatchNormBlock, self).__init__()
+        self.linear = nn.Linear(in_features, out_features, **kwargs)
+        self.batch_norm = nn.BatchNorm1d(out_features)
+
+    def forward(self, x):
+        x = self.linear(x)
+        x = self.batch_norm(x)
+        x = F.relu(x)
+        return x
+    
+    
 class SimpleNNBatchNorm(nn.Module):
     def __init__(self, input_dim, layer_sizes, output_dim=1):
         super(SimpleNNBatchNorm, self).__init__()
