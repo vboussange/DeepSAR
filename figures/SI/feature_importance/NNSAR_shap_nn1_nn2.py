@@ -27,7 +27,7 @@ from xgboost import XGBRegressor
 from src.data_processing.utils_env_pred import calculate_aggregates, CHELSADataset
 from src.data_processing.utils_landcover import CopernicusDataset
 from src.data_processing.utils_polygons import partition_polygon_gdf
-from src.NNSAR import NNSAR
+from src.SAR import NNSAR
 from NNSAR_fit_simple import get_Xy_scaled
 from src.utils import save_to_pickle
 from src.plotting import COLOR_PALETTE

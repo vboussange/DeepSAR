@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split, GroupKFold
 from pathlib import Path
 from dataclasses import dataclass, field
 from src.MLP import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.NNSAR import SAR
+from src.SAR import SAR
 from src.dataset import create_dataloader, scale_features_targets
 
 # Setup logging

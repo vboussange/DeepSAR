@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 
 
 from src.plotting import COLOR_PALETTE
-from src.NNSAR import NNSAR2
+from src.SAR import NNSAR2
 from src.utils import save_to_pickle
 
 import sys

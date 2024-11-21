@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import numpy as np
-from src.NNSAR import FullyConnectedBatchNormBlock
+from src.SAR import FullyConnectedBatchNormBlock
 from skorch import NeuralNetRegressor
 from skorch.utils import to_tensor
 from skorch.callbacks import LRScheduler,EarlyStopping
@@ -71,19 +71,6 @@ class CustomMSELoss(nn.Module):
             loss_grad = 0
         return loss_mse + loss_grad_random #+ loss_grad
     
-class MyNet(NeuralNetRegressor):
-    def get_loss(self, y_pred, y_true, X=None, training=False):
-        y_true = to_tensor(y_true, device=self.device)
-
-        if isinstance(self.criterion_, torch.nn.Module):
-            self.criterion_.train(training)
-
-        return self.criterion_(y_pred, X, y_true)
-    
-    def forward(self, X, **kwargs):
-        # Enable requires_grad on the input
-        X.requires_grad_(True)
-        return super().forward(X, **kwargs)
     
 def scale_feature_tensor(x, scaler):
     assert len(x.shape)

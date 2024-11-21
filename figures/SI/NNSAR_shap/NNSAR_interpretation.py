@@ -22,7 +22,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from captum.attr import ShapleyValueSampling
 
 from src.plotting import COLOR_PALETTE
-from src.NNSAR import NNSAR2
+from src.SAR import NNSAR2
 from src.utils import save_to_pickle
 
 import sys
