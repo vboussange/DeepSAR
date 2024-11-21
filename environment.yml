@@ -1,0 +1,35 @@
+name: SEAM
+channels:
+  - rapidsai
+  - nvidia
+  - pytorch-nightly
+  - conda-forge
+
+dependencies:
+  - cudatoolkit
+  - scikit-learn
+  - numpy
+  - pandas
+  - python=3.9
+  - ipykernel
+  - matplotlib
+  - seaborn
+  - xgboost
+  - cartopy
+  - geopy
+  - geopandas
+  - dask
+  - dask-geopandas
+  - pytorch
+  - torchvision
+  - tqdm
+  - cudf
+  - ca-certificates
+  - certifi
+  - openssl
+  - cuspatial
+  - rioxarray
+  - pathlib
+  - shap
+  - scipy
+prefix: ./env

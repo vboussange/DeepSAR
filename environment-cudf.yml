@@ -1,0 +1,27 @@
+name: SEAM
+channels:
+  - rapidsai
+  - nvidia
+  - conda-forge
+
+dependencies:
+  - cudatoolkit
+  - scikit-learn
+  - numpy
+  - pandas
+  - python
+  - ipykernel
+  - matplotlib
+  - seaborn
+  - cartopy
+  - geopy
+  - geopandas
+  - dask
+  - dask-geopandas
+  - tqdm
+  - cudf
+  - cuspatial
+  - rioxarray
+  - pathlib
+  - pyarrow
+  - fastparquet

@@ -1,0 +1,32 @@
+name: SEAM-torch
+channels:
+  - rapidsai
+  - nvidia
+  - pytorch
+  - conda-forge
+
+dependencies:
+  - scikit-learn
+  - numpy
+  - pandas
+  - python
+  - ipykernel
+  - matplotlib
+  - seaborn
+  - xgboost
+  - cartopy
+  - geopy
+  - geopandas
+  - dask
+  - dask-geopandas
+  - pytorch
+  - skorch
+  - tqdm
+  - rioxarray
+  - pathlib
+  - shap
+  - scipy
+  - captum
+  - pyarrow
+  - fastparquet
+  - gitpython
