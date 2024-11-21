@@ -1,7 +1,4 @@
-name: SEAM-torch
 channels:
-  - rapidsai
-  - nvidia
   - pytorch
   - conda-forge
 
@@ -9,7 +6,7 @@ dependencies:
   - scikit-learn
   - numpy
   - pandas
-  - python
+  - python=3.11
   - ipykernel
   - matplotlib
   - seaborn
@@ -24,7 +21,6 @@ dependencies:
   - tqdm
   - rioxarray
   - pathlib
-  - shap
   - scipy
   - captum
   - pyarrow
