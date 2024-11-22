@@ -1,20 +1,18 @@
-"""
-TODO: 
-- make a color scale based on heterogeneity level
-"""
-import matplotlib.pyplot as plt
 
-
+"""
+This script generates a plot of relative absolute Shapley values versus area for
+different habitats.
+"""
+import torch
 import numpy as np
 import pandas as pd
-import torch
-
+import matplotlib.pyplot as plt
 from src.ensemble_model import initialize_ensemble_model
-from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
+from src.mlp import scale_feature_tensor
 from captum.attr import ShapleyValueSampling
+from pathlib import Path
 
 import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
 from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 from train import Config
