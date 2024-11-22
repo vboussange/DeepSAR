@@ -1,6 +1,5 @@
 """
-TODO: 
-- make a color scale based on heterogeneity level
+Here we plot as a color scale the heterogeneity level of the climate features.
 """
 import torch
 import numpy as np

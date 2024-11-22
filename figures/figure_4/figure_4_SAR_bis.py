@@ -1,6 +1,5 @@
 """
-TODO: 
-- make a color scale based on heterogeneity level
+Here we plot corrected and not corrected SAR and dSAR.
 """
 import copy
 import torch
