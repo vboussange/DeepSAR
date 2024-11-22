@@ -1,3 +1,0 @@
-DBF_closed
-T-statistic: 8.58163393318751
-P-value: 1.2581329526574981e-05

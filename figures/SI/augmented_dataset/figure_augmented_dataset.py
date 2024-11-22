@@ -1,13 +1,13 @@
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
-from matplotlib import gridspec
-
-import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent / Path("../../../scripts/eva_processing/")))
-from preprocess_eva_CHELSA_EUNIS_plot_megaplot_ratio_1_1 import load_preprocessed_data
+import sys
+PATH_MLP_TRAINING = Path("../../../scripts/")
+sys.path.append(str(Path(__file__).parent / PATH_MLP_TRAINING))
+from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
+from train import Config
 
 # Assuming load_preprocessed_data is already defined
 
@@ -47,9 +47,12 @@ def create_subplot_for_habitat(ax, gdf, hab_name):
 
 if __name__ == "__main__":
     seed = 1
-    checkpoint_path = f"../../../scripts/MLP3/results/MLP_fit_torch_all_habs_dSRdA_weight_1e+00_seed_{seed}/checkpoint.pth"
-    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")
-
+    MODEL = "large"
+    HASH = "71f9fc7"
+    ncells_ref = 20 # used for coarsening
+    
+    checkpoint_path = PATH_MLP_TRAINING / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")
+    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    
     config = results_fit_split_all["config"]
     habitats = ["T1", "T3", "R1", "R2", "Q2", "Q5", "S2", "S3", "all"]
 
@@ -61,7 +64,7 @@ if __name__ == "__main__":
 
     # Iterate over habitats and plot each in its corresponding grid cell
     for i, hab in enumerate(habitats):
-        gdf = load_preprocessed_data(hab, config["hash"], config["data_seed"])
+        gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
         create_subplot_for_habitat(axes[i], gdf, hab)
 
     # Remove any empty subplots if the number of habitats doesn't fill the grid

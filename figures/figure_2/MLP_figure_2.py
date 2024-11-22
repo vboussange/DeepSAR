@@ -4,23 +4,14 @@ Plotting figure 2 'prediction power of climate, area, and both on SR'
 """
 
 import numpy as np
-import pandas as pd
 from pathlib import Path
-import geopandas as gpd
 import seaborn as sns
-import warnings
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import matplotlib.gridspec as gridspec
 import torch
-from sklearn.model_selection import KFold, cross_validate, GroupKFold, train_test_split
-from sklearn.metrics import r2_score, mean_squared_error
-from xgboost import XGBRegressor
-import pickle
-from src.utils import save_to_pickle
+from sklearn.metrics import mean_squared_error
 
-from src.data_processing.utils_env_pred import calculate_aggregates, CHELSADataset
-from src.plotting import read_result, ResultData, boxplot_bypreds
+from src.plotting import boxplot_bypreds
 
 import scipy.stats as stats
 

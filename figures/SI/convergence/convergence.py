@@ -10,20 +10,22 @@ import numpy as np
 import sys
 import torch
 from pathlib import Path
-PATH_MLP_TRAINING = Path("../../../scripts/MLP3/")
+PATH_MLP_TRAINING = Path("../../../scripts/")
 sys.path.append(str(Path(__file__).parent / PATH_MLP_TRAINING))
-from MLP_fit_torch_all_habs_ensemble import Config
+from scripts.train import Config
 
 if __name__ == "__main__":
     # creating X_maps for different resolutions
+    # creating X_maps for different resolutions
     seed = 1
     MODEL = "large"
-    HASH = ""
+    HASH = "71f9fc7"
+    ncells_ref = 20 # used for coarsening
     
-    checkpoint_path = PATH_MLP_TRAINING / Path(f"./results/MLP_fit_torch_all_habs_ensemble_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint.pth")
-    result_all = torch.load(checkpoint_path, map_location="cpu")
+    checkpoint_path = PATH_MLP_TRAINING / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth") 
+    result_all = torch.load(checkpoint_path, map_location="cpu")    
     config = result_all["config"]
-    
+
     fig, axs = plt.subplots(3,3, figsize=(9,9))
     for i, hab in enumerate(config.habitats):
         ax = axs.flatten()[i]
