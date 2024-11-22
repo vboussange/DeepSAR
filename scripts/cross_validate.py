@@ -1,3 +1,23 @@
+"""
+cross_validate.py
+This script performs cross-validation for training and evaluating machine learning models on habitat-specific data.
+It supports multiple model architectures and configurations, including habitat-agnostic variants.
+Classes:
+    Config: Configuration dataclass for setting up training parameters and model configurations.
+    Trainer: Class responsible for training and evaluating models across different habitats.
+Functions:
+    Trainer.train: Main method to initiate the training process for all habitats.
+    Trainer.prepare_run: Prepares the run directory for saving results.
+    Trainer.train_models_for_habitat: Trains models for a specific habitat.
+    Trainer.train_and_evaluate: Trains and evaluates models using k-fold cross-validation.
+    Trainer.train_model: Trains a single model and tracks performance metrics.
+    Trainer.evaluate_model: Evaluates a model on a given dataset.
+    Trainer.save_results: Saves the training results to a file.
+Usage:
+    Run the script directly to start the training process with the specified configuration.
+    
+# TODO: significant work is performed on CPU, consider identifying and moving to GPU
+"""
 import copy
 import random
 import logging
@@ -44,10 +64,10 @@ class Config:
     data_seed: int = 2
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"])
+    habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
     run_name: str = "checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
-    layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
+    layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
 
 class Trainer:
     def __init__(self, config: Config):
@@ -137,12 +157,12 @@ class Trainer:
                 val_loader, _, _ = create_dataloader(gdf_val_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
                 test_loader, _, _ = create_dataloader(gdf_test_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
 
-                epoch_metrics = self.train_model(model, train_loader, val_loader, test_loader, criterion, optimizer, scheduler, target_scaler)
+                best_model, epoch_metrics = self.train_model(model, train_loader, val_loader, test_loader, criterion, optimizer, scheduler, target_scaler)
                 best_epoch = np.argmin(epoch_metrics['val_MSE'])
                 best_train_MSE = epoch_metrics['train_MSE'][best_epoch]
                 best_val_MSE = epoch_metrics['val_MSE'][best_epoch]
                 best_test_MSE = epoch_metrics['test_MSE'][best_epoch]
-                best_model_state = copy.deepcopy(model.state_dict())
+                best_model_state = best_model.state_dict()
 
                 results["train_MSE"].append(best_train_MSE)
                 results["val_MSE"].append(best_val_MSE)
@@ -167,6 +187,7 @@ class Trainer:
             "test_MSE": []
         }
         best_val_MSE = float('inf')
+        best_model = None
 
         for epoch in range(self.config.n_epochs):
             model.train()
@@ -210,10 +231,11 @@ class Trainer:
 
             if avg_val_MSE < best_val_MSE:
                 best_val_MSE = avg_val_MSE
+                best_model = copy.deepcopy(model).to("cpu")
 
             scheduler.step(avg_val_MSE)
 
-        return epoch_metrics
+        return best_model, epoch_metrics
 
     def evaluate_model(self, model, loader, target_scaler):
         running_MSE = 0.0

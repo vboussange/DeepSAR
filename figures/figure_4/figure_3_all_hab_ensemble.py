@@ -6,36 +6,30 @@ TODO:
     - It seems that there are two types of convergence: one where dlogSR/dlogA is = 0.3 at large A, and the other where it convergence to 0. This could be due to a lack of constraints
 * Add variations as a fill_between plot
 * Evaluate model on trained data, for now we do not make a distinction between the two.
+
+Using ensemble model
 """
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
 import seaborn as sns
-import pickle
 
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
-from skorch import NeuralNetRegressor
-from skorch.helper import SliceDict
-from skorch.callbacks import EarlyStopping
 
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score
 
 from src.plotting import COLOR_PALETTE
 from src.mlp import MLP, scale_feature_tensor, get_gradient
-from src.utils import save_to_pickle
+from src.ensemble_model import initialize_ensemble_model
 
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent / Path("../../../../scripts/MLP3")))
-from MLP_fit_torch import process_results, preprocess_gdf_hab
+from training import Config
 sys.path.append(str(Path(__file__).parent / Path("../../../../scripts/eva_processing/")))
 from preprocess_eva_CHELSA_EUNIS_plot_megaplot_ratio_1_1 import load_preprocessed_data
 
@@ -97,8 +91,8 @@ def inverse_transform_scale_feature_tensor(y, scaler):
 
 def get_SR_dSR(model, gdf, predictors, feature_scaler, target_scaler):
         features = torch.tensor(gdf[predictors].values.astype(np.float32), dtype=torch.float32).requires_grad_(True)
-        X = scale_feature_tensor(features, feature_scaler)
-        y = model(X)
+        X = scale_feature_tensor(features, feature_scaler).to(next(model.parameters()).device)
+        y = model(X).to("cpu")
         log_SR = inverse_transform_scale_feature_tensor(y, target_scaler)
         dlogSR_dlogA = get_gradient(log_SR, features).detach().numpy()[:, 0]
         log_SR = log_SR.detach().numpy().flatten()
@@ -170,22 +164,15 @@ def plot_SAR_dSAR(ax_SAR, ax_dSAR, model, results_fit_split, gdf, dict_styles):
     ax_dSAR.set_ylim(0, 0.7)
 
     return ax_SAR, ax_dSAR
-
-def load_model(result, device):
-        """Load the model and scalers from the saved checkpoint."""
-        
-        # Load the model architecture
-        predictors = result['predictors']
-        model = MLP(len(predictors)).to(device)
-        
-        # Load model weights and other components
-        model.load_state_dict(result['model_state_dict'])
-        model.eval()
-        return model
     
 if __name__ == "__main__":
     seed = 2
-    checkpoint_path = f"../../../../scripts/MLP3/results/MLP_fit_torch_all_habs_dSRdA_weight_1e+00_seed_{seed}/checkpoint.pth"
+    ncells_ref = 20 # used for coarsening
+    MODEL = "large"
+    HASH = "71f9fc7"
+    
+    
+    checkpoint_path = f"../../../../scripts/MLP3/results/MLP_fit_torch_all_habs_ensemble_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth"
     results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")
     config = results_fit_split_all["config"]
 
@@ -199,10 +186,10 @@ if __name__ == "__main__":
     for i, hab in enumerate(habitats):
         print(hab)
         results_fit_split = results_fit_split_all[hab]
-        model = load_model(results_fit_split, "cpu")
-        print(f"MSE val: {results_fit_split["best_validation_loss"]}")
-        gdf = load_preprocessed_data(hab, config["hash"], config["data_seed"])
-        gdf_train = gdf.loc[results_fit_split["train_idx"]]
+        model = initialize_ensemble_model(results_fit_split, config, "cuda")
+        print(f"MSE val: {results_fit_split['best_validation_loss']}")
+        gdf = load_preprocessed_data(hab, config.hash, config.data_seed)
+        gdf_train = gdf.loc#[results_fit_split["train_idx"]] #todo: to fix
         ax_SAR = axs_SAR.flatten()[i]
         ax_dSAR = axs_dSAR.flatten()[i]
         plot_SAR_dSAR(ax_SAR, ax_dSAR, model, results_fit_split, gdf, dict_styles)
@@ -216,8 +203,6 @@ if __name__ == "__main__":
 
     # trained_data = plt.Line2D([0], [0], marker='s', color='w', label='test data',
     # # Add the legend
-
-            
         
     for fig, axs, label in zip([fig_SAR, fig_dSAR], (axs_SAR, axs_dSAR), ("SR", "dlogSR_dlogA")):
         fig.supylabel(label)

@@ -1,42 +1,23 @@
 """
 TODO: 
-* make Shapley values more robust
-* Refactor to simplify the code
-* Make sure that the model converges to robust results
-    - It seems that there are two types of convergence: one where dlogSR/dlogA is = 0.3 at large A, and the other where it convergence to 0. This could be due to a lack of constraints
-* Add variations as a fill_between plot
-* Evaluate model on trained data, for now we do not make a distinction between the two.
+- make a color scale based on heterogeneity level
 """
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
-from matplotlib.lines import Line2D
 
-import seaborn as sns
-import pickle
 
 import numpy as np
 import pandas as pd
 import torch
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score
-
-from src.plotting import COLOR_PALETTE
-from src.mlp import MLP, scale_feature_tensor, get_gradient
-from src.utils import save_to_pickle
-
+from src.ensemble_model import initialize_ensemble_model
+from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from captum.attr import ShapleyValueSampling
 
 import sys
 from pathlib import Path
-
-sys.path.append(str(Path(__file__).parent / Path("../../../../scripts/MLP3")))
-from MLP_fit_torch import process_results, preprocess_gdf_hab
-
-sys.path.append(str(Path(__file__).parent / Path("../../../../scripts/eva_processing/")))
-from preprocess_eva_CHELSA_EUNIS_plot_megaplot_ratio_1_1 import load_preprocessed_data
-
+sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
+from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
+from train import Config
 
 def get_df_shap_val(model, results_fit_split, gdf):
     predictors  = results_fit_split["predictors"]
@@ -47,14 +28,15 @@ def get_df_shap_val(model, results_fit_split, gdf):
     gdf = gdf.groupby('log_area_bins', group_keys=False).apply(lambda x: x.sample(min(10, len(x))))
 
     features = torch.tensor(gdf[predictors].values.astype(np.float32), dtype=torch.float32).requires_grad_(True)
-    X = scale_feature_tensor(features, feature_scaler)
+    X = scale_feature_tensor(features, feature_scaler).to(next(model.parameters()).device)
     def forward_fn(X):
         with torch.no_grad():
-            return model(X)
+            return model(X).flatten()
     explainer = ShapleyValueSampling(forward_fn)
     shap_val = explainer.attribute(X)
     # shap_abs = np.abs(shap_val.numpy())
-    shap_abs = shap_val.numpy()
+    # problem here, shap_val has shape n x 1 x m
+    shap_abs = shap_val.cpu().numpy()
 
     df_shap_values = pd.DataFrame(shap_abs, columns=predictors)
     # df_shap_values = df_shap_values / df_shap_values.abs().max().max()
@@ -63,28 +45,18 @@ def get_df_shap_val(model, results_fit_split, gdf):
 
     return df_shap_values
 
-def load_model(result, device):
-        """Load the model and scalers from the saved checkpoint."""
-        
-        # Load the model architecture
-        predictors = result['predictors']
-        model = MLP(len(predictors)).to(device)
-        
-        # Load model weights and other components
-        model.load_state_dict(result['model_state_dict'])
-        model.eval()
-        return model
-
 if __name__ == "__main__":
     seed = 1
-    checkpoint_path = f"../../../../scripts/MLP3/results/MLP_fit_torch_all_habs_dSRdA_weight_1e+00_seed_{seed}/checkpoint.pth"
+    MODEL = "large"
+    HASH = "71f9fc7"    
+    checkpoint_path = Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")
 
     config = results_fit_split_all["config"]
 
     fig, axs = plt.subplots(2, 5, figsize=(8, 4))
     habitats = ["T1", "R1", "Q5", "S2", "all", "T3", "R2", "Q2", "S3", ]
-    config_plot = [("abs_log_area", "tab:green"),  ("mean_climate_vars", "tab:blue"), ("std_climate_vars", "tab:red"),]
+    config_plot = [("Area", "tab:green"),  ("Mean climate", "tab:blue"), ("Climate heterogeneity", "tab:red"),]
 
     # habitats = [ "S2"]
 
@@ -92,20 +64,20 @@ if __name__ == "__main__":
         ax = axs.flatten()[i]
         # shap_vals = []
         results_fit_split = results_fit_split_all[hab]
-        model = load_model(results_fit_split, "cpu")
-        print(f"MSE val: {results_fit_split["best_validation_loss"]}")
-        gdf = load_preprocessed_data(hab, config["hash"], config["data_seed"])
+        model = initialize_ensemble_model(results_fit_split, config, "cuda")
+        print(f"MSE val: {results_fit_split['best_validation_loss']}")
+        gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
         _gdf = gdf#[gdf.num_plots > 10]
         df_shap = get_df_shap_val(model, results_fit_split, _gdf)
                 
 
-        std_labs = ["std_" + env for env in config["climate_variables"]]
-        mean_labs =config["climate_variables"]
-        df_shap["std_climate_vars"] = np.abs(df_shap[std_labs]).sum(axis=1)
-        df_shap["mean_climate_vars"] = np.abs(df_shap[mean_labs]).sum(axis=1)
-        df_shap["abs_log_area"] = np.abs(df_shap["log_area"])
+        std_labs = ["std_" + env for env in config.climate_variables]
+        mean_labs =config.climate_variables
+        df_shap["Climate heterogeneity"] = np.abs(df_shap[std_labs]).sum(axis=1)
+        df_shap["Mean climate"] = np.abs(df_shap[mean_labs]).sum(axis=1)
+        df_shap["Area"] = np.abs(df_shap["log_area"])
         # rescaling
-        df_shap[["abs_log_area", "std_climate_vars", "mean_climate_vars"]] = df_shap[["abs_log_area", "std_climate_vars", "mean_climate_vars"]].values / df_shap[["abs_log_area", "std_climate_vars", "mean_climate_vars"]].sum(axis=1).values.reshape(-1,1)
+        df_shap[["Area", "Climate heterogeneity", "Mean climate"]] = df_shap[["Area", "Climate heterogeneity", "Mean climate"]].values / df_shap[["Area", "Climate heterogeneity", "Mean climate"]].sum(axis=1).values.reshape(-1,1)
 
         for var, col in config_plot:
             # ax.scatter(df_shap.log_area_values, df_shap[var], label = var)

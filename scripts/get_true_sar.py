@@ -15,7 +15,6 @@ from src.data_processing.utils_env_pred import CHELSADataset
 
 from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from scripts.train import Config
-from src.ensemble_model import initialize_ensemble_model
 
 from pathlib import Path
 from pyproj import Transformer
@@ -122,18 +121,6 @@ def get_std_SR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, fea
 
     log_SR = np.concatenate(log_SR_list, axis=0)
     return log_SR
-
-def load_model(result, config, device):
-        """Load the model and scalers from the saved checkpoint."""
-        
-        # Load the model architecture
-        predictors = result['predictors']
-        model = initialize_ensemble_model(config.n_ensembles, len(predictors), layer_sizes=config.layer_sizes).to(device)
-        
-        # Load model weights and other components
-        model.load_state_dict(result['ensemble_model_state_dict'])
-        model.eval()
-        return model
     
 if __name__ == "__main__":
     # creating X_maps for different resolutions

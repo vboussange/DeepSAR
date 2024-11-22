@@ -9,7 +9,7 @@ dependencies:
   - scikit-learn
   - numpy
   - pandas
-  - python
+  - python==3.12.3
   - ipykernel
   - matplotlib
   - seaborn
@@ -25,3 +25,5 @@ dependencies:
   - pathlib
   - pyarrow
   - fastparquet
+  - pip:
+    - install -e . # todo: currently not working

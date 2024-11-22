@@ -3,6 +3,7 @@ channels:
   - conda-forge
 
 dependencies:
+  - pytorch
   - scikit-learn
   - numpy
   - pandas
@@ -10,14 +11,11 @@ dependencies:
   - ipykernel
   - matplotlib
   - seaborn
-  - xgboost
   - cartopy
   - geopy
   - geopandas
   - dask
   - dask-geopandas
-  - pytorch
-  - skorch
   - tqdm
   - rioxarray
   - pathlib
@@ -26,3 +24,5 @@ dependencies:
   - pyarrow
   - fastparquet
   - gitpython
+  - pip:
+    - install -e .  # todo: currently not working

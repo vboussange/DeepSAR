@@ -2,12 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-import numpy as np
-from skorch import NeuralNetRegressor
-from skorch.utils import to_tensor
-from skorch.callbacks import LRScheduler,EarlyStopping
-
 from torch.autograd import grad
 # https://github.com/jlager/BINNs/blob/master/Modules/Utils/Gradient.py
 
