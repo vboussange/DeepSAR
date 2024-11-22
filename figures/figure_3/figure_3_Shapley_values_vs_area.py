@@ -70,7 +70,7 @@ if __name__ == "__main__":
                 
 
         std_labs = ["std_" + env for env in config.climate_variables]
-        mean_labs =config.climate_variables
+        mean_labs = config.climate_variables
         df_shap["Climate heterogeneity"] = np.abs(df_shap[std_labs]).sum(axis=1)
         df_shap["Mean climate"] = np.abs(df_shap[mean_labs]).sum(axis=1)
         df_shap["Area"] = np.abs(df_shap["log_area"])

@@ -23,3 +23,8 @@ mamba activate ./.env-torch
 
 ### Training
 `train.py` trains neural net SAR for each habitat considered.
+
+### TODO
+
+#### SI
+- plot location of EVA plots
