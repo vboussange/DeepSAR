@@ -8,34 +8,15 @@ The script is not fully checked.
 
 Using ensemble methods.
 """
-import matplotlib.pyplot as plt
-import pickle
-import xarray as xr
-
-import numpy as np
-import pandas as pd
-import geopandas as gpd
-
 import torch
-import torch.nn as nn
-import torch.optim as optim
-
-from skorch import NeuralNetRegressor
-from skorch.helper import SliceDict
-from skorch.callbacks import EarlyStopping
-from skorch.dataset import ValidSplit
-
-from sklearn.model_selection import cross_validate, GroupKFold
-from sklearn.preprocessing import MaxAbsScaler, StandardScaler
-
-
-from src.plotting import COLOR_PALETTE
-from src.mlp import get_gradient, inverse_transform_scale_feature_tensor, scale_feature_tensor
+import pickle
+import numpy as np
+import xarray as xr
+import matplotlib.pyplot as plt
 from src.utils import save_to_pickle
-from src.data_processing.utils_env_pred import CHELSADataset, CHELSA_PATH
 from scripts.train import Config
+from src.ensemble_model import initialize_ensemble_model
 import scripts.get_true_sar as get_true_sar
-
 from pathlib import Path
 
 def create_raster(X_map, ypred):
@@ -72,12 +53,11 @@ if __name__ == "__main__":
     HASH = "71f9fc7"
     ncells_ref = 20 # used for coarsening
     
-    checkpoint_path = Path(f"./results/MLP_fit_torch_all_habs_ensemble_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")
     xmap_dict_path = Path("./results/X_maps/X_maps_dict.pkl")
-    results_path = Path(f"./results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
-    result_all = torch.load(checkpoint_path, map_location="cpu")
-    results_fit_split = result_all["all"]
-    model = get_true_sar.load_model(results_fit_split, result_all["config"], "cuda")
+    checkpoint_path = Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    
+    results_fit_split = results_fit_split_all["all"]
+    model = initialize_ensemble_model(results_fit_split, results_fit_split_all["config"], "cuda")
     
 
     predictors = results_fit_split["predictors"]
@@ -135,7 +115,7 @@ if __name__ == "__main__":
                 ax.set_xticks([])
                 ax.set_yticks([])
             fig.tight_layout()
-            fig.savefig(Path(__file__).stem + f"_res_{res_sr_map/1e3}km.png", transparent=True, dpi=300)
+            fig.savefig("results/" + Path(__file__).stem + f"_res_{res_sr_map/1e3}km.png", transparent=True, dpi=300)
     
     print(f"Saving projections at {results_path}")
     save_to_pickle(results_path, SR_dSR_rast_dict=SR_dSR_rast_dict)

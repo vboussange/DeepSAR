@@ -6,7 +6,6 @@ import geopandas as gpd
 from shapely.geometry import box
 from pathlib import Path
 import matplotlib.colors as colors
-from matplotlib.gridspec import GridSpec
 
 rcparams = {
             "font.size": 9,
@@ -25,11 +24,9 @@ seed = 1
 MODEL = "large"
 HASH = "71f9fc7"
 
-results_path = Path(f"./results/MLP_project_simple_full_grad_ensemble/" + "MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
-
 # Constants for file paths
-SR_DSR_RAST_DICT_PATH = Path("../../../scripts/MLP3/results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
-SAR_DICT_PATH = Path(f"../../../scripts/MLP3/results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
+SR_DSR_RAST_DICT_PATH = Path(f"../../scripts/results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
+SAR_DICT_PATH = Path(f"../../scripts/results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
 
 
 def load_data(sr_dsr_rast_dict_path, sar_dict_path):
@@ -104,6 +101,8 @@ if __name__ == '__main__':
     # Load data
     sr_dsr_rast_dict, dict_sar = load_data(SR_DSR_RAST_DICT_PATH, SAR_DICT_PATH)
     dict_plot = {"loc1": {"c": "tab:blue"}, "loc2": {"c": "tab:red"}, "loc3": {"c": "tab:purple"}}
+
+    Path("panels").mkdir(exist_ok=True)
 
     # Plot species richness at resolution 1km
     fig, ax = plt.subplots()

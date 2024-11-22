@@ -5,13 +5,14 @@ Using Ensemble model.
 
 TODO: continue
 """
-import matplotlib.pyplot as plt
-import xarray as xr
 import torch
 import numpy as np
 import pandas as pd
 from src.utils import save_to_pickle
 from src.data_processing.utils_env_pred import CHELSADataset
+import matplotlib.pyplot as plt
+import xarray as xr
+from src.ensemble_model import initialize_ensemble_model
 
 from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from scripts.train import Config
@@ -127,12 +128,13 @@ if __name__ == "__main__":
     seed = 1
     MODEL = "large"
     HASH = "71f9fc7"
-
-    checkpoint_path = Path(f"./results/MLP_fit_torch_all_habs_ensemble_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")
-    true_SAR_path = Path(f"./results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
-    result_all = torch.load(checkpoint_path, map_location="cpu")
-    results_fit_split = result_all["all"]
-    model = load_model(results_fit_split, result_all["config"], device="cuda")
+    ncells_ref = 20 # used for coarsening
+    
+    xmap_dict_path = Path("./results/X_maps/X_maps_dict.pkl")
+    checkpoint_path = Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    
+    results_fit_split = results_fit_split_all["all"]
+    model = initialize_ensemble_model(results_fit_split, results_fit_split_all["config"], "cuda")
 
     predictors  = results_fit_split["predictors"]
     feature_scaler = results_fit_split["feature_scaler"]

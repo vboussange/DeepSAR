@@ -16,7 +16,7 @@ EXTENT_DATASET = (
 
 CHELSA_PATH = Path(Path(__file__).parent, '../../../data/CHELSA/').resolve() if socket.gethostname() == 'macbook-pro.home' else Path('/lud11/boussang/data/chelsa/') # 1km res
 FILE_PATH = os.path.dirname(os.path.abspath(__file__))
-CACHE_CHELSA = Path(FILE_PATH, '../../../data/CHELSA/CHELSA_EU.nc')
+CACHE_CHELSA = Path(FILE_PATH, '../../data/CHELSA/CHELSA_EU.nc')
 
 
 class EnvironmentalFeatureDataset():
