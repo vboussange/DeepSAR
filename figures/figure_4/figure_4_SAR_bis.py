@@ -138,12 +138,14 @@ if __name__ == "__main__":
     label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands", "Habitat agnostic"]
     for i, (fig, axs, label) in enumerate(zip([fig_SAR, fig_dSAR], (axs_SAR, axs_dSAR), ("SR", r"$\frac{d \log(SR)}{d \log(A)}$"))):
         fig.supylabel(label, fontsize=16)
-        fig.supxlabel("Area (m2)", fontsize=16)
         fig.tight_layout()
         if i == 0:
+            axs.flatten()[-1].legend(handles=legs, loc='center', bbox_to_anchor=(0.4, 0.4))
             for i, ax in enumerate(axs[0, :]):
                 ax.set_title(label_l1[i], fontweight="bold")
-                axs.flatten()[-1].legend(handles=legs, loc='center', bbox_to_anchor=(0.4, 0.4))
+        else:
+            fig.supxlabel("Area (m2)", fontsize=16)
         axs.flatten()[-1].axis("off")
-        fig.savefig(f"figure_3_{i}.png", dpi=300, transparent=True)
+        fig.tight_layout()
+        fig.savefig(f"figure_4_{i}.png", dpi=300, transparent=True)
 

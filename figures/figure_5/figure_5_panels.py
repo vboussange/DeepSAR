@@ -116,12 +116,12 @@ if __name__ == '__main__':
                 cmap="BuGn", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
-                title='Area = $2.5 \cdot 10^5$ m2')
+                title='Area = 1km$^2$')
     fig.tight_layout()
     plot_bounding_boxes(ax, dict_sar, dict_plot)
     fig.savefig("panels/log_SR_fine.pdf", dpi=300, transparent=True)
     fig.savefig("panels/log_SR_fine.png", dpi=300, transparent=True)
-    # fig.savefig("panels/log_SR_fine.svg", dpi=300, transparent=True)
+    fig.savefig("panels/log_SR_fine.svg", dpi=300, transparent=True)
 
     # Plot species richness at resolution 10km
     fig, ax = plt.subplots()
@@ -134,11 +134,11 @@ if __name__ == '__main__':
                 cmap="BuGn", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
-                title='Area = $2.5 \cdot 10^7$ m2')
+                title='Area = 10km$^2$')
     plot_bounding_boxes(ax, dict_sar, dict_plot)
     fig.tight_layout()
     fig.savefig("panels/log_SR_coarse.pdf", dpi=300, transparent=True)
-    # fig.savefig("panels/log_SR_coarse.svg", dpi=300, transparent=True)
+    fig.savefig("panels/log_SR_coarse.svg", dpi=300, transparent=True)
 
     # Plot dlogSR/dlogA at resolution 1km
     fig, ax = plt.subplots()
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     fig.tight_layout()
     fig.savefig("panels/dlog_SR_fine.pdf", dpi=300, transparent=True)
     fig.savefig("panels/dlog_SR_fine.png", dpi=300, transparent=True)
-    # fig.savefig("panels/dlog_SR_fine.svg", dpi=300, transparent=True)
+    fig.savefig("panels/dlog_SR_fine.svg", dpi=300, transparent=True)
 
     # Plot dlogSR/dlogA at resolution 10km
     fig, ax = plt.subplots()
@@ -173,13 +173,12 @@ if __name__ == '__main__':
     fig.tight_layout()
     fig.savefig("panels/dlog_SR_coarse.pdf", dpi=300, transparent=True)
     fig.savefig("panels/dlog_SR_coarse.png", dpi=300, transparent=True)
-    # fig.savefig("panels/dlog_SR_coarse.svg", dpi=300, transparent=True)
+    fig.savefig("panels/dlog_SR_coarse.svg", dpi=300, transparent=True)
 
     # Plot SAR data on central plot
-    # TODO: to fix, it seems that this is not the right plot
     fig, ax = plt.subplots()
     area = np.exp(dict_sar["log_area"])
     plot_sar(ax, dict_sar, dict_plot, area)
     fig.tight_layout()
     fig.savefig("panels/SAR.png", dpi=300, transparent=True)
-    # fig.savefig("panels/SAR.svg", dpi=300, transparent=True)
+    fig.savefig("panels/SAR.svg", dpi=300, transparent=True)
