@@ -42,6 +42,14 @@ class MLP(nn.Module):
         x = self.nn(preds)
         return x
 
+def load_model_checkpoint(model_state, predictors):
+        """Load the model and scalers from the saved checkpoint."""
+        model = MLP(len(predictors))
+        model.load_state_dict(model_state)
+        model.eval()
+        return model
+    
+    
 def get_gradient(outputs, inputs):
     outputs = outputs.sum()
     grads = grad(outputs, inputs, create_graph=True)[0]

@@ -32,7 +32,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
 from src.sar import SAR
-from src.dataset import create_dataloader, scale_features_targets
+from src.dataset import create_dataloader
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -65,7 +65,7 @@ class Config:
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
-    run_name: str = "checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
+    run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
 
@@ -106,7 +106,9 @@ class Trainer:
             "area+climate": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), False),
             "area+climate, no physics": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, torch.nn.MSELoss(), False),
         }
-
+        # TODO: to be fixed
+        self.results["predictors_list"] = predictors_list
+        
         # Add habitat agnostic variant if applicable
         if hab != "all":
             predictors_list["area+climate, habitat agnostic"] = (
@@ -170,12 +172,17 @@ class Trainer:
                 results["test_idx"].append(gdf_test_fold.index.tolist())
                 results["model_state_dict"].append(best_model_state)
                 results["epoch_metrics"].append(epoch_metrics)
+                # TODO: to be fixed
+                results["test_MSE"]["feature_scaler"] = feature_scaler
+                results["test_MSE"]["target_scaler"] = target_scaler
             except Exception as e:
                 logger.error(f"Problem with fold {fold + 1}: {e}")
                 traceback.print_exc()
                 results["train_MSE"].append(float("nan"))
                 results["val_MSE"].append(float("nan"))
                 results["test_MSE"].append(float("nan"))
+                results["test_MSE"]["feature_scaler"] = None
+                results["test_MSE"]["target_scaler"] = None
 
         return model, results, (feature_scaler, target_scaler)
 

@@ -10,11 +10,6 @@ import matplotlib.pyplot as plt
 
 from src.data_processing.utils_eva import EVADataset
 
-# Initialize logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
 CONFIG = {
     "crs": "EPSG:3035",
     "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"]

@@ -1,42 +1,37 @@
 """"
 Plotting figure 2 'prediction power of climate, area, and both on SR'
-# TODO: fix the test indices which currently do not work
+# TODO: fix the residual plot
 """
-
+import torch
 import numpy as np
 from pathlib import Path
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import torch
 from sklearn.metrics import mean_squared_error
-
 from src.plotting import boxplot_bypreds
 
 import scipy.stats as stats
 
 import sys
-sys.path.append(str(Path(__file__).parent / Path("../../../scripts/MLP3/")))
-from MLP_fit_torch_SBCV import Config
-import MLP_fit_torch_SBCV as MLP_fit
-from src.mlp import MLP
+sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
+from cross_validate import Config
+from src.mlp import load_model_checkpoint
+from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
+from src.dataset import scale_features_targets
 
-def load_model_checkpoint(model_state, predictors):
+def load_model_state(model, model_state):
         """Load the model and scalers from the saved checkpoint."""
-        
-        model = MLP(len(predictors))
         model.load_state_dict(model_state)
         model.eval()
         return model
-    
+
 def evaluate_residuals(gdf, checkpoint, fold):
     predictors = checkpoint["predictors"]
-    # TODO: to be fixed
     test_idx = np.random.choice(checkpoint["test_idx"][fold], 1000, replace=False)
-    # test_idx = gdf.sample(1000).index
     feature_scaler, target_scaler = checkpoint["feature_target_scaler"][fold]
     gdf_test = gdf.loc[test_idx,:]
-    X_test, y_test, _, _ = MLP_fit.scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
+    X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
     log_area =  gdf_test["log_area"].values
     
     model_state = checkpoint["model_state_dict"][fold]
@@ -64,9 +59,10 @@ def evaluate_model_all_residuals(gdf, result_modelling, hab):
 
 if __name__ == "__main__":
     habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    MODEL = "very_small"
-    seed = 1
-    path_results = f"../../../scripts/MLP3/results/MLP_fit_torch_SBCV_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint.pth"
+    seed = 2
+    MODEL = "large"
+    HASH = "71f9fc7"    
+    path_results = Path(f"../../scripts/results/cross_validate_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
         
@@ -97,8 +93,10 @@ if __name__ == "__main__":
     # if not "config" in result_modelling.keys():
     #     result_modelling["config"] = {"seed": 2}
     config = result_modelling["config"]
-    gdf = MLP_fit.load_preprocessed_data(hab, config.hash_data, config.data_seed)
-    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab)
+    
+    # TODO: to be fixed
+    # gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
+    # results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab)
     
         
     result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
