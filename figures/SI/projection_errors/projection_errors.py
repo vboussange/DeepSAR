@@ -1,4 +1,6 @@
 """
+Plotting STD of log species richness.
+
 NOTE: error is calculated as the exponentiated standard deviation of the log
 species richness. It would be best to calculate the standard deviation of the
 exponentiated log species richness.
@@ -46,8 +48,10 @@ if __name__ == '__main__':
 
     Path("panels").mkdir(exist_ok=True)
 
+    # Create a figure with two subplots
+    fig, axs = plt.subplots(1, 2, figsize=(8, 4))
+
     # Plot species richness at resolution 1km
-    fig, ax = plt.subplots()
     cbar_kwargs = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
                    'label': 'SR standard deviation', 'pad': 0.05, 'location': 'left'}
     
@@ -55,31 +59,26 @@ if __name__ == '__main__':
     rast = np.exp(sr_dsr_rast_dict[res]["std_log_SR"])
     rast = preprocess_raster(rast)
     norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
-    plot_raster(ax, 
+    plot_raster(axs[0], 
                 rast, 
                 cmap="BuGn", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
-                title=f'Resolution: {res}m')
-    fig.tight_layout()
-
-    fig.savefig("panels/std_log_SR_fine.pdf", dpi=300, transparent=True)
-    # fig.savefig("panels/log_SR_fine.svg", dpi=300, transparent=True)
+                title=f'Area: 1km$^2$')
 
     # Plot species richness at resolution 10km
-    fig, ax = plt.subplots()
     cbar_kwargs['location'] = 'right'
     res = "1e+04"
     rast = np.exp(sr_dsr_rast_dict[res]["std_log_SR"])
     rast = preprocess_raster(rast)
     norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
-    plot_raster(ax, 
+    plot_raster(axs[1], 
                 rast, 
                 cmap="BuGn", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
-                title=f'Resolution: {res}m')
+                title=f'Area: 10km$^2$')
 
     fig.tight_layout()
-    fig.savefig("panels/std_log_SR_coarse.pdf", dpi=300, transparent=True)
-    # fig.savefig("panels/log_SR_coarse.svg", dpi=300, transparent=True)
+    fig.savefig("panels/std_log_SR_combined.pdf", dpi=300, transparent=True)
+    # fig.savefig("panels/log_SR_combined.svg", dpi=300, transparent=True)
