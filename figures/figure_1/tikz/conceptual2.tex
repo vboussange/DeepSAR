@@ -36,13 +36,13 @@
   
     \node[mynode, minimum height=7cm, minimum width=7cm] (box2) at (-1.5, 3.8) {};
     \node[] (box_text) at (-2.8, 7) {Raw plot data};
-    \node (lc) at(-1, 3.5) {\includegraphics[width=6.2cm]{landcover_real.png}};
+    \node (lc) at(-1, 3.5) {\includegraphics[width=6.2cm]{../panels/landcover_real.png}};
 
     \node[mynodeorange, minimum height=13.5cm, minimum width=7.6cm] (box) at (-1.8, -6.8) {};
     \node[] (box_text) at (-2., -0.5) {Raw environmental data};
-    \node (cl1) at (-1.8, -4.0) {\includegraphics[width=7.8cm]{chelsa_real_bio1.png}};
+    \node (cl1) at (-1.8, -4.0) {\includegraphics[width=7.8cm]{../panels/chelsa_real_bio1.png}};
     \node (cl2) at (-1, -7.25) {$\vdots$};
-    \node (cl3) at (-1.8, -10.5) {\includegraphics[width=7.8cm]{chelsa_real_bio4.png}};
+    \node (cl3) at (-1.8, -10.5) {\includegraphics[width=7.8cm]{../panels/chelsa_real_bio4.png}};
 
     \node (avp) at (7, 6.0) {Augmented vegetation plot $j$};
     \node (vp) [below=0.1cm of avp] {Vegetation plot $i$};
@@ -70,10 +70,7 @@
     \node[mynodeblue] (mean2) [right=2cm of cl3,yshift=2cm] {$\text{Mean}(\text{Bio4}_j)$};
     \node[mynodered] (std2) [below=0.2cm of mean2] {$\text{Std}(\text{Bio4}_j)$};
 
-    \node[mynode, draw=mygrey!30, fill=mygrey!10, align=center] (model) [right=6cm of dots, yshift=3cm] {Supervised \\learning\\[1em] \Huge{$\mathcal{M}(A_j, \mu_j, \sigma_j) = \hat{SR}_j$}};
-    \node[mynodeblue] (mu) [left=0.1cm of model, yshift=0.1cm] {$\mu_j$};
-    \node[mynodered] (sigma) [below=0.1cm of mu] {$\sigma_j$};
-    \node[mynode] (y) [above=0.1cm of model] {$y_j$};
+    \node[mynode, draw=mygrey!30, fill=mygrey!10, align=center] (model) [right=6cm of dots, yshift=3cm] {\Huge{Neural SAR} \\ \Huge{model}\\[1em] \huge{$\mathcal{M}(X_j) = \hat{SR}_j$}};
     \node[mynodeorange, align=center] (physics) [below=2cm of model] {Physics-informed\\constraint\\[1em] \Huge{$\frac{\partial \mathcal{M}}{\partial A} > 0$}};
 
 
@@ -88,15 +85,15 @@
     \draw[arrow] ([xshift=-1.3cm,yshift=-1.4cm]cl3.east) to[out=0, in=180] (std2.west);
 
 
-    \draw[arrow] (SR.east) -| (y.north);
+    \draw[arrow] (SR.east) -| (model.north);
     \draw[arrow] (physics.north) -| (model.south);
 
 
-    \draw[arrow] (Area.east) -| ([xshift=-1cm, yshift=0.8cm]model.west) |- ([yshift=0.8cm]model.west);
-    \draw[arrow] (mean1.east) -| ([xshift=-1cm, yshift=0.3cm]sigma.west) |- (mu.west);
-    \draw[arrow] (std1.east) -| ([xshift=-1cm,yshift=-0.1cm]sigma.west) |- (sigma.west);
-    \draw[arrow] (mean2.east) -| ([xshift=-1cm]sigma.west) |-  (mu.west);
-    \draw[arrow] (std2.east) -| ([xshift=-1cm, yshift=-1cm]sigma.west) |- (sigma.west);
+    \draw[arrow] (Area.east) -| ([xshift=-1cm, yshift=0.8cm]model.west) |- (model.west);
+    \draw[arrow] (mean1.east) -| ([xshift=-1cm, yshift=0.3cm]model.west) |- (model.west);
+    \draw[arrow] (std1.east) -| ([xshift=-1cm,yshift=-0.1cm]model.west) |- (model.west);
+    \draw[arrow] (mean2.east) -| ([xshift=-1cm]model.west) |-  (model.west);
+    \draw[arrow] (std2.east) -| ([xshift=-1cm, yshift=-1cm]model.west) |- (model.west);
 
   \end{tikzpicture}
   
