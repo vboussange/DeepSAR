@@ -93,6 +93,7 @@ if __name__ == "__main__":
         ref = climate_dataset["bio1"]
     
         X_map_dict = {}
+        # TODO: range to increase when projecting for larger areas
         for ncells in 2**np.array(range(2)):
             print(f"Calculating X_map for ncells: {ncells}")
             X_map_dict[ncells] = get_true_sar.create_X_map(predictors, ncells, climate_dataset, res_climate_pixel, ref)
