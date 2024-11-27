@@ -93,7 +93,7 @@ if __name__ == "__main__":
         print("Projection predictions on map.")
         log_SR_rast = create_raster(X_map_dict[1], log_SR)
         dlog_SR_dlogA_rast = create_raster(X_map_dict[1], dlogSR_dlogA)
-        std_log_SR_rast = create_raster(X_map_dict[1], dlogSR_dlogA)
+        std_log_SR_rast = create_raster(X_map_dict[1], std_log_SR)
         SR_dSR_rast_dict[f"{res_sr_map:.0e}"] = {"log_SR": log_SR_rast, "dlogSR_dlogA": dlog_SR_dlogA_rast, "std_log_SR": std_log_SR_rast}
         
         if plotting:
