@@ -1,4 +1,5 @@
-# Neural species area relationship model
+# Deep-learning-based species area relationship model
+Code and model weights for predicting vegetation species richness across Europe as a function of sampling area and climate.
 
 ## Installation
 
