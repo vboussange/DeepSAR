@@ -2,7 +2,10 @@
 envs
 .conda
 *.pyc
-data/*
+data/**
+!data/**/*.txt
+# Allow subdirectories themselves to be tracked (important for ! rules to work)
+!data/**/ 
 *.png
 *.jld2
 stdout/*
