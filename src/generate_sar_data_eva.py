@@ -6,11 +6,14 @@ from math import radians
 import geopandas as gpd
 from tqdm import tqdm 
 from src.data_processing.utils_polygons import random_size_from_range, place_randomly_rectangle
-from src.data_processing.utils_gbif_local import batch_indices
 from shapely.geometry import Point, MultiPoint
 from scipy.spatial import KDTree
 import logging 
 
+def batch_indices(N, batch_size):
+    """Yield successive batch-sized chunks of indices from 0 to N."""
+    for i in range(0, N, batch_size):
+        yield range(i, min(i + batch_size, N))
 
 # working with dictionnary of species
 def clip_EVA_SR(plot_gdf, dict_sp, polygons_gdf):
