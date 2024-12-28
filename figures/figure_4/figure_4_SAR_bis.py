@@ -147,5 +147,5 @@ if __name__ == "__main__":
             fig.supxlabel("Area (m2)", fontsize=16)
         axs.flatten()[-1].axis("off")
         fig.tight_layout()
-        fig.savefig(f"figure_4_{i}.png", dpi=300, transparent=True)
+        fig.savefig(f"figure_4_{i}.pdf", dpi=300, transparent=True)
 

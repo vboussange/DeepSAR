@@ -4,12 +4,15 @@ import numpy as np
 from src.plotting import read_result, ResultData
 import git 
 from pathlib import Path
+PATH_RAW_AUGMENTED_DATA = Path(__file__).parent / Path("../../data/processed/EVA_CHELSA/EVA_CHELSA_raw/EVA_CHELSA_raw_random_state_{random_state}_{sha}.pkl")
+PATH_PREPROC_AUGMENTED_DATA = Path(__file__).parent / Path("../../data/processed/EVA_CHELSA_filtered/")
 
-def process_results(path_results):
+def process_results(random_state, sha, path_results=PATH_RAW_AUGMENTED_DATA):
     """
     Reading and preparing raw processed data.
     """
-    results = read_result(path_results)
+    result_path = path_results/"EVA_CHELSA_raw_random_state_{random_state}_{sha}.pkl"
+    results = read_result(result_path)
     gdf_full = results["SAR_data"]
     config = results["config"]
     aggregate_labels = config["env_vars"] + ["std_" + env for env in config["env_vars"]]
@@ -46,7 +49,7 @@ def preprocess_gdf_hab(gdf_full, hab, random_state):
     plot_megaplot_gdf_hab = gdf_full.loc[megaplot_idxs]
     return plot_megaplot_gdf_hab.sample(frac=1, random_state=random_state)
 
-def load_preprocessed_data(hab, git_hash, random_state, path_augmented_data=PATH_AUGMENTED_DATA):
+def load_preprocessed_data(hab, git_hash, random_state, path_augmented_data=PATH_PREPROC_AUGMENTED_DATA):
     path_preprocess_data = path_augmented_data / f"{hab}_preprocessed_data_random_state_{random_state}_{git_hash}.pkl"
     return pd.read_pickle(path_preprocess_data)
 
@@ -58,9 +61,8 @@ if __name__ == "__main__":
     
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
-    PATH_AUGMENTED_DATA = Path(__file__).parent / Path("../../data/processed/EVA_CHELSA/EVA_CHELSA_raw/EVA_CHELSA_raw_random_state_{random_state}_{sha}.pkl")
 
     for hab in habitats:
-        path_preprocess_data = PATH_AUGMENTED_DATA.parent / f"{hab}_preprocessed_data_random_state_{random_state}_{sha}.pkl"
+        path_preprocess_data = PATH_RAW_AUGMENTED_DATA / f"{hab}_preprocessed_data_random_state_{random_state}_{sha}.pkl"
         gdf = preprocess_gdf_hab(dataset.gdf, hab, random_state)
         gdf.to_pickle(path_preprocess_data)

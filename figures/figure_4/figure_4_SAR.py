@@ -1,5 +1,6 @@
 """
 Here we plot as a color scale the heterogeneity level of the climate features.
+This figure is not used in the current version of the paper.
 """
 import torch
 import numpy as np

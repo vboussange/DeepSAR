@@ -106,8 +106,6 @@ class Trainer:
             "area+climate": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), False),
             "area+climate, no physics": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, torch.nn.MSELoss(), False),
         }
-        # TODO: to be fixed
-        self.results["predictors_list"] = predictors_list
         
         # Add habitat agnostic variant if applicable
         if hab != "all":
@@ -142,7 +140,10 @@ class Trainer:
             "test_MSE": [],
             "test_idx": [],
             "model_state_dict": [],
-            "epoch_metrics": []
+            "epoch_metrics": [],
+            "feature_scaler": [],
+            "target_scaler": [], 
+            "predictors": predictors
         }
 
         for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition)):
@@ -172,17 +173,16 @@ class Trainer:
                 results["test_idx"].append(gdf_test_fold.index.tolist())
                 results["model_state_dict"].append(best_model_state)
                 results["epoch_metrics"].append(epoch_metrics)
-                # TODO: to be fixed
-                results["test_MSE"]["feature_scaler"] = feature_scaler
-                results["test_MSE"]["target_scaler"] = target_scaler
+                results["feature_scaler"].append(feature_scaler)
+                results["target_scaler"].append(target_scaler)
             except Exception as e:
                 logger.error(f"Problem with fold {fold + 1}: {e}")
                 traceback.print_exc()
                 results["train_MSE"].append(float("nan"))
                 results["val_MSE"].append(float("nan"))
                 results["test_MSE"].append(float("nan"))
-                results["test_MSE"]["feature_scaler"] = None
-                results["test_MSE"]["target_scaler"] = None
+                results["feature_scaler"].append(None)
+                results["target_scaler"].append(None)
 
         return model, results, (feature_scaler, target_scaler)
 
@@ -271,14 +271,11 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
-    # Set seeds for reproducibility
-    torch.manual_seed(2)
-    np.random.seed(2)
-    random.seed(2)
-
-    # Create Config instance
     config = Config(device=device)
+    
+    torch.manual_seed(config.seed)
+    np.random.seed(config.seed)
+    random.seed(config.seed)
 
-    # Instantiate and run the Trainer
     trainer = Trainer(config)
     trainer.train()

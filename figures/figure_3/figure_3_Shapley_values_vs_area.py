@@ -94,7 +94,7 @@ def plot_shap_values(shap_values, config, habitats, config_plot):
     legs = [plt.Line2D([0, 1], [0, 0], color=e[1], label=e[0]) for e in config_plot]
     axs.flatten()[-1].legend(handles=legs, loc='center', bbox_to_anchor=(0.4, 0.4))
     
-    fig.savefig(Path(__file__).stem + ".png", dpi=300, transparent=True)
+    fig.savefig(Path(__file__).stem + ".pdf", dpi=300, transparent=True)
 
 if __name__ == "__main__":
     seed = 1

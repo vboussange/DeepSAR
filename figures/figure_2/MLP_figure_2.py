@@ -29,7 +29,8 @@ def load_model_state(model, model_state):
 def evaluate_residuals(gdf, checkpoint, fold):
     predictors = checkpoint["predictors"]
     test_idx = np.random.choice(checkpoint["test_idx"][fold], 1000, replace=False)
-    feature_scaler, target_scaler = checkpoint["feature_target_scaler"][fold]
+    feature_scaler = checkpoint["feature_scaler"][fold]
+    target_scaler = checkpoint["target_scaler"][fold]
     gdf_test = gdf.loc[test_idx,:]
     X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
     log_area =  gdf_test["log_area"].values
@@ -45,9 +46,7 @@ def evaluate_residuals(gdf, checkpoint, fold):
 
 def evaluate_model_all_residuals(gdf, result_modelling, hab):
     fold = 5
-
     result_all = {}
-
     for scenario in ["area", "climate", "area+climate"]:
         checkpoint = result_modelling[hab][scenario]
         log_area, residuals = evaluate_residuals(gdf, checkpoint, fold)
@@ -65,10 +64,6 @@ if __name__ == "__main__":
     path_results = Path(f"../../scripts/results/cross_validate_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
-        
-    # path_results_no_physics = "../../../scripts/MLP3/MLP_fit_torch_SBCVdSRdA_weight_0e+00.pkl"
-    # with open(path_results_no_physics, 'rb') as file:
-    #     result_modelling_no_physics = pickle.load(file)["result_modelling"]
         
     for hab in habitats:
         val = result_modelling[hab]
@@ -89,14 +84,10 @@ if __name__ == "__main__":
                 
     # Calculating residuals
     hab = "all"
-    # dataset = MLP_fit.process_results()
-    # if not "config" in result_modelling.keys():
-    #     result_modelling["config"] = {"seed": 2}
     config = result_modelling["config"]
     
-    # TODO: to be fixed
-    # gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
-    # results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab)
+    gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
+    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab)
     
         
     result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
@@ -135,7 +126,7 @@ if __name__ == "__main__":
     label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands"]
     for i,x in enumerate(np.arange(1, len(habitats), step=2)):
         ax1.text(x+0.5, -0., label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
-    fig.savefig(Path(__file__).stem + "_model_score.png", transparent=True, dpi=300)
+    fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
     
     # second axis
     color_palette = sns.color_palette("Set2", 4)
@@ -182,7 +173,7 @@ if __name__ == "__main__":
         )
 
     fig.tight_layout()
-    fig.savefig("figure_2.png", dpi=300, transparent=True)
+    fig.savefig("figure_2.pdf", dpi=300, transparent=True)
 
     with open("paired_t_test_EVA_EUNIS.txt", "w") as file:
         for j, c in enumerate(habitats[:-1]):
