@@ -4,11 +4,10 @@ import numpy as np
 from src.plotting import read_result, ResultData
 import git 
 from pathlib import Path
-PATH_AUGMENTED_DATA = Path(__file__).parent / Path("../../data/processed/EVA_CHELSA/")
 
-def process_results(path_results=PATH_AUGMENTED_DATA):
+def process_results(path_results):
     """
-    Reading and processing compiled data.
+    Reading and preparing raw processed data.
     """
     results = read_result(path_results)
     gdf_full = results["SAR_data"]
@@ -28,6 +27,9 @@ def process_results(path_results=PATH_AUGMENTED_DATA):
     return ResultData(gdf_full, config, aggregate_labels, None)
 
 def preprocess_gdf_hab(gdf_full, hab, random_state):
+    """
+    Preprocessing the data for a specific habitat.
+    """
     if hab == "all":
         gdf = pd.concat([gdf_full[gdf_full.habitat_id == hab], gdf_full[gdf_full.num_plots == 1]])
     else:
@@ -51,11 +53,13 @@ def load_preprocessed_data(hab, git_hash, random_state, path_augmented_data=PATH
 
 if __name__ == "__main__":
     habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    random_state = 1
+    random_state = 2
     dataset = process_results()
     
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
+    PATH_AUGMENTED_DATA = Path(__file__).parent / Path("../../data/processed/EVA_CHELSA/EVA_CHELSA_raw/EVA_CHELSA_raw_random_state_{random_state}_{sha}.pkl")
+
     for hab in habitats:
         path_preprocess_data = PATH_AUGMENTED_DATA.parent / f"{hab}_preprocessed_data_random_state_{random_state}_{sha}.pkl"
         gdf = preprocess_gdf_hab(dataset.gdf, hab, random_state)

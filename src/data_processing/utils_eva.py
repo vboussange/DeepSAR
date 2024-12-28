@@ -11,9 +11,21 @@ import xarray as xr
 from src.data_processing.utils_landcover import EUNISDataset
 
 
-DATA_DIR = Path(__file__).parent / "../../../data/data_31_03_2023"
+DATA_DIR = Path(__file__).parent / "../../data/EVA"
 EVA_CACHE = DATA_DIR / "cache.pkl"
+LANDCOVER_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_land/ne_10m_land.shp"
+COUNTRY_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_admin_0_countries/ne_10m_admin_0_countries.shp"
 
+COUNTRY_LIST = [
+    "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
+    "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", 
+    "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", 
+    "Liechtenstein", "Lithuania", "Luxembourg", "North Macedonia", "Malta", 
+    "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", 
+    "Portugal", "Romania", "San Marino", "Republic of Serbia", 
+    "Slovakia", "Slovenia", "Spain", "Sweden", 
+    "Switzerland", "Turkey", "Ukraine", "United Kingdom"
+]
 
 class EVADataset:
     def __init__(self, data_dir=DATA_DIR, cache=EVA_CACHE):
@@ -63,23 +75,27 @@ class EVADataset:
         # calculate SR per plot
         print("Discarding duplicates")
         plot_gdf["SR"] = [len(dict_sp[idx]) for idx in plot_gdf.index]
-
         # identify unique locations and plot_id with highest SR
         plot_idx = []
-        for poly, _gdf in plot_gdf.groupby("geometry"):
+        for _, _gdf in plot_gdf.groupby("geometry"):
             plot_idx.append(_gdf["SR"].idxmax())
-
         # keep only plots with high SR
         plot_gdf = plot_gdf.loc[plot_idx]
 
-        # filtering by landcover. If habitat_id is _FillValue, it means that there is a problem in the coordinates
-        print("Discarding points outside of EUNIS extent")
-        lc_dataset = EUNISDataset()
-        lc_raster = lc_dataset.load_landcover().rio.reproject(plot_gdf.crs)
-        plot_gdf = assign_habitat(plot_gdf, lc_raster)
-        idxs = plot_gdf["habitat_id_EUNIS-Sara"] > 0
-        print(f"Discarding {len(plot_gdf) - idxs.sum()} plots for wrong coordinates")
-        plot_gdf = plot_gdf[idxs]
+        print("Filtering by landcover and extent")
+        # landcover_gdf = gpd.read_file(LANDCOVER_DATA)
+        countries_gdf = gpd.read_file(COUNTRY_DATA)
+        eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
+        missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
+        assert len(missing_countries) == 0
+        
+        
+        _n = len(plot_gdf)
+        if plot_gdf.crs != eva_countries_gdf.crs:
+            eva_countries_gdf = eva_countries_gdf.to_crs(plot_gdf.crs)
+        plot_gdf = plot_gdf.clip(eva_countries_gdf)
+
+        print(f"Discarded {_n - len(plot_gdf)} plots for inconsistent coordinates")
         
         # filtering for uncertainty in meter
         print("Filtering for coordinate uncertainty")
@@ -120,21 +136,6 @@ class EVADataset:
             with open(self.cache, "rb") as pickle_file:
                 cached_data = pickle.load(pickle_file)
             return cached_data["plot_gdf"], cached_data["dict_sp"]
-
-
-def assign_habitat(plot_gdf, lc_raster):
-    assert (
-        plot_gdf.crs == lc_raster.rio.crs
-    ), "`lc_raster` and `plot_gdf` must have similar CRS"
-    name_col = f"habitat_id_{lc_raster.name}"
-
-    xx = plot_gdf.geometry.x
-    yy = plot_gdf.geometry.y
-    plot_gdf[name_col] = lc_raster.sel(
-        x=xr.DataArray(xx, dims="z"), y=xr.DataArray(yy, dims="z"), method="nearest"
-    ).astype(int)
-    plot_gdf.dropna(inplace=True)
-    return plot_gdf
 
 
 if __name__ == "__main__":

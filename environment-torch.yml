@@ -24,5 +24,3 @@ dependencies:
   - pyarrow
   - fastparquet
   - gitpython
-  - pip:
-    - install -e .  # todo: currently not working

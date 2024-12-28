@@ -24,6 +24,8 @@ from src.utils import save_to_pickle
 from src.data_processing.utils_polygons import (
     partition_polygon_gdf,
 )
+import git
+import random
 
 # Initialize logging
 logging.basicConfig(
@@ -38,7 +40,7 @@ block_relative_extent = 0.2
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../results/EVA_polygons_CHELSA/EVA_EUNIS_CHELSA/EVA_EUNIS_Chelsa_plot_megaplot_block_relative_extent_{block_relative_extent}_v2.pkl",
+        f"../../data/processed/EVA_CHELSA_raw/",
     ),
     "env_vars": [
         "bio1",
@@ -56,7 +58,8 @@ CONFIG = {
     "num_polygon_max": int(1e6),
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
-    "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"]
+    "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
+    "random_state": 2,
 }
 mean_labels = CONFIG["env_vars"]
 std_labels = [f"std_{var}" for var in CONFIG["env_vars"]]
@@ -190,6 +193,11 @@ def format_plot_data(plot_data, columns):
     return plot_data
 
 if __name__ == "__main__":
+    random.seed(CONFIG["random_state"])
+    np.random.seed(CONFIG["random_state"])
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.git.rev_parse(repo.head, short=True)
+    CONFIG["ouput_file_name"] = Path(f"EVA_CHELSA_raw_random_state_{CONFIG['random_state']}_{sha}.pkl")
     
     plot_gdf, dict_sp, climate_raster = load_and_preprocess_data()
     plot_gdf = compile_climate_data_plot(plot_gdf, climate_raster)
@@ -198,9 +206,9 @@ if __name__ == "__main__":
     block_length = (plot_gdf.total_bounds[2] - plot_gdf.total_bounds[0]) * CONFIG["block_relative_extent"]
     logging.info(f"Block length = {block_length/1000}km")
     plot_gdf = partition_polygon_gdf(plot_gdf, block_length)
-    
-    # possibly need to reassign EVA entries to landcover classes
-    
+    # Save the indices of plot_gdf as a CSV
+    plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
+        
     plot_megaplot_ar = []
     plot_gdf_by_hab = plot_gdf.groupby("Level_2")
     
@@ -215,13 +223,13 @@ if __name__ == "__main__":
         
         assert (megaplot_data_hab.sr > 0).all()
 
-        logging.info("Checkpointing compiled dataset")
-        save_to_pickle(
-            CONFIG["output_file_path"].parent
-            / (CONFIG["output_file_path"].stem + f"_{hab}.pkl"),
-            SAR_data=megaplot_data_hab,
-            config=CONFIG,
-        )
+        # logging.info("Checkpointing compiled dataset")
+        # save_to_pickle(
+        #     CONFIG["output_file_path"]
+        #     / (CONFIG["output_file_name"].stem + f"_{hab}.pkl"),
+        #     SAR_data=megaplot_data_hab,
+        #     config=CONFIG,
+        # )
         plot_megaplot_ar.append(megaplot_data_hab)
         
     # compiling data for all habitats
@@ -242,5 +250,5 @@ if __name__ == "__main__":
         geometry="geometry",
         crs=CONFIG["crs"],
     )
-    save_to_pickle(CONFIG["output_file_path"], SAR_data=SAR_data, config=CONFIG)
+    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], SAR_data=SAR_data, config=CONFIG)
     logging.info("Compilation completed successfully")

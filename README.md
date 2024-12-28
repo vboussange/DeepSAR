@@ -9,14 +9,16 @@ To install and activate e.g. the `torch` environment, make sure you have conda (
 ```
 mamba env create --prefix ./.env-torch --file environment-torch.yml
 mamba activate ./.env-torch
+pip install -e .
 ```
 
 
 ## Quick start
 ### Data pre-processing
-1. Construct megaplots with `scripts/eva_chelsa_processing.py`
-2. Preprocess megaplots with  `scripts/preprocess_eva_chelsa_megaplots.py`
-    - Creates a train / validation / test dataset based on outputs of `eva_chelsa_processing` for each habitat considered and saves it as a separate file (TODO: not clean, could be avoided by refactoring `scripts/eva_chelsa_processing.py`)
+1. Construct megaplots with `scripts/eva_chelsa_processing/compile_eva_chelsa_megaplots.py`
+2. Preprocess megaplots with  `scripts/eva_chelsa_processing/preprocess_eva_chelsa_megaplots.py`
+    - Creates a train / validation / test dataset based on outputs of `eva_chelsa_processing` for each habitat considered and saves it as a separate file 
+    <!-- (TODO: not clean, could be avoided by refactoring `scripts/eva_chelsa_processing.py`) -->
 
 ### Cross-validation
 `cross_validate.py` performs a k-folded spatial block cross validation.

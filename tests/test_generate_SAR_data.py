@@ -24,18 +24,18 @@ def test_apply_to_offdiag_elem():
     assert result == 30
     
 def test_read_CLM5_data():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df = read_CLM5_data(data_dir)
     assert isinstance(clm5_df, pd.DataFrame)
 
 def test_get_splot_bio_dfs():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df, bio_df = get_splot_bio_dfs(data_dir)
     assert isinstance(clm5_df, pd.DataFrame)
     assert isinstance(bio_df, pd.DataFrame)
 
 def test_generate_SAR_data_SA():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df, bio_df = get_splot_bio_dfs(data_dir)
     data = generate_SAR_data_SA(clm5_df.iloc[:2], bio_df, npoints=1, max_aggregate=2, replace=False, stats_aggregate=["mean", "std", "heterogeneity", "distance"])
 
@@ -45,7 +45,7 @@ def test_generate_SAR_data_SA():
     assert np.isclose(data["a"][0], np.sum(clm5_df.iloc[:2]["a"]), atol=1)
     
 def test_generate_SAR_data():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df, bio_df = get_splot_bio_dfs(data_dir)
     data = generate_SAR_data(clm5_df.iloc[:2], bio_df, npoints=1, max_aggregate=2, replace=False, stats_aggregate=["mean", "std", "heterogeneity", "distance"])
 
@@ -58,7 +58,7 @@ def test_generate_SAR_data():
     assert np.isclose(data["RH2M_std_mean"][0], np.mean(clm5_df["RH2M_std"][0:2])) 
     
 def test_kfold_sar_data():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df, bio_df = get_splot_bio_dfs(data_dir)
     nsplits = 3
     cv = KFold(nsplits, shuffle = True)
@@ -78,7 +78,7 @@ def test_kfold_sar_data():
     assert data.isna().any().any()
     
 def test_format_clm5_for_training():
-    data_dir = Path("../../data/data_31_03_2023/forest_t1")
+    data_dir = Path("../../data/EVA/forest_t1")
     clm5_df, _ = get_splot_bio_dfs(data_dir)
     data = format_clm5_for_training(clm5_df, stats_aggregate=["mean", "std", "distance"])
     

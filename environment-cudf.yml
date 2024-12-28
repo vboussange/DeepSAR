@@ -25,5 +25,3 @@ dependencies:
   - pathlib
   - pyarrow
   - fastparquet
-  - pip:
-    - install -e . # todo: currently not working
