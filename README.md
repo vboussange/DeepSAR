@@ -1,6 +1,8 @@
 # Neural species area relationship model
 
 ## Installation
+
+### Environment
 Two environments are necessary to run the scripts, specified in `environment-cudf.yml` (for megaplot compilation) and in `environment-torch.yml` (for cross-validation and training).
 
 
@@ -11,6 +13,28 @@ mamba env create --prefix ./.env-torch --file environment-torch.yml
 mamba activate ./.env-torch
 pip install -e .
 ```
+
+### Data
+Three datasets are required for generating the training dataset, located in `data`.
+#### `CHELSA/`
+*Climate data.*
+
+Got to the folder and type
+
+```
+wget --no-host-directories --force-directories --input-file=envidat.txt
+```
+
+### `NaturealEarth/`
+*Used for filtering EVA plots.*
+Got to the folder and type
+
+```
+wget -q https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip -O ne_10m_admin_0_countries.zip && unzip -q ne_10m_admin_0_countries.zip
+```
+
+### `EVA/`
+Vegetation plot data. Make a request at https://euroveg.org/eva-database/. You should obtain a `hea_all.csv` and a `vpl_all.csv`, to be placed in this folder.
 
 
 ## Quick start
@@ -26,7 +50,5 @@ pip install -e .
 ### Training
 `train.py` trains neural net SAR for each habitat considered.
 
-### TODO
-
-#### SI
-- plot location of EVA plots
+## Model weights and SR maps
+Located in `maps/`.

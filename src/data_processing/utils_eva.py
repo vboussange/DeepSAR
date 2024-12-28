@@ -13,8 +13,7 @@ from src.data_processing.utils_landcover import EUNISDataset
 
 DATA_DIR = Path(__file__).parent / "../../data/EVA"
 EVA_CACHE = DATA_DIR / "cache.pkl"
-LANDCOVER_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_land/ne_10m_land.shp"
-COUNTRY_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_admin_0_countries/ne_10m_admin_0_countries.shp"
+COUNTRY_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_admin_0_countries.shp"
 
 COUNTRY_LIST = [
     "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
@@ -83,7 +82,6 @@ class EVADataset:
         plot_gdf = plot_gdf.loc[plot_idx]
 
         print("Filtering by landcover and extent")
-        # landcover_gdf = gpd.read_file(LANDCOVER_DATA)
         countries_gdf = gpd.read_file(COUNTRY_DATA)
         eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
         missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
