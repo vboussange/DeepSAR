@@ -229,7 +229,7 @@
        inkscape:svg-dpi="96"
        width="99.227013"
        height="74.42025"
-       xlink:href="panels/dlog_SR_5e02.svg"
+       xlink:href="panels/dlog_SR_fine.svg"
        id="image1"
        x="-4.0740557"
        y="106.94744" /><image
@@ -237,7 +237,7 @@
        inkscape:svg-dpi="96"
        width="99.227013"
        height="74.42025"
-       xlink:href="panels/dlog_SR_5e03.svg"
+       xlink:href="panels/dlog_SR_coarse.svg"
        id="image1-7"
        x="95.187599"
        y="106.94744" /><g
@@ -247,7 +247,7 @@
          inkscape:svg-dpi="96"
          width="77.297035"
          height="57.972767"
-         xlink:href="panels/log_SR_5e02.svg"
+         xlink:href="panels/log_SR_fine.svg"
          id="image1-0"
          x="13.22894"
          y="22.054924" /><image
@@ -255,7 +255,7 @@
          inkscape:svg-dpi="96"
          width="77.297569"
          height="57.973171"
-         xlink:href="panels/log_SR_5e03.svg"
+         xlink:href="panels/log_SR_coarse.svg"
          id="image1-3"
          x="93.062218"
          y="22.054924" /><rect
