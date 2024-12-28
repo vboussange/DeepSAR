@@ -12,6 +12,7 @@ stdout/*
 *.CondaPkg
 Manifest.toml
 *.pdf
+!figures/**/*.pdf
 julia/results/**/*.txt
 python/figures/**/*.txt
 *.egg-info
