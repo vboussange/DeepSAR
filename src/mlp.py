@@ -42,9 +42,9 @@ class MLP(nn.Module):
         x = self.nn(preds)
         return x
 
-def load_model_checkpoint(model_state, predictors):
+def load_model_checkpoint(model_state, predictors, layer_sizes):
         """Load the model and scalers from the saved checkpoint."""
-        model = MLP(len(predictors))
+        model = MLP(len(predictors), layer_sizes=layer_sizes)
         model.load_state_dict(model_state)
         model.eval()
         return model

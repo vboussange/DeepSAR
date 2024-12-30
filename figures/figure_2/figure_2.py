@@ -20,13 +20,8 @@ from src.mlp import load_model_checkpoint
 from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 from src.dataset import scale_features_targets
 
-def load_model_state(model, model_state):
-        """Load the model and scalers from the saved checkpoint."""
-        model.load_state_dict(model_state)
-        model.eval()
-        return model
 
-def evaluate_residuals(gdf, checkpoint, fold):
+def evaluate_residuals(gdf, checkpoint, fold, config):
     predictors = checkpoint["predictors"]
     test_idx = np.random.choice(checkpoint["test_idx"][fold], 1000, replace=False)
     feature_scaler = checkpoint["feature_scaler"][fold]
@@ -36,7 +31,7 @@ def evaluate_residuals(gdf, checkpoint, fold):
     log_area =  gdf_test["log_area"].values
     
     model_state = checkpoint["model_state_dict"][fold]
-    model = load_model_checkpoint(model_state, predictors)
+    model = load_model_checkpoint(model_state, predictors, layer_sizes=config.layer_sizes)
     with torch.no_grad():
         y = target_scaler.inverse_transform(model(X_test))
         y_test = target_scaler.inverse_transform(y_test)
@@ -44,12 +39,12 @@ def evaluate_residuals(gdf, checkpoint, fold):
         print(f"MSE: {mean_squared_error(y, y_test):.4f}")
     return log_area, res.flatten()
 
-def evaluate_model_all_residuals(gdf, result_modelling, hab):
+def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
     fold = 5
     result_all = {}
     for scenario in ["area", "climate", "area+climate"]:
         checkpoint = result_modelling[hab][scenario]
-        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold)
+        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config)
         result_all[scenario] = {}
         result_all[scenario]["residuals"] = residuals
         result_all[scenario]["log_area"] = log_area
@@ -87,7 +82,7 @@ if __name__ == "__main__":
     config = result_modelling["config"]
     
     gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
-    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab)
+    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab, config)
     
         
     result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
@@ -96,7 +91,7 @@ if __name__ == "__main__":
                   "climate", 
                   'area+climate, habitat agnostic', 
                   "area+climate", 
-                  "area+climate, no physics"
+                #   "area+climate, no physics"
                   ]
 
     # plotting results for test data
@@ -125,9 +120,9 @@ if __name__ == "__main__":
     )
     label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands"]
     for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-        ax1.text(x+0.5, -0., label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
+        ax1.text(x+0.5, -0.15, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
     fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
-    
+    fig
     # second axis
     color_palette = sns.color_palette("Set2", 4)
     qr_range = [0.05, 0.95]
