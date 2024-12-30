@@ -33,7 +33,11 @@
     node distance=0.5cm,
     every node/.style={font=\Large}
   ]
+
+    \node[] (SAR) at (-14, 9) {\huge{Expected species-area relationship}};
+    \node[] (SAR) at (-15, -3.5) {\includegraphics[width=14cm]{../conceptual_SAR.pdf}};
   
+    \node[] (SAR) at (6, 9) {\huge{Vegetation plot augmentation scheme}};
     \node[mynode, minimum height=7cm, minimum width=7cm] (box2) at (-1.5, 3.8) {};
     \node[] (box_text) at (-2.8, 7) {Raw plot data};
     \node (lc) at(-1, 3.5) {\includegraphics[width=6.2cm]{../panels/landcover_real.png}};
@@ -44,10 +48,10 @@
     \node (cl2) at (-1, -7.25) {$\vdots$};
     \node (cl3) at (-1.8, -10.5) {\includegraphics[width=7.8cm]{../panels/chelsa_real_bio4.png}};
 
-    \node (avp) at (7, 6.0) {Augmented vegetation plot $j$};
+    \node[align=center] (avp) at (7, 6.0) {Augmented vegetation plot $j$\\(megaplot)};
     \node (vp) [below=0.1cm of avp] {Vegetation plot $i$};
     \node (hm) [below=0.1cm of vp] {Habitat mask};
-    \node (sb) [below=0.1cm of hm] {$100 \times 100$ km$^2$ Spatial block};
+    \node (sb) [below=0.1cm of hm] {Spatial block};
 
     \draw ([xshift=-1cm,yshift=2.3cm]lc.east) to (avp.west);
     \draw ([xshift=-1.75cm,yshift=2.1cm]lc.east) to (vp.west);
@@ -56,8 +60,8 @@
 
 
 
-    \draw [decorate,very thick,decoration={brace,amplitude=5pt,mirror,raise=4ex}]
-  ([xshift=-2.2cm, yshift=-3.2cm]lc.north) -- ([xshift=-2.2cm,yshift=0.4cm]lc.south) node[midway,xshift=-4em,rotate=90]{\normalsize 100km};
+  %   \draw [decorate,very thick,decoration={brace,amplitude=5pt,mirror,raise=4ex}]
+  % ([xshift=-2.2cm, yshift=-3.2cm]lc.north) -- ([xshift=-2.2cm,yshift=0.4cm]lc.south) node[midway,xshift=-4em,rotate=90]{\normalsize 100km};
 
     % \node (sar) at (13,-1) {\includegraphics[width=14cm]{sar.png}};
     
@@ -70,7 +74,7 @@
     \node[mynodeblue] (mean2) [right=2cm of cl3,yshift=2cm] {$\text{Mean}(\text{Bio4}_j)$};
     \node[mynodered] (std2) [below=0.2cm of mean2] {$\text{Std}(\text{Bio4}_j)$};
 
-    \node[mynode, draw=mygrey!30, fill=mygrey!10, align=center] (model) [right=6cm of dots, yshift=3cm] {\Huge{Neural SAR} \\ \Huge{model}\\[1em] \huge{$\mathcal{M}(X_j) = \hat{SR}_j$}};
+    \node[mynode, draw=mygrey!30, fill=mygrey!10, align=center] (model) [right=6cm of dots, yshift=3cm] {\huge{Neural SAR} \\ \huge{model}\\[1em] \huge{$\mathcal{M}(X_j) = \hat{SR}_j$}};
     \node[mynodeorange, align=center] (physics) [below=2cm of model] {Physics-informed\\constraint\\[1em] \Huge{$\frac{\partial \mathcal{M}}{\partial A} > 0$}};
 
 
