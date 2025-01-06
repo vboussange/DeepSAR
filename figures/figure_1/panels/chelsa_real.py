@@ -185,5 +185,5 @@ for var in ["bio1",
     ax.autoscale_view()
     fig.tight_layout()
     # Save the figure
-    fig.savefig(Path(__file__).stem + f"_{var}.png", dpi=300, transparent=True)
+    fig.savefig(Path(__file__).stem + f"_{var}.pdf", dpi=300, transparent=True)
     plt.show()

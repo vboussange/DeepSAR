@@ -173,5 +173,5 @@ ax.autoscale_view()
 fig.tight_layout()
 
 # Save the figure
-fig.savefig("landcover_real.png", dpi=300, transparent=True)
+fig.savefig("landcover_real.pdf", dpi=300, transparent=True)
 plt.show()
