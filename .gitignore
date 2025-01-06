@@ -26,6 +26,7 @@ reports/*
 *.npy
 *.pth
 *.csv
+*.zip
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
