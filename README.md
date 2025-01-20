@@ -17,6 +17,7 @@ pip install -e .
 
 ### Data
 Three datasets are required for generating the training dataset, located in `data`.
+
 #### `CHELSA/`
 *Climate data.*
 
@@ -26,7 +27,7 @@ Got to the folder and type
 wget --no-host-directories --force-directories --input-file=envidat.txt
 ```
 
-### `NaturealEarth/`
+#### `NaturealEarth/`
 *Used for filtering EVA plots.*
 Got to the folder and type
 
@@ -34,7 +35,7 @@ Got to the folder and type
 wget -q https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip -O ne_10m_admin_0_countries.zip && unzip -q ne_10m_admin_0_countries.zip
 ```
 
-### `EVA/`
+#### `EVA/`
 Vegetation plot data. Make a request at https://euroveg.org/eva-database/. You should obtain a `hea_all.csv` and a `vpl_all.csv`, to be placed in this folder.
 
 
