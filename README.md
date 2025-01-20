@@ -24,7 +24,7 @@ Three datasets are required for generating the training dataset, located in `dat
 wget --no-host-directories --force-directories --input-file=envidat.txt
 ```
 
- `NaturealEarth/` (*Used for filtering EVA plots.*) Go to the folder and type
+ - `NaturealEarth/` (*Used for filtering EVA plots.*) Go to the folder and type
 
 ```
 wget -q https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip -O ne_10m_admin_0_countries.zip && unzip -q ne_10m_admin_0_countries.zip
