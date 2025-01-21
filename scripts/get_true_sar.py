@@ -129,7 +129,7 @@ if __name__ == "__main__":
     MODEL = "large"
     HASH = "71f9fc7"
     ncells_ref = 20 # used for coarsening
-    
+    true_SAR_path = Path(f".results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
     xmap_dict_path = Path("./results/X_maps/X_maps_dict.pkl")
     checkpoint_path = Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    

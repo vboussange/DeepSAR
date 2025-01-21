@@ -52,6 +52,7 @@ if __name__ == "__main__":
     MODEL = "large"
     HASH = "71f9fc7"
     ncells_ref = 20 # used for coarsening
+    results_path = Path("./results/results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
     
     xmap_dict_path = Path("./results/X_maps/X_maps_dict.pkl")
     checkpoint_path = Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
