@@ -50,9 +50,9 @@ def create_X_map(predictor_labels, ncells, climate_dataset, res_climate_pixel, r
     # but becomes > 0 as soon as ncells >= 2
     # to make a more smooth transition, we can interpolate, 
     # assuming that heterogeneity is 0 for a smaller area than 1km2, that we call `default_sr_map`.
-    default_sr_map = 1e1
+    default_res_sr_map = 1e1
     if ncells == 1:
-        res_sr_map = default_sr_map
+        res_sr_map = default_res_sr_map
     else:
         res_sr_map = ncells * res_climate_pixel
 
