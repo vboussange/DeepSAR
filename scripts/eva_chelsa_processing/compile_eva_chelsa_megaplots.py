@@ -40,7 +40,7 @@ block_relative_extent = 0.2
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../data/processed/EVA_CHELSA_raw/",
+        f"../../data/processed/EVA_CHELSA_raw_compilation/",
     ),
     "env_vars": [
         "bio1",
@@ -55,7 +55,7 @@ CONFIG = {
     "batch_size": 20,
     "area_range": (1e4, 1e11),  # in m2
     "side_range": (1e2, 1e6), # in m
-    "num_polygon_max": int(1e6),
+    "num_polygon_max": int(1e1),
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
     "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
@@ -121,6 +121,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
             #     eva_data_part, pol_gdf
             # )  # to be modified for gpu
             megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
+            megaplot_data_partition["megaplot_area"] = plot_gdf.area
             
             # thinning
             megaplot_data_partition = megaplot_data_partition[megaplot_data_partition["num_plots"] > 1]
@@ -136,7 +137,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)}, \nNb. plots: {len(plot_gdf)}")
 
-    return megaplot_data_hab[["sr", "area"] + CLIMATE_COL_NAMES]
+    return megaplot_data_hab[["sr", "area", "megaplot_area"] + CLIMATE_COL_NAMES]
 
 
 def compile_climate_data_megaplot(megaplot_data, climate_raster):
@@ -196,6 +197,8 @@ def format_plot_data(plot_data):
     return plot_data
 
 if __name__ == "__main__":
+    CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
+    
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
     repo = git.Repo(search_parent_directories=True)
@@ -229,13 +232,6 @@ if __name__ == "__main__":
         
         assert (megaplot_data_hab.sr > 0).all()
 
-        # logging.info("Checkpointing compiled dataset")
-        # save_to_pickle(
-        #     CONFIG["output_file_path"]
-        #     / (CONFIG["output_file_name"].stem + f"_{hab}.pkl"),
-        #     SAR_data=megaplot_data_hab,
-        #     config=CONFIG,
-        # )
         plot_megaplot_ar.append(megaplot_data_hab)
         
     # compiling data for all habitats

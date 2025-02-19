@@ -1,15 +1,14 @@
-name: SEAM
 channels:
   - rapidsai
-  - nvidia
   - conda-forge
+  - nvidia
 
 dependencies:
-  - cudatoolkit
+  - cuda-version=11.5
   - scikit-learn
   - numpy
   - pandas
-  - python==3.12.3
+  - python==3.11
   - ipykernel
   - matplotlib
   - seaborn
@@ -25,3 +24,4 @@ dependencies:
   - pathlib
   - pyarrow
   - fastparquet
+  - gitpython
