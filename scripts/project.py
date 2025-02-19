@@ -1,10 +1,8 @@
 """
 Projecting spatially MLP, 
 where 
-- heterogeneity value if interpolated to have more sensible predictions
+- heterogeneity value is interpolated to have more sensible predictions
 - dlogSR/dlogA is calculated by accounting for the change in heterogeneity with the change in area
-
-The script is not fully checked.
 
 Using ensemble methods.
 """
@@ -86,7 +84,7 @@ if __name__ == "__main__":
     SR_dSR_rast_dict = {}
     plotting = True
     print("Calculating SR and dlogSR/dlogA...")
-    for res_sr_map in [1e3, 1e4]:
+    for res_sr_map in [1e0, 1e1, 1e2, 1e3, 1e4]:
         print(f"Calculating SR, dSR and stdSR for resolution {res_sr_map}")
         log_SR, dlogSR_dlogA = get_true_sar.get_SR_dSR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
         std_log_SR = get_true_sar.get_std_SR(model, X_map_dict, res_climate_pixel, res_sr_map, predictors, feature_scaler, target_scaler)
@@ -96,6 +94,8 @@ if __name__ == "__main__":
         dlog_SR_dlogA_rast = create_raster(X_map_dict[1], dlogSR_dlogA)
         std_log_SR_rast = create_raster(X_map_dict[1], std_log_SR)
         SR_dSR_rast_dict[f"{res_sr_map:.0e}"] = {"log_SR": log_SR_rast, "dlogSR_dlogA": dlog_SR_dlogA_rast, "std_log_SR": std_log_SR_rast}
+        SR_rast = np.exp(log_SR_rast)
+        SR_rast.rio.to_raster("results/" + Path(__file__).stem + f"_res_{res_sr_map:.0e}m.tif")
         
         if plotting:
             fig, axs = plt.subplots(1, 2, figsize=(6, 4))

@@ -10,9 +10,8 @@ import xarray as xr
 
 from src.data_processing.utils_landcover import EUNISDataset
 
-
-DATA_DIR = Path(__file__).parent / "../../data/EVA"
-EVA_CACHE = DATA_DIR / "cache.pkl"
+EVA_DATA_DIR = Path(__file__).parent / "../../data/EVA/"
+EVA_CACHE = EVA_DATA_DIR / "cache.pkl"
 COUNTRY_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_admin_0_countries.shp"
 
 COUNTRY_LIST = [
@@ -27,48 +26,23 @@ COUNTRY_LIST = [
 ]
 
 class EVADataset:
-    def __init__(self, data_dir=DATA_DIR, cache=EVA_CACHE):
+    def __init__(self, data_dir=EVA_DATA_DIR, cache=EVA_CACHE):
         self.data_dir = data_dir
         self.cache = cache
 
     def read_biodiv_data(self):
-        parquet_file = self.data_dir / "biodiv_df.parquet"
-        if parquet_file.exists():
-            return pd.read_parquet(parquet_file)
+        species_data = self.data_dir / "anonymised/species_data.parquet"
+        if species_data.exists():
+            return pd.read_parquet(species_data)
         else:
-            bio_df = pd.read_csv(
-                Path(self.data_dir) / "vpl_all.csv",
-                header=0,
-                usecols=["plot_id", "species"],
-                sep=",",
-                engine="python",
-            )
-            bio_df.to_parquet(parquet_file)
-            return bio_df
-
+            raise FileNotFoundError("Anoymised species data not found")
+    
     def read_plot_data(self):
-        parquet_file = self.data_dir / "plot_df.parquet"
-        if parquet_file.exists():
-            return pd.read_parquet(parquet_file)
+        plot_data_file = self.data_dir / "anonymised/plot_data.parquet"
+        if plot_data_file.exists():
+            return pd.read_parquet(plot_data_file)
         else:
-            bio_df = pd.read_csv(
-                Path(self.data_dir) / "hea_all.csv",
-                header=0,
-                usecols=[
-                    "plot_id",
-                    "Level_2",
-                    "Level_2_name",
-                    "Longitude",
-                    "Latitude",
-                    "plot_size",
-                    "uncertainty_m",
-                ],
-                sep=",",
-                engine="python",
-                index_col="plot_id",
-            )
-            bio_df.to_parquet(parquet_file)
-            return bio_df
+            raise FileNotFoundError("Plot data not found")
 
     def clean_eva_plots(self, plot_gdf, dict_sp):
         # calculate SR per plot
@@ -104,11 +78,11 @@ class EVADataset:
     def load(self):
         if not self.cache.exists():
             # loading plot data
-            plot_df = self.read_plot_data()
-            plot_df["geometry"] = gpd.points_from_xy(
-                plot_df.Longitude, plot_df.Latitude, crs="EPSG:4326"
+            plot_data = self.read_plot_data()
+            plot_data["geometry"] = gpd.points_from_xy(
+                plot_data.Longitude, plot_data.Latitude, crs="EPSG:4326"
             )
-            plot_gdf = gpd.GeoDataFrame(plot_df, geometry="geometry", crs="EPSG:4326")
+            plot_gdf = gpd.GeoDataFrame(plot_data, geometry="geometry", crs="EPSG:4326")
 
             # making dict from biodiv data
             biodiv_df = self.read_biodiv_data()
@@ -135,20 +109,7 @@ class EVADataset:
                 cached_data = pickle.load(pickle_file)
             return cached_data["plot_gdf"], cached_data["dict_sp"]
 
-
 if __name__ == "__main__":
-    # trying to create a wide table format.
-    # takes for ever
     dataset = EVADataset()
     df_sp = dataset.read_biodiv_data()
-    df_sp['presence'] = True
-    
-    # pivoting, this takes some time
-    wide_df_sp = df_sp.pivot(index='plot_id', columns='species', values='presence')
-    wide_df_sp = wide_df_sp.fillna(False) # takes for ever
-    
-    
-    size_in_mb = wide_df_sp.memory_usage(deep=True).sum() / (1024 ** 2)
-    print(f"Size of dataframe: {size_in_mb:.2f} MB")
-
-    wide_df_sp.to_parquet("wide_df_vpl_all.parquet", engine='pyarrow', index=True)
+    dataset.load()

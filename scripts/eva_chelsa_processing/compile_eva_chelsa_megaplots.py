@@ -63,19 +63,22 @@ CONFIG = {
 }
 mean_labels = CONFIG["env_vars"]
 std_labels = [f"std_{var}" for var in CONFIG["env_vars"]]
-CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels))
+CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels)).tolist()
 
 # range to be investigated
 # poly_range = (100, 100, 200e3, 200e3) # in meters
 
-def load_and_preprocess_data():
+def load_and_preprocess_data(check_consistency=False):
     """
     Load and preprocess EVA and landcover data.
     Returns processed EVA and landcover datasets.
     """
     logging.info("Loading EVA data...")
     plot_gdf, dict_sp = EVADataset().load()
-    
+    if check_consistency:
+        print("Checking data consistency...")
+        assert all([len(np.unique(dict_sp[k])) == r.SR for k, r in plot_gdf.iterrows()])
+
     logging.info("Loading climate raster...")
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
 
@@ -133,7 +136,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)}, \nNb. plots: {len(plot_gdf)}")
 
-    return megaplot_data_hab
+    return megaplot_data_hab[["sr", "area"] + CLIMATE_COL_NAMES]
 
 
 def compile_climate_data_megaplot(megaplot_data, climate_raster):
@@ -177,7 +180,7 @@ def compile_climate_data_plot(plot_data, climate_raster):
     return plot_data
 
 
-def format_plot_data(plot_data, columns):
+def format_plot_data(plot_data):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
@@ -188,7 +191,7 @@ def format_plot_data(plot_data, columns):
     plot_data.loc[:, "num_plots"] = 1
 
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data = plot_data[columns]
+    plot_data = plot_data[["sr", "area"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
@@ -208,6 +211,9 @@ if __name__ == "__main__":
     plot_gdf = partition_polygon_gdf(plot_gdf, block_length)
     # Save the indices of plot_gdf as a CSV
     plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
+    # save raw plot SR and climate data
+    plot_data_all = format_plot_data(plot_gdf)
+    plot_data_all.to_csv(CONFIG["output_file_path"] / "raw_plot_data.csv", index=False)
         
     plot_megaplot_ar = []
     plot_gdf_by_hab = plot_gdf.groupby("Level_2")
@@ -241,7 +247,6 @@ if __name__ == "__main__":
     plot_megaplot_ar.append(megaplot_data_hab)
 
     # appending simple plot data
-    plot_data_all = format_plot_data(plot_gdf, megaplot_data_hab.columns)
     plot_megaplot_ar.append(plot_data_all)
 
     # aggregating results and final save
