@@ -54,7 +54,6 @@ def load_preprocessed_data(hab, sha, random_state):
     path_filtered_augmented_data = PATH_FILTERED_AUGMENTED_DATA / f"{hab}_preprocessed_data_random_state_{random_state}_{sha}.pkl"
     return pd.read_pickle(path_filtered_augmented_data)
 
-
 if __name__ == "__main__":
     habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     random_state = 2

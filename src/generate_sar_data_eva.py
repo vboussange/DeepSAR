@@ -124,7 +124,8 @@ def generate_random_boxes_from_candidate_pairs(candidate_points, num_boxes):
         max_y = max(point1.y, point2.y)
         
         # Create the box.
-        new_box = box(min_x, min_y, max_x, max_y)
+        # We add and subtract 1 to the coordinates to ensure that the box contains the points.
+        new_box = box(min_x - 1, min_y - 1, max_x + 1, max_y + 1)
         boxes.append(new_box)
         
     

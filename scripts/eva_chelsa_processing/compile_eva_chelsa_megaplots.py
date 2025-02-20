@@ -49,7 +49,7 @@ CONFIG = {
     "batch_size": 20,
     "area_range": (1e4, 1e11),  # in m2
     "side_range": (1e2, 1e6), # in m
-    "num_polygon_max": int(1e1),
+    "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
     "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
@@ -93,22 +93,20 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     
     megaplot_data_hab_ar = []
     for partition, block_plot_gdf in plot_gdf.groupby("partition"):
-        logging.info(
-            f"Partition {partition}: Processing EVA data..."
-        )
-        boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, max(len(block_plot_gdf), CONFIG["num_polygon_max"]))
+        if len(block_plot_gdf) > 1:
+            logging.info(
+                f"Partition {partition}: Processing EVA data..."
+            )
+            boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(10 * len(block_plot_gdf), CONFIG["num_polygon_max"]))
 
-        megaplot_data_partition = clip_EVA_SR(
-            block_plot_gdf, dict_sp, boxes_gdf
-        ) 
-        megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
-        megaplot_data_partition["megaplot_area"] = boxes_gdf.area
-        
-        # thinning
-        megaplot_data_partition = megaplot_data_partition[megaplot_data_partition["num_plots"] > 1]
-        megaplot_data_partition["partition"] = partition
-        megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
-        megaplot_data_hab_ar.append(megaplot_data_partition)
+            megaplot_data_partition = clip_EVA_SR(
+                block_plot_gdf, dict_sp, boxes_gdf
+            ) 
+            megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
+            megaplot_data_partition["megaplot_area"] = boxes_gdf.area
+            megaplot_data_partition["partition"] = partition
+            megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
+            megaplot_data_hab_ar.append(megaplot_data_partition)
             
     megaplot_data_hab = gpd.GeoDataFrame(
         pd.concat(megaplot_data_hab_ar, ignore_index=True),
@@ -229,5 +227,8 @@ if __name__ == "__main__":
         geometry="geometry",
         crs=CONFIG["crs"],
     )
-    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], megaplot_data=megaplot_data, config=CONFIG)
+    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], 
+                   megaplot_data=megaplot_data, 
+                   plot_data_all=plot_data_all,
+                   config=CONFIG)
     logging.info("Compilation completed successfully")
