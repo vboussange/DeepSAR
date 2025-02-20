@@ -96,6 +96,43 @@ def stats_min_pairwise_distance(multipoint):
     
     return average_distance, std_distance
 
+def generate_random_boxes_from_candidate_pairs(candidate_points, num_boxes):
+    """
+    Generates random rectangular boxes by picking two candidate points from candidate_points.
+    Each box is the axis‐aligned rectangle defined by the two points.
+    
+    Parameters:
+    - candidate_points: A GeoDataFrame containing candidate points with a 'geometry'
+      column and a 'partition' column.
+    - num_boxes: The number of boxes to generate.
+    
+    Returns:
+    - A GeoDataFrame containing the generated boxes with the same CRS as candidate_points.
+    """
+    boxes = []
+    
+    for _ in range(num_boxes):
+        # Pick two distinct candidate points at random.
+        idxs = np.random.choice(candidate_points.index, 2, replace=False)
+        point1 = candidate_points.geometry[idxs[0]]
+        point2 = candidate_points.geometry[idxs[1]]
+        
+        # Determine the lower left and upper right coordinates.
+        min_x = min(point1.x, point2.x)
+        min_y = min(point1.y, point2.y)
+        max_x = max(point1.x, point2.x)
+        max_y = max(point1.y, point2.y)
+        
+        # Create the box.
+        new_box = box(min_x, min_y, max_x, max_y)
+        boxes.append(new_box)
+        
+    
+    return gpd.GeoDataFrame(
+        geometry=boxes,
+        crs=candidate_points.crs
+    )
+
 
 def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
     """

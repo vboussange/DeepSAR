@@ -35,14 +35,14 @@ class EVADataset:
         if species_data.exists():
             return pd.read_parquet(species_data)
         else:
-            raise FileNotFoundError("Anoymised species data not found")
+            raise FileNotFoundError("Anoymised species data not found, did you download/anonymise the data?")
     
     def read_plot_data(self):
         plot_data_file = self.data_dir / "anonymised/plot_data.parquet"
         if plot_data_file.exists():
             return pd.read_parquet(plot_data_file)
         else:
-            raise FileNotFoundError("Plot data not found")
+            raise FileNotFoundError("Plot data not found, did you download/anonymise the data?")
 
     def clean_eva_plots(self, plot_gdf, dict_sp):
         # calculate SR per plot

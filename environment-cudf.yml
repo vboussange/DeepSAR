@@ -4,7 +4,6 @@ channels:
   - nvidia
 
 dependencies:
-  - cuda-version=11.5
   - scikit-learn
   - numpy
   - pandas

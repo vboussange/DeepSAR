@@ -8,6 +8,7 @@ import pandas as pd
 
 RAW_EVA_DATA = Path(__file__).parent / "../../data/EVA/raw"
 ANONYMISED_EVA_DATA = Path(__file__).parent / "../../data/EVA/anonymised"
+ANONYMISED_EVA_DATA.mkdir(parents=True, exist_ok=True)
 
 def generate_spid(species_name: str) -> str:
     """

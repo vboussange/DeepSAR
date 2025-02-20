@@ -1,11 +1,5 @@
 """
-Processing features based on polygons and CHELSA rasters, and EUNIS Esy for
-landcover. In plot_megaplot version, we include all single plots to be
-predicted, and we generate at least as much megaplots.
-
-The augmented dataset is then processed so that the ratio plot:megaplot is 1:1.
-This is to have a more fair evaluation of model, as variation in SR is higher at fine scales.
-The corresponding augmented dataset is sometimes called "v2".
+Compiles megaplots based on EVA and CHELSA data, for different habitat types.
 """
 
 import pandas as pd
@@ -17,7 +11,7 @@ import logging
 import math
 from tqdm import tqdm
 
-from src.generate_sar_data_eva import clip_EVA_SR_gpu, generate_random_boxes
+from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs
 from src.data_processing.utils_eva import EVADataset
 from src.data_processing.utils_env_pred import CHELSADataset
 from src.utils import save_to_pickle
@@ -97,37 +91,24 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     Returns GeoDataFrame of SAR data.
     """
     
-    # TOFIX: quick and dirty trick to generate at least `len(plot_gdf)` megaplots with more than one plot
-    num_polygons = np.minimum(CONFIG["num_polygon_max"], 2 * len(plot_gdf))
-
-    polygons_gdf = generate_random_boxes(
-        plot_gdf,
-        num_polygons,
-        CONFIG["area_range"],
-        CONFIG["side_range"],
-    )
-    
     megaplot_data_hab_ar = []
-    for partition, pol_gdf in polygons_gdf.groupby("partition"):
+    for partition, block_plot_gdf in plot_gdf.groupby("partition"):
         logging.info(
             f"Partition {partition}: Processing EVA data..."
         )
-        if not pol_gdf.empty:
-            eva_data_part = plot_gdf[plot_gdf.partition == partition].copy()
-            # if gpu available
-            megaplot_data_partition = clip_EVA_SR_gpu(eva_data_part, dict_sp, pol_gdf, CONFIG["batch_size"])
-            # if no gpu available
-            # megaplot_data = clip_EVA_SR(
-            #     eva_data_part, pol_gdf
-            # )  # to be modified for gpu
-            megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
-            megaplot_data_partition["megaplot_area"] = plot_gdf.area
-            
-            # thinning
-            megaplot_data_partition = megaplot_data_partition[megaplot_data_partition["num_plots"] > 1]
-            megaplot_data_partition["partition"] = partition
-            megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
-            megaplot_data_hab_ar.append(megaplot_data_partition)
+        boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, max(len(block_plot_gdf), CONFIG["num_polygon_max"]))
+
+        megaplot_data_partition = clip_EVA_SR(
+            block_plot_gdf, dict_sp, boxes_gdf
+        ) 
+        megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
+        megaplot_data_partition["megaplot_area"] = boxes_gdf.area
+        
+        # thinning
+        megaplot_data_partition = megaplot_data_partition[megaplot_data_partition["num_plots"] > 1]
+        megaplot_data_partition["partition"] = partition
+        megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
+        megaplot_data_hab_ar.append(megaplot_data_partition)
             
     megaplot_data_hab = gpd.GeoDataFrame(
         pd.concat(megaplot_data_hab_ar, ignore_index=True),
@@ -137,7 +118,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)}, \nNb. plots: {len(plot_gdf)}")
 
-    return megaplot_data_hab[["sr", "area", "megaplot_area"] + CLIMATE_COL_NAMES]
+    return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry"] + CLIMATE_COL_NAMES]
 
 
 def compile_climate_data_megaplot(megaplot_data, climate_raster):
@@ -192,7 +173,7 @@ def format_plot_data(plot_data):
     plot_data.loc[:, "num_plots"] = 1
 
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data = plot_data[["sr", "area"] + CLIMATE_COL_NAMES]
+    plot_data = plot_data[["sr", "area", "geometry"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
@@ -203,7 +184,7 @@ if __name__ == "__main__":
     np.random.seed(CONFIG["random_state"])
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
-    CONFIG["ouput_file_name"] = Path(f"EVA_CHELSA_raw_random_state_{CONFIG['random_state']}_{sha}.pkl")
+    CONFIG["output_file_name"] = Path(f"EVA_CHELSA_raw_random_state_{CONFIG['random_state']}_{sha}.pkl")
     
     plot_gdf, dict_sp, climate_raster = load_and_preprocess_data()
     plot_gdf = compile_climate_data_plot(plot_gdf, climate_raster)
@@ -216,9 +197,9 @@ if __name__ == "__main__":
     plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
     # save raw plot SR and climate data
     plot_data_all = format_plot_data(plot_gdf)
-    plot_data_all.to_csv(CONFIG["output_file_path"] / "raw_plot_data.csv", index=False)
+    plot_data_all.drop(columns=["geometry"]).to_csv(CONFIG["output_file_path"] / "raw_plot_data.csv", index=False)
         
-    plot_megaplot_ar = []
+    megaplot_ar = []
     plot_gdf_by_hab = plot_gdf.groupby("Level_2")
     
     # compiling data for each separate habitat
@@ -232,7 +213,7 @@ if __name__ == "__main__":
         
         assert (megaplot_data_hab.sr > 0).all()
 
-        plot_megaplot_ar.append(megaplot_data_hab)
+        megaplot_ar.append(megaplot_data_hab)
         
     # compiling data for all habitats
     logging.info(
@@ -240,16 +221,13 @@ if __name__ == "__main__":
             )
     megaplot_data_hab = generate_megaplots(plot_gdf, dict_sp, climate_raster)
     megaplot_data_hab["habitat_id"] = "all"
-    plot_megaplot_ar.append(megaplot_data_hab)
-
-    # appending simple plot data
-    plot_megaplot_ar.append(plot_data_all)
+    megaplot_ar.append(megaplot_data_hab)
 
     # aggregating results and final save
-    SAR_data = gpd.GeoDataFrame(
-        pd.concat(plot_megaplot_ar, ignore_index=True),
+    megaplot_data = gpd.GeoDataFrame(
+        pd.concat(megaplot_ar, ignore_index=True),
         geometry="geometry",
         crs=CONFIG["crs"],
     )
-    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], SAR_data=SAR_data, config=CONFIG)
+    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], megaplot_data=megaplot_data, config=CONFIG)
     logging.info("Compilation completed successfully")
