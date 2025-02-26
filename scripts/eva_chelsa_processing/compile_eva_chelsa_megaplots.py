@@ -97,7 +97,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
             logging.info(
                 f"Partition {partition}: Processing EVA data..."
             )
-            boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(10 * len(block_plot_gdf), CONFIG["num_polygon_max"]))
+            boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(5 * len(block_plot_gdf), CONFIG["num_polygon_max"]))
 
             megaplot_data_partition = clip_EVA_SR(
                 block_plot_gdf, dict_sp, boxes_gdf
@@ -114,7 +114,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
         crs=CONFIG["crs"],
     )
     assert (megaplot_data_hab["num_plots"] > 1).all()
-    logging.info(f"Nb. megaplots: {len(megaplot_data_hab)}, \nNb. plots: {len(plot_gdf)}")
+    logging.info(f"Nb. megaplots: {len(megaplot_data_hab)} || Nb. plots: {len(plot_gdf)}")
 
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry"] + CLIMATE_COL_NAMES]
 
@@ -200,6 +200,18 @@ if __name__ == "__main__":
     megaplot_ar = []
     plot_gdf_by_hab = plot_gdf.groupby("Level_2")
     
+    
+    # compiling data for all habitats
+    logging.info(
+                f"Generating megaplots based on all plots"
+            )
+    megaplot_data_hab = generate_megaplots(plot_gdf, dict_sp, climate_raster)
+    megaplot_data_hab["habitat_id"] = "all"
+    megaplot_ar.append(megaplot_data_hab)
+    checkpoint_path = CONFIG["output_file_path"] / CONFIG["output_file_name"].stem + f"_checkpoint_all.pkl"
+    save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
+    logging.info(f"Checkpoint saved for all habs at {checkpoint_path}")
+
     # compiling data for each separate habitat
     for hab in CONFIG["habitats"]:
         logging.info(
@@ -213,13 +225,11 @@ if __name__ == "__main__":
 
         megaplot_ar.append(megaplot_data_hab)
         
-    # compiling data for all habitats
-    logging.info(
-                f"Generating megaplots based on all plots"
-            )
-    megaplot_data_hab = generate_megaplots(plot_gdf, dict_sp, climate_raster)
-    megaplot_data_hab["habitat_id"] = "all"
-    megaplot_ar.append(megaplot_data_hab)
+        # Save checkpoint
+        checkpoint_path = CONFIG["output_file_path"] / CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl"
+        save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
+        logging.info(f"Checkpoint saved for habitat {hab} at {checkpoint_path}")
+        
 
     # aggregating results and final save
     megaplot_data = gpd.GeoDataFrame(
@@ -231,4 +241,5 @@ if __name__ == "__main__":
                    megaplot_data=megaplot_data, 
                    plot_data_all=plot_data_all,
                    config=CONFIG)
-    logging.info("Compilation completed successfully")
+    logging.info(f"Full compilation saved at {CONFIG["output_file_path"] / CONFIG["output_file_name"]}")
+    logging.info("Compilation completed successfully.")
