@@ -49,6 +49,7 @@ plot_df = pd.read_csv(
                 header=0,
                 usecols=[
                     "plot_id",
+                    "Level_1",
                     "Level_2",
                     "Level_2_name",
                     "Longitude",

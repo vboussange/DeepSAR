@@ -71,7 +71,14 @@ class EVADataset:
         
         # filtering for uncertainty in meter
         print("Filtering for coordinate uncertainty")
-        plot_gdf = plot_gdf[plot_gdf.uncertainty_m < 1000]
+        plot_gdf = plot_gdf[(plot_gdf.uncertainty_m.isna()) | (plot_gdf.uncertainty_m < 1000)]
+
+        # filtering for plot size
+        print("Filtering for plot size")
+        plot_gdf = plot_gdf[
+            ((plot_gdf.Level_1.isin(['Q', 'S', 'R'])) & (plot_gdf.plot_size.between(1, 100))) |
+            ((plot_gdf.Level_1 == 'T') & (plot_gdf.plot_size.between(100, 1000)))
+        ]
 
         return plot_gdf
 

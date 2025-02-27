@@ -10,6 +10,7 @@ import xarray as xr
 import logging
 import math
 from tqdm import tqdm
+import warnings
 
 from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs
 from src.data_processing.utils_eva import EVADataset
@@ -20,6 +21,7 @@ from src.data_processing.utils_polygons import (
 )
 import git
 import random
+from joblib import Parallel, delayed
 
 # Initialize logging
 logging.basicConfig(
@@ -49,7 +51,7 @@ CONFIG = {
     "batch_size": 20,
     "area_range": (1e4, 1e11),  # in m2
     "side_range": (1e2, 1e6), # in m
-    "num_polygon_max": np.inf,
+    "num_polygon_max": 100,#np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
     "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
@@ -85,34 +87,33 @@ def load_and_preprocess_data(check_consistency=False):
     return plot_gdf, dict_sp, climate_raster
 
 
+def process_partition(partition, block_plot_gdf, dict_sp, climate_raster):
+    if len(block_plot_gdf) > 1:
+        logging.info(f"Partition {partition}: Processing EVA data...")
+        boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(5 * len(block_plot_gdf), CONFIG["num_polygon_max"]))
+        megaplot_data_partition = clip_EVA_SR(block_plot_gdf, dict_sp, boxes_gdf)
+        # megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
+        megaplot_data_partition["megaplot_area"] = boxes_gdf.area
+        megaplot_data_partition["geometry"] = boxes_gdf.geometry
+        megaplot_data_partition["partition"] = partition
+        megaplot_data_partition = gpd.GeoDataFrame(megaplot_data_partition, crs = plot_gdf.crs, geometry="geometry")
+        megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
+        return megaplot_data_partition
+    return None
+
 def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     """
     Process EVA data and generate synthetic megaplots data based on landcover.
     Returns GeoDataFrame of SAR data.
     """
-    
-    megaplot_data_hab_ar = []
-    for partition, block_plot_gdf in plot_gdf.groupby("partition"):
-        if len(block_plot_gdf) > 1:
-            logging.info(
-                f"Partition {partition}: Processing EVA data..."
-            )
-            boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(5 * len(block_plot_gdf), CONFIG["num_polygon_max"]))
-
-            megaplot_data_partition = clip_EVA_SR(
-                block_plot_gdf, dict_sp, boxes_gdf
-            ) 
-            megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
-            megaplot_data_partition["megaplot_area"] = boxes_gdf.area
-            megaplot_data_partition["partition"] = partition
-            megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
-            megaplot_data_hab_ar.append(megaplot_data_partition)
-            
-    megaplot_data_hab = gpd.GeoDataFrame(
-        pd.concat(megaplot_data_hab_ar, ignore_index=True),
-        geometry="geometry",
-        crs=CONFIG["crs"],
+    results = Parallel(n_jobs=-1)(
+        delayed(process_partition)(partition, block_plot_gdf, dict_sp, climate_raster)
+        for partition, block_plot_gdf in plot_gdf.groupby("partition")
     )
+    megaplot_data_hab_ar = [result for result in results if result is not None]
+    
+    megaplot_data_hab = pd.concat(megaplot_data_hab_ar, ignore_index=True)
+
     assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)} || Nb. plots: {len(plot_gdf)}")
 
@@ -125,20 +126,20 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster):
     Returns processed SAR data.
     """
     logging.info("Compiling climate...")
-    for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0]):
+    for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate"):
         # climate
-        y = [p.y for p in row.geometry.geoms]
-        x = [p.x for p in row.geometry.geoms]
+        minx, miny, maxx, maxy = row.geometry.bounds
         env_vars = climate_raster.sel(
-            x=xr.DataArray(x, dims="z"),
-            y=xr.DataArray(y, dims="z"),
-            method="nearest",
+            x=slice(minx, maxx),
+            y=slice(miny, maxy) 
         )
-        env_vars = env_vars.to_numpy().reshape((len(CONFIG["env_vars"]), -1, 1))
-        _m = np.nanmean(env_vars, axis=(1, 2))
-        _std = np.nanstd(env_vars, axis=(1, 2))
+        env_vars = env_vars.to_numpy()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            _m = np.nanmean(env_vars, axis=(1, 2))
+            _std = np.nanstd(env_vars, axis=(1, 2))
         env_pred_stats = np.concatenate([_m, _std])
-        megaplot_data.loc[i, CLIMATE_COL_NAMES] = np.stack(env_pred_stats)
+        megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
     return megaplot_data
 
 def compile_climate_data_plot(plot_data, climate_raster):
@@ -168,7 +169,6 @@ def format_plot_data(plot_data):
     
     plot_data = plot_data.rename({"SR":"sr", "plot_size": "area", "Level_2":"habitat_id"}, axis=1)
     plot_data.loc[:, "plot_idxs"] = plot_data.index
-    plot_data.loc[:, "num_plots"] = 1
 
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
     plot_data = plot_data[["sr", "area", "geometry"] + CLIMATE_COL_NAMES]
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     megaplot_data_hab = generate_megaplots(plot_gdf, dict_sp, climate_raster)
     megaplot_data_hab["habitat_id"] = "all"
     megaplot_ar.append(megaplot_data_hab)
-    checkpoint_path = CONFIG["output_file_path"] / CONFIG["output_file_name"].stem + f"_checkpoint_all.pkl"
+    checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + "_checkpoint_all.pkl")
     save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
     logging.info(f"Checkpoint saved for all habs at {checkpoint_path}")
 
@@ -232,14 +232,11 @@ if __name__ == "__main__":
         
 
     # aggregating results and final save
-    megaplot_data = gpd.GeoDataFrame(
-        pd.concat(megaplot_ar, ignore_index=True),
-        geometry="geometry",
-        crs=CONFIG["crs"],
-    )
+    megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
+       
     save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], 
                    megaplot_data=megaplot_data, 
                    plot_data_all=plot_data_all,
                    config=CONFIG)
-    logging.info(f"Full compilation saved at {CONFIG["output_file_path"] / CONFIG["output_file_name"]}")
+    logging.info(f'Full compilation saved at {CONFIG["output_file_path"] / CONFIG["output_file_name"]}')
     logging.info("Compilation completed successfully.")
