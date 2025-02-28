@@ -51,7 +51,7 @@ CONFIG = {
     "batch_size": 20,
     "area_range": (1e4, 1e11),  # in m2
     "side_range": (1e2, 1e6), # in m
-    "num_polygon_max": 100,#np.inf,
+    "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
     "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         megaplot_ar.append(megaplot_data_hab)
         
         # Save checkpoint
-        checkpoint_path = CONFIG["output_file_path"] / CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl"
+        checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
         save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
         logging.info(f"Checkpoint saved for habitat {hab} at {checkpoint_path}")
         
