@@ -171,7 +171,8 @@ def format_plot_data(plot_data):
     plot_data.loc[:, "plot_idxs"] = plot_data.index
 
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data = plot_data[["sr", "area", "geometry"] + CLIMATE_COL_NAMES]
+    plot_data["megaplot_area"] = plot_data["area"]
+    plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id"] + CLIMATE_COL_NAMES]
 
     return plot_data
 

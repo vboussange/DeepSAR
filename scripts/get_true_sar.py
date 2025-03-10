@@ -15,7 +15,7 @@ import xarray as xr
 from src.ensemble_model import initialize_ensemble_model
 
 from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
-from scripts.train import Config
+# from scripts.train import Config
 
 from pathlib import Path
 from pyproj import Transformer

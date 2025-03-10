@@ -37,7 +37,6 @@ class Config:
     dSRdA_weight: float = 1e0
     weight_decay: float = 1e-3
     seed: int = 1
-    data_seed: int = 1
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]

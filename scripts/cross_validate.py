@@ -1,21 +1,6 @@
 """
-cross_validate.py
-This script performs cross-validation for training and evaluating machine learning models on habitat-specific data.
-It supports multiple model architectures and configurations, including habitat-agnostic variants.
-Classes:
-    Config: Configuration dataclass for setting up training parameters and model configurations.
-    Trainer: Class responsible for training and evaluating models across different habitats.
-Functions:
-    Trainer.train: Main method to initiate the training process for all habitats.
-    Trainer.prepare_run: Prepares the run directory for saving results.
-    Trainer.train_models_for_habitat: Trains models for a specific habitat.
-    Trainer.train_and_evaluate: Trains and evaluates models using k-fold cross-validation.
-    Trainer.train_model: Trains a single model and tracks performance metrics.
-    Trainer.evaluate_model: Evaluates a model on a given dataset.
-    Trainer.save_results: Saves the training results to a file.
-Usage:
-    Run the script directly to start the training process with the specified configuration.
-    
+Cross-validation script for training and evaluating models on the EVA-CHELSA dataset for different habitats and predictors.
+
 # TODO: significant work is performed on CPU, consider identifying and moving to GPU
 """
 import copy
@@ -28,11 +13,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split, GroupKFold
+import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
 from src.sar import SAR
 from src.dataset import create_dataloader
+from src.plotting import read_result
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -61,13 +48,14 @@ class Config:
     weight_decay: float = 1e-3
     val_size: float = 0.2
     seed: int = 2
-    data_seed: int = 2
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
-    run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
+    run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
+    path_augmented_data: str ="/home/boussang/DeepSAR/data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_cf6ea5c.pkl"
+
 
 class Trainer:
     def __init__(self, config: Config):
@@ -78,6 +66,7 @@ class Trainer:
         self.target_scalers = {}
         self.habitat_agnostic_model = None
         self.habitat_agnostic_scalers = {}
+        self.data = read_result(config.path_augmented_data)
 
     def train(self):
         self.prepare_run()
@@ -101,22 +90,22 @@ class Trainer:
         # Define predictor configurations with corresponding models, input features, loss functions, and physics flag
         predictors_list = {
             "power_law": (SAR(), ["log_area"], torch.nn.MSELoss(), False),
-            "area": (MLP(1, config.layer_sizes), ["log_area"], CustomMSELoss(config.dSRdA_weight), False),
+            "area": (MLP(2, config.layer_sizes), ["log_area", "log_megaplot_area"], CustomMSELoss(config.dSRdA_weight), False),
             "climate": (MLP(num_climate_features, config.layer_sizes), climate_features, torch.nn.MSELoss(), False),
-            "area+climate": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), False),
-            "area+climate, no physics": (MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, torch.nn.MSELoss(), False),
+            "area+climate": (MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), False),
+            "area+climate, no physics": (MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, torch.nn.MSELoss(), False),
         }
         
         # Add habitat agnostic variant if applicable
         if hab != "all":
             predictors_list["area+climate, habitat agnostic"] = (
-                MLP(num_climate_features + 1, config.layer_sizes), ["log_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
+                MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = load_preprocessed_data(hab, self.config.hash_data, self.config.data_seed)
+        gdf = compile_training_data(hab, self.data)
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
             if agnostic:
-                gdf_all = load_preprocessed_data("all", config.hash_data, config.data_seed)
+                gdf_all = load_preprocessed_data("all", self.data)
                 gdf_train_val, gdf_test = gdf_all, gdf
             else:
                 gdf_train_val, gdf_test = gdf, gdf
@@ -262,6 +251,23 @@ class Trainer:
         save_path = self.config.run_folder / f"{self.config.run_name}.pth"
         logger.info(f"Saving results to {save_path}")
         torch.save(self.results, save_path)
+        
+        
+def compile_training_data(data, hab):
+    megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
+    if hab == "all":
+        plot_data = data["plot_data_all"]
+    else:
+        plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
+        
+    augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
+    
+    # stack with raw plot data
+    augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
+    augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
+    augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
+    augmented_data = augmented_data.dropna()
+    return augmented_data
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
