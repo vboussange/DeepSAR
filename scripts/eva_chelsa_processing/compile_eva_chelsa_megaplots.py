@@ -117,7 +117,7 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)} || Nb. plots: {len(plot_gdf)}")
 
-    return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry"] + CLIMATE_COL_NAMES]
+    return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
 
 
 def compile_climate_data_megaplot(megaplot_data, climate_raster):
@@ -172,7 +172,7 @@ def format_plot_data(plot_data):
 
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
     plot_data["megaplot_area"] = plot_data["area"]
-    plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id"] + CLIMATE_COL_NAMES]
+    plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id", "partition"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
