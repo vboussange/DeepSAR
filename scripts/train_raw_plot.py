@@ -42,7 +42,7 @@ class Config:
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     n_ensembles: int = 5  # Number of models in the ensemble
-    run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
+    run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_plot_only_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
 
@@ -191,15 +191,11 @@ class Trainer:
         }
         
 def compile_training_data(data, hab):
-    megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
     if hab == "all":
-        plot_data = data["plot_data_all"]
+        augmented_data = data["plot_data_all"]
     else:
-        plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
+        augmented_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
         
-    augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
-    
-    # stack with raw plot data
     augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
     augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
     augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
@@ -207,6 +203,7 @@ def compile_training_data(data, hab):
     climate_predictors = config.climate_variables + ["std_" + env for env in config.climate_variables]
     predictors = ["log_area", "log_megaplot_area"] + climate_predictors
     return augmented_data, predictors
+
 
 if __name__ == "__main__":
     if torch.cuda.is_available():

@@ -63,26 +63,24 @@ class CustomMSELoss(nn.Module):
 
     def forward(self, model, predictions, input_features, targets):
         loss_mse = torch.mean((predictions - targets) ** 2)
-        try:
-            # # Gradient penalty on training data
-            # grads = torch.autograd.grad(predictions.sum(), input_features, create_graph=True)[0]
-            # grads_a = grads[:, 0]
-            # loss_grad = self.dSRdA_weight * torch.mean((torch.relu(-grads_a))**2)
-            
-            # Random sampling across data range
-            batch_size = input_features.size(0)
-            random_inputs = torch.rand(batch_size, input_features.size(1), device=input_features.device)
-            random_inputs.requires_grad_(True)
+        
+        # # Gradient penalty on training data
+        # grads = torch.autograd.grad(predictions.sum(), input_features, create_graph=True)[0]
+        # grads_a = grads[:, 0]
+        # loss_grad = self.dSRdA_weight * torch.mean((torch.relu(-grads_a))**2)
+        
+        # Random sampling across data range
+        batch_size = input_features.size(0)
+        random_inputs = torch.rand(batch_size, input_features.size(1), device=input_features.device)
+        random_inputs.requires_grad_(True)
 
-            # Gradient penalty on random inputs
-            random_outputs = model(random_inputs)
-            grads_random = torch.autograd.grad(random_outputs.sum(), random_inputs, create_graph=True)[0]
-            grads_a_random = grads_random[:, 0]
-            loss_grad_random = self.dSRdA_weight * torch.mean(torch.relu(-grads_a_random) ** 2)
+        # Gradient penalty on random inputs
+        random_outputs = model(random_inputs)
+        grads_random = torch.autograd.grad(random_outputs.sum(), random_inputs, create_graph=True)[0]
+        grads_a_random = grads_random[:, 0:2]
+        loss_grad_random = self.dSRdA_weight * torch.mean(torch.relu(-grads_a_random) ** 2)
 
-        except Exception as e:
-            print(f"Problem with gradient evaluation: {e}")
-            loss_grad = 0
+
         return loss_mse + loss_grad_random #+ loss_grad
     
     
