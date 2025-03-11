@@ -52,7 +52,7 @@ class Config:
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_augmented_data: str ="../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_cf6ea5c.pkl"
+    path_augmented_data: str = Path(__file__).parent / "../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_d84985e.pkl"
 
 
 class Trainer:
@@ -126,6 +126,7 @@ class Trainer:
             "val_MSE": [],
             "test_MSE": [],
             "test_idx": [],
+            "test_partition": [],
             "model_state_dict": [],
             "epoch_metrics": [],
             "feature_scaler": [],
@@ -158,6 +159,7 @@ class Trainer:
                 results["val_MSE"].append(best_val_MSE)
                 results["test_MSE"].append(best_test_MSE)
                 results["test_idx"].append(gdf_test_fold.index.tolist())
+                results["test_partition"].append(test_partitions.tolist())
                 results["model_state_dict"].append(best_model_state)
                 results["epoch_metrics"].append(epoch_metrics)
                 results["feature_scaler"].append(feature_scaler)
