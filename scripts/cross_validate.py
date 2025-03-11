@@ -25,8 +25,6 @@ from src.plotting import read_result
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
-
 MODEL_ARCHITECTURE = {
                       "small":[16, 16, 16],
                       "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4],
@@ -54,7 +52,7 @@ class Config:
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_augmented_data: str ="/home/boussang/DeepSAR/data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_cf6ea5c.pkl"
+    path_augmented_data: str ="../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_cf6ea5c.pkl"
 
 
 class Trainer:
@@ -102,10 +100,10 @@ class Trainer:
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = compile_training_data(hab, self.data)
+        gdf = compile_training_data(self.data, hab)
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
             if agnostic:
-                gdf_all = load_preprocessed_data("all", self.data)
+                gdf_all = compile_training_data(self.data, "all", )
                 gdf_train_val, gdf_test = gdf_all, gdf
             else:
                 gdf_train_val, gdf_test = gdf, gdf

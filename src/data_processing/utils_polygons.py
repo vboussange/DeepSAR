@@ -200,8 +200,8 @@ def create_grid(gdf, block_length):
     GeoDataFrame: A geopandas dataframe representing the grid.
     """
     minx, miny, maxx, maxy = gdf.total_bounds
-    x_edges = np.arange(minx, maxx + block_length, block_length)
-    y_edges = np.arange(miny, maxy + block_length, block_length)
+    x_edges = np.arange(minx-1e-5, maxx + 1e-5 + block_length, block_length)
+    y_edges = np.arange(miny-1e-5, maxy + 1e-5 + block_length, block_length)
 
     grid_cells = []
     for x0, x1 in zip(x_edges[:-1], x_edges[1:]):
@@ -218,7 +218,7 @@ def partition_polygon_gdf(gdf, block_length):
 
     grid_gdf = create_grid(gdf, block_length)
     joined = gpd.sjoin(gdf, grid_gdf, how='left', predicate="intersects")
-    gdf["partition"] = joined.index_right
+    gdf["partition"] = joined.index_right.astype(int)
 
     return gdf
 
