@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     # trained_data = plt.Line2D([0], [0], marker='s', color='w', label='test data',
     # # Add the legend
-    label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands", "Habitat agnostic"]
+    label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands", "Habitat agnostic"]
     for i, (fig, axs, label) in enumerate(zip([fig_SAR, fig_dSAR], (axs_SAR, axs_dSAR), ("SR", r"$\frac{d \log(SR)}{d \log(A)}$"))):
         fig.supylabel(label, fontsize=16)
         fig.tight_layout()

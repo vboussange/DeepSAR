@@ -85,7 +85,7 @@ def plot_shap_values(shap_values, config, habitats, config_plot):
 
     fig.supylabel("Relative absolute Shapley values")
     fig.supxlabel("Area (m2)")
-    label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands", "Habitat agnostic"]
+    label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands", "Habitat agnostic"]
     for i, ax in enumerate(axs[0, :]):
         ax.set_title(label_l1[i], fontweight="bold")
     fig.tight_layout()

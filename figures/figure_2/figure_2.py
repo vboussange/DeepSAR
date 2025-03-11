@@ -118,7 +118,7 @@ if __name__ == "__main__":
         predictors=PREDICTORS,
         widths=0.1,
     )
-    label_l1 = ["Forests", "Grasslands", "Mires", "Shrublands"]
+    label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
     for i,x in enumerate(np.arange(1, len(habitats), step=2)):
         ax1.text(x+0.5, -0.15, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
     fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
@@ -130,25 +130,28 @@ if __name__ == "__main__":
     x = results_residuals["area"]["log_area"]
     residuals = results_residuals["area"]["residuals"]
     q1_ax2, q3_ax2 = np.quantile(residuals, qr_range)
-    ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[0], alpha=0.1)
+    ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[1], alpha=0.1)
     ax2.scatter(x, residuals, s=3.0, label="area", color = color_palette[0], alpha=1)
     ax2.set_ylabel("Residuals\n$\\hat{\log \\text{SR}} - \log \\text{SR}$")
     ax2.set_ylim(-2.5,2.5)
+    ax2.set_title("Area only")
 
     ax3 = fig.add_subplot(gs[1, 1],sharey=ax2, sharex=ax2)
     x = results_residuals["climate"]["log_area"]
     residuals = results_residuals["climate"]["residuals"]
     q1_ax3, q3_ax3 = np.quantile(residuals, qr_range)
-    ax3.axhspan(q1_ax3, q3_ax3, color=color_palette[1], alpha=0.1)
+    ax3.axhspan(q1_ax3, q3_ax3, color=color_palette[2], alpha=0.1)
     ax3.scatter(x, residuals, s=3.0, label="climate", color = color_palette[1], alpha=0.8)
+    ax3.set_title("Climate only")
 
     ax4 = fig.add_subplot(gs[1, 2], sharey=ax2, sharex=ax2)
     x = results_residuals["area+climate"]["log_area"]
     residuals = results_residuals["area+climate"]["residuals"]
     q1_ax4, q3_ax4 = np.quantile(residuals, qr_range)
-    ax4.axhspan(q1_ax4, q3_ax4, color=color_palette[3], alpha=0.1)
+    ax4.axhspan(q1_ax4, q3_ax4, color=color_palette[4], alpha=0.1)
     ax4.scatter(x, residuals, s=3.0, label="area + climate", color = color_palette[3], alpha=0.8)
-    
+    ax4.set_title("Area and climate")
+
     plt.setp(ax3.get_yticklabels(), visible=False)
     plt.setp(ax4.get_yticklabels(), visible=False)
 
