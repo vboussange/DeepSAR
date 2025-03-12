@@ -59,8 +59,6 @@ class Trainer:
         self.config = config
         self.device = config.device
         self.results = {}
-        self.feature_scalers = {}
-        self.target_scalers = {}
         self.habitat_agnostic_model = None
         self.habitat_agnostic_scalers = {}
         self.data = read_result(config.path_augmented_data)
@@ -115,8 +113,6 @@ class Trainer:
 
             trained_model, metrics, scalers = self.train_and_evaluate(model, predictors, criterion, optimizer, scheduler, gdf_train_val, gdf_test, agnostic)
             self.results[hab][predictors_name] = metrics
-            self.feature_scalers[hab] = scalers[0]
-            self.target_scalers[hab] = scalers[1]
 
     def train_and_evaluate(self, model, predictors, criterion, optimizer, scheduler, gdf_train_val, gdf_test, agnostic):
         kfold = GroupKFold(n_splits=self.config.k_folds)
