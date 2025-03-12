@@ -1,4 +1,5 @@
 # evaluating model trained on the full augmented data on the raw data
+# TODO: fix data leak by using models trained on train/test data
 
 import torch
 import pickle
