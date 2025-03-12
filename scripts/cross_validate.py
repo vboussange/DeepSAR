@@ -31,7 +31,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "71f9fc7"
+HASH = "d84985e"
 @dataclass
 class Config:
     device: str
@@ -46,13 +46,12 @@ class Config:
     weight_decay: float = 1e-3
     val_size: float = 0.2
     seed: int = 2
-    hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_augmented_data: str = Path(__file__).parent / "../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_d84985e.pkl"
+    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_{HASH}.pkl"
 
 
 class Trainer:
@@ -267,11 +266,12 @@ def compile_training_data(data, hab):
     augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
     augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
     augmented_data = augmented_data.dropna()
+    augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
     return augmented_data
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda:1"
+        device = "cuda:2"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
