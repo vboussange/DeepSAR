@@ -16,9 +16,9 @@ def batch_indices(N, batch_size):
         yield range(i, min(i + batch_size, N))
 
 # working with dictionnary of species
-def clip_EVA_SR(plot_gdf, dict_sp, polygons_gdf):
+def clip_EVA_SR(plot_gdf, dict_sp, polygons_gdf, verbose=False):
     data = pd.DataFrame({"area" : pd.Series(int), "sr": pd.Series(int), "num_plots" : pd.Series(int)})
-    for i, poly in tqdm(enumerate(polygons_gdf.geometry), desc="Clipping SR", total=len(polygons_gdf)):
+    for i, poly in tqdm(enumerate(polygons_gdf.geometry), desc="Clipping SR", total=len(polygons_gdf), disable=not verbose):
         df_samp = plot_gdf[plot_gdf.within(poly)]
         species = np.concatenate([dict_sp[idx] for idx in df_samp.index])
         sr = len(np.unique(species))

@@ -13,14 +13,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from sklearn.model_selection import train_test_split, GroupKFold
+from sklearn.model_selection import GroupShuffleSplit, GroupKFold
 import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
 from joblib import Parallel, delayed
 
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.sar import SAR
 from src.dataset import create_dataloader
 from src.plotting import read_result
 
@@ -42,7 +41,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "d84985e"
+HASH = "7ad505e"
 @dataclass
 class Config:
     device: str
@@ -134,7 +133,13 @@ class Trainer:
         scheduler = scheduler_cls(optimizer, factor=self.config.lr_scheduler_factor, patience=self.config.lr_scheduler_patience)
 
         gdf_train_val_fold = gdf_train_val.iloc[train_idx]
-        gdf_train_fold, gdf_val_fold = train_test_split(gdf_train_val_fold, test_size=self.config.val_size, random_state=self.config.seed)
+        ttrain_idx, val_idx = next(GroupShuffleSplit(test_size=self.config.val_size, random_state=self.config.seed).split(gdf_train_val_fold, groups=gdf_train_val_fold.partition))
+        gdf_train_fold = gdf_train_val_fold.iloc[ttrain_idx]
+        gdf_val_fold = gdf_train_val_fold.iloc[val_idx]
+        
+        val_partitions = gdf_val_fold.partition.unique()
+        # NOTE: we gather partitions that must be used for test set, and define the test 
+        # dataset with gdf_test. This is essential to cover the agnostic model case (no use otherwise)
         test_partitions = gdf_train_val.iloc[test_idx].partition.unique()
         test_idx_fold = gdf_test.partition.isin(test_partitions)
         gdf_test_fold = gdf_test[test_idx_fold]
@@ -150,8 +155,8 @@ class Trainer:
             "train_MSE": epoch_metrics['train_MSE'][best_epoch],
             "val_MSE": epoch_metrics['val_MSE'][best_epoch],
             "test_MSE": epoch_metrics['test_MSE'][best_epoch],
-            "test_idx": gdf_test_fold.index.tolist(),
             "test_partition": test_partitions.tolist(),
+            "val_partition": val_partitions.tolist(),
             "model_state_dict": best_model.state_dict(),
             "epoch_metrics": epoch_metrics,
             "feature_scaler": feature_scaler,
