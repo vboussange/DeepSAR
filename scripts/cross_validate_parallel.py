@@ -105,10 +105,10 @@ class Trainer:
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = compile_training_data(self.data, hab)
+        gdf = compile_training_data(self.data, hab, config)
 
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
-            gdf_train_val, gdf_test = (compile_training_data(self.data, "all"), gdf) if agnostic else (gdf, gdf)
+            gdf_train_val, gdf_test = (compile_training_data(self.data, "all", config), gdf) if agnostic else (gdf, gdf)
 
             print(f"Training model with predictors: {predictors_name}")
 
@@ -264,7 +264,7 @@ class Trainer:
         torch.save(self.results, save_path)
         
         
-def compile_training_data(data, hab):
+def compile_training_data(data, hab, config):
     megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
     if hab == "all":
         plot_data = data["plot_data_all"]

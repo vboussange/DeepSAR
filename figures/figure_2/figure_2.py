@@ -1,6 +1,5 @@
 """"
 Plotting figure 2 'prediction power of climate, area, and both on SR'
-# TODO: fix the residual plot
 """
 import torch
 import numpy as np
@@ -15,10 +14,10 @@ import scipy.stats as stats
 
 import sys
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from cross_validate import Config
+from cross_validate_parallel import Config, compile_training_data
 from src.mlp import load_model_checkpoint
-from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 from src.dataset import scale_features_targets
+from src.plotting import read_result
 
 
 def evaluate_residuals(gdf, checkpoint, fold, config):
@@ -52,14 +51,16 @@ def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
 
 
 if __name__ == "__main__":
-    habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    # habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    habitats = ["T1", "T3", "all"]
     seed = 2
     MODEL = "large"
-    HASH = "71f9fc7"    
-    path_results = Path(f"../../scripts/results/cross_validate_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    HASH = "d84985e"    
+    path_results = Path(f"../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
-        
+    config = result_modelling["config"]
+    
     for hab in habitats:
         val = result_modelling[hab]
         mse_arr = []
@@ -80,8 +81,9 @@ if __name__ == "__main__":
     # Calculating residuals
     hab = "all"
     config = result_modelling["config"]
-    
-    gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
+    data = read_result(config.path_augmented_data)
+    gdf = compile_training_data(data, hab, config)
+
     results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab, config)
     
         
@@ -97,8 +99,6 @@ if __name__ == "__main__":
     # plotting results for test data
     fig = plt.figure(figsize=(6, 6))
     nclasses = len(list(result_modelling.keys()))
-    # habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    # habitats = ["T1", "T3"]
     gs = gridspec.GridSpec(2, 3, height_ratios=[1.5,1])
     
     # first axis

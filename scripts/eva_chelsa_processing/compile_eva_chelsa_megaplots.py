@@ -32,7 +32,6 @@ numba_logger.setLevel(
     logging.WARNING
 )  # see https://stackoverflow.com/questions/65398774/numba-printing-information-regarding-nvidia-driver-to-python-console-when-using
 
-block_relative_extent = 0.2
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
@@ -47,10 +46,8 @@ CONFIG = {
         "bio12",
         "bio15",
     ],
-    "block_relative_extent": block_relative_extent,
+    "block_length": 1e6, # in meters
     "batch_size": 20,
-    "area_range": (1e4, 1e11),  # in m2
-    "side_range": (1e2, 1e6), # in m
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
@@ -189,9 +186,7 @@ if __name__ == "__main__":
     plot_gdf = compile_climate_data_plot(plot_gdf, climate_raster)
     
     logging.info("Partitioning...")
-    block_length = (plot_gdf.total_bounds[2] - plot_gdf.total_bounds[0]) * CONFIG["block_relative_extent"]
-    logging.info(f"Block length = {block_length/1000}km")
-    plot_gdf = partition_polygon_gdf(plot_gdf, block_length)
+    plot_gdf = partition_polygon_gdf(plot_gdf, CONFIG["block_length"])
     # Save the indices of plot_gdf as a CSV
     plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
     # save raw plot SR and climate data
