@@ -101,13 +101,13 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
     Process EVA data and generate synthetic megaplots data based on landcover.
     Returns GeoDataFrame of SAR data.
     """
-    total = len(len(plot_gdf["partition"].unique()))
+    total = len(plot_gdf["partition"].unique())
     miniters = max(total // 100, 1)  # Refresh every 1%
+    megaplot_data_hab_ar = []
     for partition, block_plot_gdf in tqdm(plot_gdf.groupby("partition"), desc="Processing partitions", total=total, miniters=miniters):
-        megaplot_data_hab_ar = []
         if len(block_plot_gdf) > 1:
             megaplot_data_hab_ar.append(process_partition(partition, block_plot_gdf, dict_sp, climate_raster))
-            
+                
     megaplot_data_hab = pd.concat(megaplot_data_hab_ar, ignore_index=True)
 
     assert (megaplot_data_hab["num_plots"] > 1).all()
