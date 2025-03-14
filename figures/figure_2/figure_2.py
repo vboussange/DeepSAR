@@ -52,10 +52,10 @@ def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
 
 if __name__ == "__main__":
     # habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    habitats = ["T1", "T3", "all"]
+    habitats = ["all", "T1"]
     seed = 2
     MODEL = "large"
-    HASH = "d84985e"    
+    HASH = "a53390d"
     path_results = Path(f"../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     
     # first axis
     ax1 = fig.add_subplot(gs[0, :])
-    ax1.set_ylim(0., 0.8)
+    ax1.set_ylim(0.1, 0.8)
     boxplot_bypreds(
         result_modelling,
         ax=ax1,

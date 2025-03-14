@@ -58,3 +58,4 @@ reports/*
 *-blx.bib
 *.run.xml
 
+*.gpkg

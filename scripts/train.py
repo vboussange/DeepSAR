@@ -1,3 +1,8 @@
+"""
+Training ensemble model for the different datasets.
+"""
+
+
 import copy
 import random
 import logging
@@ -23,7 +28,7 @@ MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                     "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]}
 MODEL = "large"
-HASH = "71f9fc7"
+HASH = "a53390d"
 @dataclass
 class Config:
     device: str
@@ -39,11 +44,13 @@ class Config:
     seed: int = 1
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     n_ensembles: int = 5  # Number of models in the ensemble
     run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
+    test_partitions: list = field(default_factory=lambda: [684, 546, 100, 880, 1256, 296]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/{HASH}/augmented_data.pkl"
 
 class Trainer:
     def __init__(self, config: Config):
@@ -130,13 +137,15 @@ class Trainer:
             np.random.seed(self.config.seed + ensemble_idx)
             random.seed(self.config.seed + ensemble_idx)
 
-            train_idx, test_idx = train_test_split(
-                gdf_full.index,
-                test_size=self.config.test_size,
-                random_state=self.config.seed + ensemble_idx,
-            )
+            test_idx = gdf_full.partition.isin(self.config.test_partitions)
+            # train_idx, test_idx = train_test_split(
+            #     gdf_full.index,
+            #     test_size=self.config.test_size,
+            #     random_state=self.config.seed + ensemble_idx,
+            # )
 
-            gdf_train, gdf_test = gdf_full.loc[train_idx], gdf_full.loc[test_idx]
+            gdf_train, gdf_test = gdf_full.loc[~test_idx], gdf_full.loc[test_idx]
+            logger.info(f"Ratio of test data: {len(gdf_test) / len(gdf_full):.2f}")
 
             train_loader, self.feature_scaler, self.target_scaler = create_dataloader(gdf_train, predictors, self.config.batch_size, self.config.num_workers)
             val_loader, _, _ = create_dataloader(gdf_test, predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
@@ -186,7 +195,6 @@ class Trainer:
             "target_scaler": self.target_scaler,
             "predictors": predictors,
             "ensemble_metrics": ensemble_metrics,
-            "train_idx": train_idx
         }
         
 def compile_training_data(data, hab):
@@ -197,19 +205,21 @@ def compile_training_data(data, hab):
         plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
         
     augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
+    # augmented_data = megaplot_data
     
     # stack with raw plot data
     augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
     augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
     augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
     augmented_data = augmented_data.dropna()
+    augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
     climate_predictors = config.climate_variables + ["std_" + env for env in config.climate_variables]
     predictors = ["log_area", "log_megaplot_area"] + climate_predictors
     return augmented_data, predictors
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda:0"
+        device = "cuda:1"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -220,7 +230,6 @@ if __name__ == "__main__":
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
-    path_augmented_data = Path("/home/boussang/DeepSAR/data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_cf6ea5c.pkl")
     data = read_result(path_augmented_data)
 
     results_all = {}

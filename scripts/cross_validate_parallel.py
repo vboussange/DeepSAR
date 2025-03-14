@@ -41,7 +41,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "d691ac2"
+HASH = "a53390d" 
 @dataclass
 class Config:
     device: str
