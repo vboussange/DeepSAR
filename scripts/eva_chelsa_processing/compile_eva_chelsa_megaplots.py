@@ -12,7 +12,7 @@ import math
 from tqdm import tqdm
 import warnings
 
-from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs
+from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs, generate_random_boxes
 from src.data_processing.utils_eva import EVADataset
 from src.data_processing.utils_env_pred import CHELSADataset
 from src.utils import save_to_pickle
@@ -46,7 +46,8 @@ CONFIG = {
         "bio15",
     ],
     "block_length": 1e5, # in meters
-    "batch_size": 20,
+    "area_range": (1e4, 1e10),  # in m2
+    "side_range": (1e2, 1e5), # in m
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
@@ -85,7 +86,11 @@ def load_and_preprocess_data(check_consistency=False):
 
 def process_partition(partition, block_plot_gdf, dict_sp, climate_raster):
     # print(f"Partition {partition}: Processing EVA data...")
-    boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(len(block_plot_gdf), CONFIG["num_polygon_max"]))
+    # boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(len(block_plot_gdf), CONFIG["num_polygon_max"]))
+    boxes_gdf = generate_random_boxes(block_plot_gdf, 
+                                      min(len(block_plot_gdf), CONFIG["num_polygon_max"]), 
+                                      CONFIG["area_range"],
+                                      CONFIG["side_range"])
     megaplot_data_partition = clip_EVA_SR(block_plot_gdf, dict_sp, boxes_gdf)
     # megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
     megaplot_data_partition["megaplot_area"] = boxes_gdf.area
@@ -110,7 +115,6 @@ def generate_megaplots(plot_gdf, dict_sp, climate_raster):
                 
     megaplot_data_hab = pd.concat(megaplot_data_hab_ar, ignore_index=True)
 
-    assert (megaplot_data_hab["num_plots"] > 1).all()
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)} || Nb. plots: {len(plot_gdf)}")
 
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
@@ -170,14 +174,14 @@ def format_plot_data(plot_data):
 
     return plot_data
 
-if __name__ == "__main__":
-    CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
-    
+if __name__ == "__main__":    
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
-    CONFIG["output_file_name"] = Path(f"EVA_CHELSA_raw_random_state_{CONFIG['random_state']}_{sha}.pkl")
+    CONFIG["output_file_path"]  = CONFIG["output_file_path"] / sha
+    CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
+    CONFIG["output_file_name"] = Path(f"augmented_data.pkl")
     
     plot_gdf, dict_sp, climate_raster = load_and_preprocess_data()
     plot_gdf = compile_climate_data_plot(plot_gdf, climate_raster)
@@ -185,11 +189,8 @@ if __name__ == "__main__":
     logging.info("Partitioning...")
     plot_gdf = partition_polygon_gdf(plot_gdf, CONFIG["block_length"])
     logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
-    # Save the indices of plot_gdf as a CSV
-    plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
     # save raw plot SR and climate data
     plot_data_all = format_plot_data(plot_gdf)
-    plot_data_all.to_file(CONFIG["output_file_path"] / "raw_plot_data.gpkg", driver="GPKG")
     
     megaplot_ar = []
     plot_gdf_by_hab = plot_gdf.groupby("Level_2")
@@ -223,8 +224,27 @@ if __name__ == "__main__":
     # aggregating results and final save
     megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
        
-    save_to_pickle(CONFIG["output_file_path"] / CONFIG["output_file_name"], 
+       
+    # --------- FINAL EXPORT ---------
+    # Save the indices of plot_data_all as a CSV for custodianship
+    plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
+    
+    # export the full compilation to pickle
+    output_path = CONFIG["output_file_path"] / CONFIG["output_file_name"]
+    print(f"Exporting {output_path}")
+    save_to_pickle(output_path, 
                    megaplot_data=megaplot_data, 
                    plot_data_all=plot_data_all,
                    config=CONFIG)
-    logging.info(f'Full compilation saved at {CONFIG["output_file_path"] / CONFIG["output_file_name"]}.')
+    
+    # exporting megaplot_data to gpkg
+    output_path = CONFIG["output_file_path"] / "megaplot_data.gpkg"
+    print(f"Exporting {output_path}")
+    megaplot_data.to_file(output_path, driver="GPKG")
+    
+    # exporting raw plot data tp gpkg
+    output_path = CONFIG["output_file_path"] / "raw_plot_data.gpkg"
+    print(f"Exporting {output_path}")
+    plot_data_all.to_file(output_path, driver="GPKG")
+    
+    logging.info(f'Full compilation saved at {CONFIG["output_file_path"]}.')

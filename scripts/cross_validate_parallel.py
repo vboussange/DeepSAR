@@ -41,7 +41,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "7ad505e"
+HASH = "d691ac2"
 @dataclass
 class Config:
     device: str
@@ -61,7 +61,7 @@ class Config:
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_{HASH}.pkl"
+    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/{HASH}/augmented_data.pkl"
 
 
 class Trainer:
