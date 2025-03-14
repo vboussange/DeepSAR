@@ -130,10 +130,12 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
     """
     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
-        minx, miny, maxx, maxy = row.geometry.bounds
+        y = [p.y for p in row.geometry.geoms]
+        x = [p.x for p in row.geometry.geoms]
         env_vars = climate_raster.sel(
-            x=slice(minx, maxx),
-            y=slice(miny, maxy) 
+            x=xr.DataArray(x, dims="z"),
+            y=xr.DataArray(y, dims="z"),
+            method="nearest",
         )
         env_vars = env_vars.to_numpy()
         with warnings.catch_warnings():
