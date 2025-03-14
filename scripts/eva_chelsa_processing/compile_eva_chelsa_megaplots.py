@@ -130,20 +130,21 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
     """
     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
-        y = [p.y for p in row.geometry.geoms]
-        x = [p.x for p in row.geometry.geoms]
+        y = [p.y for p in row.multipoint.geoms]
+        x = [p.x for p in row.multipoint.geoms]
         env_vars = climate_raster.sel(
             x=xr.DataArray(x, dims="z"),
             y=xr.DataArray(y, dims="z"),
             method="nearest",
         )
-        env_vars = env_vars.to_numpy()
+        env_vars = env_vars.to_numpy().reshape((len(CONFIG["env_vars"]), -1, 1))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             _m = np.nanmean(env_vars, axis=(1, 2))
             _std = np.nanstd(env_vars, axis=(1, 2))
         env_pred_stats = np.concatenate([_m, _std])
         megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
+    megaplot_data.drop(columns=["multipoint"], inplace=True)
     return megaplot_data
 
 def compile_climate_data_plot(plot_data, climate_raster):
