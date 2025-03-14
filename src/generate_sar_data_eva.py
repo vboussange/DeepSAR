@@ -17,15 +17,15 @@ def batch_indices(N, batch_size):
 
 # working with dictionnary of species
 def clip_EVA_SR(plot_gdf, dict_sp, polygons_gdf, verbose=False):
-    data = pd.DataFrame({"area" : pd.Series(int), "sr": pd.Series(int), "num_plots" : pd.Series(int)})
+    data = pd.DataFrame({"area" : pd.Series(int), "sr": pd.Series(int), "num_plots" : pd.Series(int), "multipoint" : pd.Series("object")})
     for i, poly in tqdm(enumerate(polygons_gdf.geometry), desc="Clipping SR", total=len(polygons_gdf), disable=not verbose):
         df_samp = plot_gdf[plot_gdf.within(poly)]
         species = np.concatenate([dict_sp[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
         a = np.sum(df_samp['plot_size'])
-        # geom = MultiPoint(df_samp.geometry.to_list())
+        geom = MultiPoint(df_samp.geometry.to_list())
         num_plots = len(df_samp)
-        data.loc[i, ["area", "sr", "num_plots"]] = [a, sr, num_plots]
+        data.loc[i, ["area", "sr", "num_plots", "multipoint"]] = [a, sr, num_plots, geom]
     return data
 
 
