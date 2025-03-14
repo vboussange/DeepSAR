@@ -134,6 +134,45 @@ def generate_random_boxes_from_candidate_pairs(candidate_points, num_boxes):
         geometry=boxes,
         crs=candidate_points.crs
     )
+    
+    
+def generate_random_squares(candidate_points, num_boxes, area_range):
+    """
+    Generates a specified number of random squares a given
+    area.
+    The generated squares are centered on points randomly sampled from `candidate_points`.
+    
+    TODO: While the box is centered on the candidate point, parts of it may fall outside bounds.
+    TODO: The box should be cropped given a certain bounding box (to be added as an argument).
+
+    Returns:
+    - A GeoDataFrame containing the generated boxes with the same CRS
+    as `candidate_points`.
+    """
+
+    boxes = []
+    log_area_range = np.log(area_range)
+    for idx in np.random.choice(candidate_points.index, num_boxes):
+        point = candidate_points.geometry[idx]
+        log_area = np.random.uniform(*log_area_range)
+        log_length = log_area / 2
+        height = np.exp(log_length)
+        length = np.exp(log_length)
+        
+        # Calculate half dimensions to center the box around the point
+        half_length = length / 2
+        half_height = height / 2
+        
+        # Create the box centered on the point
+        new_box = box(
+            point.x - half_length, 
+            point.y - half_height, 
+            point.x + half_length, 
+            point.y + half_height
+        )
+        boxes.append(new_box)
+
+    return gpd.GeoDataFrame(geometry=boxes, crs=candidate_points.crs)
 
 
 def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
@@ -141,15 +180,14 @@ def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
     Generates a specified number of random rectangular boxes within a given
     area, ensuring that each box's area and side lengths fall within specified
     ranges.
-    The generated rectangles are assigned the partition number of the candidate point 
-    that has served as the lower left corner of the box.
+    The generated rectangles are centered on points randomly sampled from `candidate_points`.
     
-    TODO: While lower left corner will fall within `candidate_points` total bounds, the rest of the box may fall outside. 
+    TODO: While the box is centered on the candidate point, parts of it may fall outside bounds.
     TODO: The box should be cropped given a certain bounding box (to be added as an argument).
 
     Parameters:
-    - candidate_points: A GeoDataFrame containing points that are
-    considered as lower-left corners for boxes.
+    - candidate_points: A GeoDataFrame containing points that will
+    serve as the centers for the generated boxes.
     - num_boxes: The number of boxes to generate.
     - area_range: A tuple specifying the minimum and maximum area
     for each box, in same units than geometry of `candidate_points`
@@ -162,7 +200,6 @@ def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
     """
 
     boxes = []
-    partitions = []
     log_area_range = np.log(area_range)
     log_side_range = np.log(side_range)
     for idx in np.random.choice(candidate_points.index, num_boxes):
@@ -175,14 +212,21 @@ def generate_random_boxes(candidate_points, num_boxes, area_range, side_range):
         log_height = np.random.uniform(log_height_min, log_height_max)
         height = np.exp(log_height)
         length = np.exp(log_length)
-        # Create the box and add it to the list.
-        new_box = box(point.x - 1.0, point.y - 1.0, point.x + length, point.y + height)
+        
+        # Calculate half dimensions to center the box around the point
+        half_length = length / 2
+        half_height = height / 2
+        
+        # Create the box centered on the point
+        new_box = box(
+            point.x - half_length, 
+            point.y - half_height, 
+            point.x + half_length, 
+            point.y + half_height
+        )
         boxes.append(new_box)
-        partitions.append(candidate_points.partition[idx])
 
-    return gpd.GeoDataFrame(
-        data={"partition": partitions}, geometry=boxes, crs=candidate_points.crs
-    )
+    return gpd.GeoDataFrame(geometry=boxes, crs=candidate_points.crs)
 
 
 def crop_raster(lc_binary, geom):

@@ -12,7 +12,7 @@ import math
 from tqdm import tqdm
 import warnings
 
-from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs, generate_random_boxes
+from src.generate_sar_data_eva import clip_EVA_SR, generate_random_boxes_from_candidate_pairs, generate_random_boxes, generate_random_squares
 from src.data_processing.utils_eva import EVADataset
 from src.data_processing.utils_env_pred import CHELSADataset
 from src.utils import save_to_pickle
@@ -47,7 +47,7 @@ CONFIG = {
     ],
     "block_length": 1e5, # in meters
     "area_range": (1e4, 1e10),  # in m2
-    "side_range": (1e2, 1e5), # in m
+    # "side_range": (1e2, 1e5), # in m
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     # "habitats" : ["T1"]
@@ -87,10 +87,13 @@ def load_and_preprocess_data(check_consistency=False):
 def process_partition(partition, block_plot_gdf, dict_sp, climate_raster):
     # print(f"Partition {partition}: Processing EVA data...")
     # boxes_gdf = generate_random_boxes_from_candidate_pairs(block_plot_gdf, min(len(block_plot_gdf), CONFIG["num_polygon_max"]))
-    boxes_gdf = generate_random_boxes(block_plot_gdf, 
+    # boxes_gdf = generate_random_boxes(block_plot_gdf, 
+    #                                   min(len(block_plot_gdf), CONFIG["num_polygon_max"]), 
+    #                                   CONFIG["area_range"],
+    #                                   CONFIG["side_range"])
+    boxes_gdf = generate_random_squares(block_plot_gdf, 
                                       min(len(block_plot_gdf), CONFIG["num_polygon_max"]), 
-                                      CONFIG["area_range"],
-                                      CONFIG["side_range"])
+                                      CONFIG["area_range"])
     megaplot_data_partition = clip_EVA_SR(block_plot_gdf, dict_sp, boxes_gdf)
     # megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
     megaplot_data_partition["megaplot_area"] = boxes_gdf.area
