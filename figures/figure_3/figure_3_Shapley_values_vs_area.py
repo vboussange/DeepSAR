@@ -8,13 +8,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from src.ensemble_model import initialize_ensemble_model
 from src.mlp import scale_feature_tensor
+from src.plotting import read_result
+
 from captum.attr import ShapleyValueSampling
 from pathlib import Path
 import sys
 
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
-from train import Config
+from train import Config, compile_training_data
 
 def get_df_shap_val(model, results_fit_split, gdf):
     predictors = results_fit_split["predictors"]
@@ -42,22 +43,22 @@ def get_df_shap_val(model, results_fit_split, gdf):
     return df_shap_values
 
 def compute_shap_values(seed, model_name, hash_value, habitats):
-    checkpoint_path = Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{model_name}_model_full_physics_informed_constraint_{hash_value}.pth")
-    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")
+    path_results = Path(__file__).parent / Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{model_name}_model_full_physics_informed_constraint_{hash_value}.pth")    
+    results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
-
+    data = read_result(config.path_augmented_data)
     shap_values = {}
     for hab in habitats:
         results_fit_split = results_fit_split_all[hab]
         model = initialize_ensemble_model(results_fit_split, config, "cuda")
-        gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
+        gdf = compile_training_data(data, hab, config)
         df_shap = get_df_shap_val(model, results_fit_split, gdf)
         
         std_labs = ["std_" + env for env in config.climate_variables]
         mean_labs = config.climate_variables
         df_shap["Climate heterogeneity"] = np.abs(df_shap[std_labs]).sum(axis=1)
         df_shap["Mean climate"] = np.abs(df_shap[mean_labs]).sum(axis=1)
-        df_shap["Area"] = np.abs(df_shap["log_area"])
+        df_shap["Area"] = np.abs(df_shap[["log_area", "log_megaplot_area"]]).sum(axis=1)
         
         df_shap[["Area", "Climate heterogeneity", "Mean climate"]] = df_shap[["Area", "Climate heterogeneity", "Mean climate"]].values / df_shap[["Area", "Climate heterogeneity", "Mean climate"]].sum(axis=1).values.reshape(-1, 1)
         
@@ -99,7 +100,7 @@ def plot_shap_values(shap_values, config, habitats, config_plot):
 if __name__ == "__main__":
     seed = 1
     model_name = "large"
-    hash_value = "71f9fc7"
+    hash_value = "a53390d"
     habitats = ["T1", "R1", "Q5", "S2", "all", "T3", "R2", "Q2", "S3"]
     config_plot = [("Area", "tab:green"), ("Mean climate", "tab:blue"), ("Climate heterogeneity", "tab:red")]
 

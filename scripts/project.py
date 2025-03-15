@@ -49,7 +49,7 @@ def plot_raster(rast, label, ax, cmap, vmin=None, vmax=None):
 def create_features(predictor_labels, climate_dataset, res):
     # see: https://docs.xarray.dev/en/stable/generated/xarray.DataArray.coarsen.html
     resolution = abs(climate_dataset.rio.resolution()[0])
-    ncells = int(res / resolution)
+    ncells = max(1, int(res / resolution))
     coarse = climate_dataset.coarsen(x=ncells, y=ncells, boundary="trim")
     
     # See: https://corteva.github.io/rioxarray/stable/rioxarray.html#rioxarray.raster_array.RasterArray.reproject_match
@@ -64,9 +64,10 @@ def create_features(predictor_labels, climate_dataset, res):
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=2048):
+def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=2048):
     mean_log_SR_list = []
     std_log_SR_list = []
+    dlogSR_dlogA_list = []
     features = create_features(predictors, climate_dataset, res)
     total_length = len(features)
 
@@ -82,11 +83,17 @@ def get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, targe
         std_log_SR = np.std(log_SRs, axis=0)
         mean_log_SR_list.append(mean_log_SR)
         std_log_SR_list.append(std_log_SR)
-
+        
+        # grad: dSR/dA
+        X = X.requires_grad_(True)
+        log_SR = model(X)
+        dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,:2].sum(axis=1)
+        dlogSR_dlogA_list.append(dlogSR_dlogA)
+        
     mean_log_SR = np.concatenate(mean_log_SR_list, axis=0)
     std_log_SR = np.concatenate(std_log_SR_list, axis=0)
-
-    return features, mean_log_SR, std_log_SR
+    dlogSR_dlogA = np.concatenate(dlogSR_dlogA_list, axis=0)    
+    return features, mean_log_SR, std_log_SR, dlogSR_dlogA
         
         
 def load_chelsa_and_reproject(predictors):
@@ -97,66 +104,35 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     results_path = Path("./results/projections")
-    checkpoint_path = Path("/home/boussang/DeepSAR/scripts/results/train_single_habitat_dSRdA_weight_1e+00_seed_1/checkpoint_large_model_full_physics_informed_constraint_71f9fc7.pth")    
-    
     results_path.mkdir(parents=True, exist_ok=True)
-    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    
-    model_params = results_fit_split_all["results"]
-    model = initialize_ensemble_model(model_params, results_fit_split_all["config"], "cuda")
+
+    seed = 1
+    MODEL = "large"
+    HASH = "a53390d"  
+    path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    results_fit_split_all = torch.load(path_results, map_location="cpu")
+    config = results_fit_split_all["config"]
+    results_fit_split = results_fit_split_all["all"]
+    model = initialize_ensemble_model(results_fit_split, config, "cuda")
     
 
-    predictors = model_params["predictors"]
-    feature_scaler = model_params["feature_scaler"]
-    target_scaler = model_params["target_scaler"]
+    predictors = results_fit_split["predictors"]
+    feature_scaler = results_fit_split["feature_scaler"]
+    target_scaler = results_fit_split["target_scaler"]
     
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 
-    res = np.sqrt(7774e6)
-    print(f"Calculating SR, and stdSR for resolution {res}")
-    features, SR, std_SR = get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
+    for res in [10000]:#[100, 1000, 10000, 100000]:
+        print(f"Calculating SR, and stdSR for resolution: {res}m")
+        features, SR, std_SR, dlogSR_dlogA = get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
-    print("Projection predictions on map.")
-    SR_rast = create_raster(features, SR)
-    std_SR_rast = create_raster(features, std_SR)
-    
-    SR_rast.rio.to_raster(results_path/f"SR_raster_{res:.0f}m.tif")
-    std_SR_rast.rio.to_raster(results_path/f"std_SR_raster_{res:.0f}m.tif")
-    
-    # fig, axs = plt.subplots(1, 2, figsize=(6, 4))
-    # print(f"Plotting SR...")
-    # plot_raster(SR_rast.coarsen(x=20, y=20, boundary="trim").mean(),
-    #             f"SR resolved at {res_sr_map/1e3}km",
-    #             axs[0],
-    #             "BuGn")
-    # print(f"Plotting dlogSR/dlogA...")
-    # plot_raster(std_SR_rast.coarsen(x=20, y=20,  boundary="trim").mean(),
-    #             "Std. SR",
-    #             axs[1],
-    #             "OrRd",)
-
-    # for ax in axs.flatten():
-    #     ax.set_xticklabels([])
-    #     ax.set_yticklabels([])
-    #     ax.set_xticks([])
-    #     ax.set_yticks([])
-    # fig.tight_layout()
-    # fig.savefig(results_path / f"rel_std_SR_{res_sr_map:.0f}m.png")
-    
-    # relative_std_SR = std_SR / SR
-
-    # relative_std_SR_rast = create_raster(X_map_dict[1], relative_std_SR)
-
-    # fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    # print(f"Plotting relative std. SR...")
-    # plot_raster(relative_std_SR_rast.coarsen(x=20, y=20, boundary="trim").mean(),
-    #             "Relative Std. SR",
-    #             ax,
-    #             "Reds",)
-
-    # ax.set_xticklabels([])
-    # ax.set_yticklabels([])
-    # ax.set_xticks([])
-    # ax.set_yticks([])
-    # fig.tight_layout()
-    # fig.savefig(results_path / f"rel_std_SR_{res_sr_map:.0f}m.png")
+        print("Projection predictions on map.")
+        SR_rast = create_raster(features, SR)
+        std_SR_rast = create_raster(features, std_SR)
+        
+        SR_rast.rio.to_raster(results_path/f"SR_raster_{res:.0f}m.tif")
+        std_SR_rast.rio.to_raster(results_path/f"std_SR_raster_{res:.0f}m.tif")
+        
+        dlogSR_dlogA_rast = create_raster(features, dlogSR_dlogA)
+        dlogSR_dlogA_rast.rio.to_raster(results_path/f"dlogSR_dlogA_raster_{res:.0f}m.tif")

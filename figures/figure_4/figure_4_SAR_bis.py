@@ -1,5 +1,6 @@
 """
 Here we plot corrected and not corrected SAR and dSAR.
+TODO: since heterogeneity does not seem to be a big player, we may just remove the colors and just talk about the variability of the SAR.
 """
 import copy
 import torch
@@ -8,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
+from src.plotting import read_result
 from src.ensemble_model import initialize_ensemble_model
 from pathlib import Path
 from sklearn.decomposition import PCA
@@ -15,8 +17,7 @@ from sklearn.model_selection import StratifiedKFold
 
 import sys
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from train import Config
-from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
+from train import Config, compile_training_data
 
 
 def get_SR_dSR(model, gdf, predictors, feature_scaler, target_scaler):
@@ -103,10 +104,11 @@ def plot_SAR_dSAR(ax_SAR, ax_dSAR, model, results_fit_split, gdf, dict_styles):
 if __name__ == "__main__":
     seed = 1
     MODEL = "large"
-    HASH = "71f9fc7"    
-    checkpoint_path = Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
-    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")
+    HASH = "a53390d"  
+    path_results = Path(__file__).parent / Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
+    data = read_result(config.path_augmented_data)
 
 
     fig_SAR, axs_SAR = plt.subplots(2, 5, figsize=(8, 4), sharex=True, sharey=True)
@@ -120,7 +122,7 @@ if __name__ == "__main__":
         results_fit_split = results_fit_split_all[hab]
         model = initialize_ensemble_model(results_fit_split, config, "cuda")
         print(f"MSE val: {results_fit_split['best_validation_loss']}")
-        gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)
+        gdf = compile_training_data(data, hab, config)
 
         ax_SAR = axs_SAR.flatten()[i]
         ax_dSAR = axs_dSAR.flatten()[i]

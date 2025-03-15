@@ -20,17 +20,18 @@ from src.dataset import scale_features_targets
 from src.plotting import read_result
 
 
-def evaluate_residuals(gdf, checkpoint, fold, config):
+def evaluate_residuals(gdf, checkpoint, fold, config, scenario):
     predictors = checkpoint["predictors"]
-    test_idx = np.random.choice(checkpoint["test_idx"][fold], 1000, replace=False)
+    partition_idx = checkpoint["test_partition"][fold]
+    gdf_test = gdf[gdf.partition.isin(partition_idx)].sample(n=1000, random_state=42)
     feature_scaler = checkpoint["feature_scaler"][fold]
     target_scaler = checkpoint["target_scaler"][fold]
-    gdf_test = gdf.loc[test_idx,:]
     X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
     log_area =  gdf_test["log_area"].values
     
     model_state = checkpoint["model_state_dict"][fold]
-    model = load_model_checkpoint(model_state, predictors, layer_sizes=config.layer_sizes)
+    layer_sizes = [] if scenario == "power_law" else config.layer_sizes
+    model = load_model_checkpoint(model_state, predictors, layer_sizes=layer_sizes)
     with torch.no_grad():
         y = target_scaler.inverse_transform(model(X_test))
         y_test = target_scaler.inverse_transform(y_test)
@@ -39,11 +40,11 @@ def evaluate_residuals(gdf, checkpoint, fold, config):
     return log_area, res.flatten()
 
 def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
-    fold = 5
+    fold = 1
     result_all = {}
-    for scenario in ["area", "climate", "area+climate"]:
+    for scenario in ["power_law", "climate", "area+climate"]:
         checkpoint = result_modelling[hab][scenario]
-        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config)
+        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config, scenario)
         result_all[scenario] = {}
         result_all[scenario]["residuals"] = residuals
         result_all[scenario]["log_area"] = log_area
@@ -51,8 +52,8 @@ def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
 
 
 if __name__ == "__main__":
-    # habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    habitats = ["all", "T1"]
+    habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    # habitats = ["all", "T1"]
     seed = 2
     MODEL = "large"
     HASH = "a53390d"
@@ -91,15 +92,15 @@ if __name__ == "__main__":
     PREDICTORS = ["power_law", 
                   "area", 
                   "climate", 
+                "area+climate", 
                   'area+climate, habitat agnostic', 
-                  "area+climate", 
                 #   "area+climate, no physics"
                   ]
 
     # plotting results for test data
-    fig = plt.figure(figsize=(6, 6))
+    fig = plt.figure(figsize=(8, 6))
     nclasses = len(list(result_modelling.keys()))
-    gs = gridspec.GridSpec(2, 3, height_ratios=[1.5,1])
+    gs = gridspec.GridSpec(2, 3, height_ratios=[1.4,1], hspace=0.4)
     
     # first axis
     ax1 = fig.add_subplot(gs[0, :])
@@ -120,35 +121,35 @@ if __name__ == "__main__":
     )
     label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
     for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-        ax1.text(x+0.5, -0.15, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
+        ax1.text(x+0.5, -0.03, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
     fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
     fig
     # second axis
-    color_palette = sns.color_palette("Set2", 4)
+    color_palette = sns.color_palette("Set2", 5)
     qr_range = [0.05, 0.95]
     ax2 = fig.add_subplot(gs[1, 0], )
-    x = results_residuals["area"]["log_area"]
-    residuals = results_residuals["area"]["residuals"]
+    x = results_residuals["power_law"]["log_area"]
+    residuals = results_residuals["power_law"]["residuals"]
     q1_ax2, q3_ax2 = np.quantile(residuals, qr_range)
-    ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[1], alpha=0.1)
+    ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[0], alpha=0.1)
     ax2.scatter(x, residuals, s=3.0, label="area", color = color_palette[0], alpha=1)
     ax2.set_ylabel("Residuals\n$\\hat{\log \\text{SR}} - \log \\text{SR}$")
     ax2.set_ylim(-2.5,2.5)
-    ax2.set_title("Area only")
+    ax2.set_title("Power-law model")
 
     ax3 = fig.add_subplot(gs[1, 1],sharey=ax2, sharex=ax2)
     x = results_residuals["climate"]["log_area"]
     residuals = results_residuals["climate"]["residuals"]
     q1_ax3, q3_ax3 = np.quantile(residuals, qr_range)
     ax3.axhspan(q1_ax3, q3_ax3, color=color_palette[2], alpha=0.1)
-    ax3.scatter(x, residuals, s=3.0, label="climate", color = color_palette[1], alpha=0.8)
+    ax3.scatter(x, residuals, s=3.0, label="climate", color = color_palette[2], alpha=0.8)
     ax3.set_title("Climate only")
 
     ax4 = fig.add_subplot(gs[1, 2], sharey=ax2, sharex=ax2)
     x = results_residuals["area+climate"]["log_area"]
     residuals = results_residuals["area+climate"]["residuals"]
     q1_ax4, q3_ax4 = np.quantile(residuals, qr_range)
-    ax4.axhspan(q1_ax4, q3_ax4, color=color_palette[4], alpha=0.1)
+    ax4.axhspan(q1_ax4, q3_ax4, color=color_palette[3], alpha=0.1)
     ax4.scatter(x, residuals, s=3.0, label="area + climate", color = color_palette[3], alpha=0.8)
     ax4.set_title("Area and climate")
 
@@ -159,7 +160,7 @@ if __name__ == "__main__":
         ax.plot([min(x), max(x)], [0, 0], c="grey", linestyle="--")
         ax.set_xlabel("log(A)")
 
-    _let = ["A", "B", "C", "D"]
+    _let = ["a", "b", "c", "d"]
     for i,ax in enumerate([ax1, ax2,ax3,ax4]):
         _x = -0.1
         ax.text(_x, 1.05, _let[i],
@@ -169,10 +170,11 @@ if __name__ == "__main__":
             ha="left",
             transform=ax.transAxes,
         )
+    fig
 
-    fig.tight_layout()
+    # fig.tight_layout()
     fig.savefig("figure_2.pdf", dpi=300, transparent=True)
-
+    
     with open("paired_t_test_EVA_EUNIS.txt", "w") as file:
         for j, c in enumerate(habitats[:-1]):
             print(c, file=file)

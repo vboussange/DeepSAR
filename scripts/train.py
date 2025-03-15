@@ -197,7 +197,7 @@ class Trainer:
             "ensemble_metrics": ensemble_metrics,
         }
         
-def compile_training_data(data, hab):
+def compile_training_data(data, hab, config):
     megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
     if hab == "all":
         plot_data = data["plot_data_all"]
@@ -205,7 +205,6 @@ def compile_training_data(data, hab):
         plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
         
     augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
-    # augmented_data = megaplot_data
     
     # stack with raw plot data
     augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
@@ -213,9 +212,7 @@ def compile_training_data(data, hab):
     augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
     augmented_data = augmented_data.dropna()
     augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
-    climate_predictors = config.climate_variables + ["std_" + env for env in config.climate_variables]
-    predictors = ["log_area", "log_megaplot_area"] + climate_predictors
-    return augmented_data, predictors
+    return augmented_data
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -230,12 +227,13 @@ if __name__ == "__main__":
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
-    data = read_result(path_augmented_data)
+    data = read_result(config.path_augmented_data)
 
     results_all = {}
+    predictors = ["log_area", "log_megaplot_area"] + config.climate_variables
     for hab in config.habitats:
         logger.info(f"Training ensemble model with habitat {hab}")
-        augmented_data, predictors = compile_training_data(data, hab)
+        augmented_data = compile_training_data(data, hab, config)
 
         trainer = Trainer(config)
         results = trainer.train_and_evaluate_ensemble(
