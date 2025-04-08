@@ -1,4 +1,4 @@
-""""
+"""
 Plotting figure 2 'prediction power of climate, area, and both on SR'
 """
 import torch
@@ -30,7 +30,7 @@ def evaluate_residuals(gdf, checkpoint, fold, config, scenario):
     log_area =  gdf_test["log_area"].values
     
     model_state = checkpoint["model_state_dict"][fold]
-    layer_sizes = [] if scenario == "power_law" else config.layer_sizes
+    layer_sizes = [] if scenario == "linear_model" else config.layer_sizes
     model = load_model_checkpoint(model_state, predictors, layer_sizes=layer_sizes)
     with torch.no_grad():
         y = target_scaler.inverse_transform(model(X_test))
@@ -42,7 +42,7 @@ def evaluate_residuals(gdf, checkpoint, fold, config, scenario):
 def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
     fold = 1
     result_all = {}
-    for scenario in ["power_law", "climate", "area+climate"]:
+    for scenario in ["linear_model", "climate", "area+climate"]:
         checkpoint = result_modelling[hab][scenario]
         log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config, scenario)
         result_all[scenario] = {}
@@ -66,7 +66,10 @@ if __name__ == "__main__":
         val = result_modelling[hab]
         mse_arr = []
         # removing nan values
-        for val2 in val.values():
+        for k in list(val.keys()):
+            val2 = val[k]
+            if k == "power_law":
+                val["linear_model"] = val.pop(k)
             mse = val2["test_MSE"]
             if len(mse) > 0:
                 mse_arr.append(mse)
@@ -89,7 +92,7 @@ if __name__ == "__main__":
     
         
     result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
-    PREDICTORS = ["power_law", 
+    PREDICTORS = ["linear_model", 
                   "area", 
                   "climate", 
                 "area+climate", 
@@ -128,14 +131,14 @@ if __name__ == "__main__":
     color_palette = sns.color_palette("Set2", 5)
     qr_range = [0.05, 0.95]
     ax2 = fig.add_subplot(gs[1, 0], )
-    x = results_residuals["power_law"]["log_area"]
-    residuals = results_residuals["power_law"]["residuals"]
+    x = results_residuals["linear_model"]["log_area"]
+    residuals = results_residuals["linear_model"]["residuals"]
     q1_ax2, q3_ax2 = np.quantile(residuals, qr_range)
     ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[0], alpha=0.1)
     ax2.scatter(x, residuals, s=3.0, label="area", color = color_palette[0], alpha=1)
     ax2.set_ylabel("Residuals\n$\\hat{\log \\text{SR}} - \log \\text{SR}$")
     ax2.set_ylim(-2.5,2.5)
-    ax2.set_title("Power-law model")
+    ax2.set_title("Linear model")
 
     ax3 = fig.add_subplot(gs[1, 1],sharey=ax2, sharex=ax2)
     x = results_residuals["climate"]["log_area"]

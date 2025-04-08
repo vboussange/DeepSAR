@@ -15,50 +15,20 @@ import scipy.stats as stats
 
 import sys
 sys.path.append(str(Path(__file__).parent / Path("../../../scripts/")))
-from cross_validate import Config
+from cross_validate_parallel import Config, compile_training_data
 from src.mlp import load_model_checkpoint
-from eva_chelsa_processing.preprocess_eva_chelsa_megaplots import load_preprocessed_data
 from src.dataset import scale_features_targets
-
-
-def evaluate_residuals(gdf, checkpoint, fold, config):
-    predictors = checkpoint["predictors"]
-    test_idx = np.random.choice(checkpoint["test_idx"][fold], 1000, replace=False)
-    feature_scaler = checkpoint["feature_scaler"][fold]
-    target_scaler = checkpoint["target_scaler"][fold]
-    gdf_test = gdf.loc[test_idx,:]
-    X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
-    log_area =  gdf_test["log_area"].values
-    
-    model_state = checkpoint["model_state_dict"][fold]
-    model = load_model_checkpoint(model_state, predictors, layer_sizes=config.layer_sizes)
-    with torch.no_grad():
-        y = target_scaler.inverse_transform(model(X_test))
-        y_test = target_scaler.inverse_transform(y_test)
-        res = y - y_test
-        print(f"MSE: {mean_squared_error(y, y_test):.4f}")
-    return log_area, res.flatten()
-
-def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
-    fold = 5
-    result_all = {}
-    for scenario in ["area", "climate", "area+climate"]:
-        checkpoint = result_modelling[hab][scenario]
-        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config)
-        result_all[scenario] = {}
-        result_all[scenario]["residuals"] = residuals
-        result_all[scenario]["log_area"] = log_area
-    return result_all
-
+from src.plotting import read_result
 
 if __name__ == "__main__":
     habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     seed = 2
     MODEL = "large"
-    HASH = "71f9fc7"    
-    path_results = Path(f"../../../scripts/results/cross_validate_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    HASH = "a53390d"    
+    path_results = Path(f"../../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
+    config = result_modelling["config"]
         
     for hab in habitats:
         val = result_modelling[hab]
@@ -81,7 +51,8 @@ if __name__ == "__main__":
     hab = "all"
     config = result_modelling["config"]
     
-    gdf = load_preprocessed_data(hab, config.hash_data, config.data_seed)    
+    data = read_result(config.path_augmented_data)
+    gdf = compile_training_data(data, hab, config)    
         
     result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
     PREDICTORS = [
@@ -116,3 +87,5 @@ if __name__ == "__main__":
         predictors=PREDICTORS,
         widths=0.15,
     )
+    fig.savefig(Path(__file__).stem + ".pdf", dpi=300, transparent=True, bbox_inches='tight')
+

@@ -81,7 +81,8 @@ def plot_shap_values(shap_values, config, habitats, config_plot):
             ax.errorbar(np.exp(log_area), mean_var, yerr=std_var, fmt='o', c=col)
         
         ax.set_xscale("log")
-        ax.set_xlabel(hab)
+        ax.text(0.1, 0.95, hab, transform=ax.transAxes, 
+            fontsize=10, va='top')
         ax.set_ylabel("")
 
     fig.supylabel("Relative absolute Shapley values")

@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pickle
 import xarray as xr
+import rioxarray
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import box
@@ -22,31 +23,38 @@ plt.rcParams.update(rcparams)
 
 seed = 1
 MODEL = "large"
-HASH = "71f9fc7"
+HASH = "a53390d"
 
 # Constants for file paths
-SR_DSR_RAST_DICT_PATH = Path(f"../../scripts/results/MLP_project_simple_full_grad_ensemble/MLP_projections_rasters_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
-SAR_DICT_PATH = Path(f"../../scripts/results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
+RAST_PATH = Path(f"../../scripts/results/projections")
+SAR_PATH = Path(f"../../scripts/results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl")
 
 
-def load_data(sr_dsr_rast_dict_path, sar_dict_path):
+def load_data(rast_path=RAST_PATH, sar_path=SAR_PATH):
     """Load data from pickle files."""
-    with open(sr_dsr_rast_dict_path, 'rb') as pickle_file:
-        sr_dsr_rast_dict = pickle.load(pickle_file)["SR_dSR_rast_dict"]
-    with open(sar_dict_path, 'rb') as pickle_file:
+    # Find and read all raster files containing MODEL and HASH in the path
+    rast_dict = {}
+    for file_path in rast_path.glob(f"*.tif"):
+        # Extract resolution from filename (assuming it's part of the filename pattern)
+        # Typically files might be named something like "projection_1e+03_large_71f9fc7.tiff"
+        name = file_path.stem
+        # Open the raster file using xarray with rioxarray
+        raster_data = rioxarray.open_rasterio(file_path)
+        rast_dict[name] = raster_data
+    with open(sar_path, 'rb') as pickle_file:
         dict_sar = pickle.load(pickle_file)["dict_SAR"]
-    return sr_dsr_rast_dict, dict_sar
+    return rast_dict, dict_sar
 
-def preprocess_raster(rast, coarsen_factor=0, rolling_window=2):
-    """Preprocess raster data by coarsening and smoothing."""
-    if coarsen_factor > 0:
-        rast = rast.coarsen(x=coarsen_factor, y=coarsen_factor, boundary="trim").mean() 
-    if rolling_window > 0:
-        rast = rast.rolling(x=rolling_window, y=rolling_window, 
-                            center=False, 
-                            # min_periods=4
-                            ).mean()
-    return rast
+# def preprocess_raster(rast, coarsen_factor=0, rolling_window=2):
+#     """Preprocess raster data by coarsening and smoothing."""
+#     if coarsen_factor > 0:
+#         rast = rast.coarsen(x=coarsen_factor, y=coarsen_factor, boundary="trim").mean() 
+#     if rolling_window > 0:
+#         rast = rast.rolling(x=rolling_window, y=rolling_window, 
+#                             center=False, 
+#                             # min_periods=4
+#                             ).mean()
+#     return rast
 
 def plot_raster(ax, rast, cmap, cbar_kwargs, norm=None, title='', **kwargs):
     """Plot raster data on a given axis."""
@@ -59,15 +67,7 @@ def plot_sar(ax, dict_sar, dict_plot, area):
     for loc, loc_info in dict_plot.items():
         sar_data = dict_sar[loc]
         color = loc_info['c']
-        ax.plot(area, np.exp(sar_data["log_SR_median"]), c=color)
-        ax.fill_between(
-            area,
-            np.exp(sar_data["log_SR_first_quantile"]),
-            np.exp(sar_data["log_SR_third_quantile"]),
-            color=color,
-            alpha=0.4,
-            linewidth=0.3
-        )
+        ax.plot(area, np.exp(sar_data["log_SR"]), c=color)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Area", bbox=dict(facecolor='white', edgecolor='none', pad=3))
@@ -92,14 +92,17 @@ def plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=100000):
         bbox_proj = box(minx_proj, miny_proj, maxx_proj, maxy_proj)
         x, y = bbox_proj.exterior.xy
 
-        col = ax.plot(x, y, color=color, linewidth=2)
+        # Plot the bbox with white border first, then the colored line
+        col = []
+        col.append(ax.plot(x, y, color='white', linewidth=4)[0])  # Wider white border
+        col.append(ax.plot(x, y, color=color, linewidth=2)[0])    # Colored line on top
         for c in col:
             c.set_rasterized(True)
     
 
 if __name__ == '__main__':
     # Load data
-    sr_dsr_rast_dict, dict_sar = load_data(SR_DSR_RAST_DICT_PATH, SAR_DICT_PATH)
+    rast_dict, dict_sar = load_data()
     dict_plot = {"loc1": {"c": "tab:blue"}, "loc2": {"c": "tab:red"}, "loc3": {"c": "tab:purple"}}
 
     Path("panels").mkdir(exist_ok=True)
@@ -108,72 +111,83 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
     cbar_kwargs = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
                    'label': 'Species richness', 'pad': 0.05, 'location': 'left'}
-    rast = np.exp(sr_dsr_rast_dict["1e+03"]["log_SR"])
-    rast = preprocess_raster(rast)
-    norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
+    name = "SR_raster_100m"
+    rast_sr_100m = rast_dict[name]
+    # reducing the size of the raster for faster plotting
+    rast_sr_100m = rast_sr_100m.coarsen(x=10, y=10, boundary="trim").mean()
+    # rast = preprocess_raster(rast)
+    # norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
     plot_raster(ax, 
-                rast, 
-                cmap="BuGn", 
+                rast_sr_100m, 
+                cmap="viridis", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
-                title='Area = 1km$^2$')
+                title='Area = 100m$^2$')
     fig.tight_layout()
     plot_bounding_boxes(ax, dict_sar, dict_plot)
-    fig.savefig("panels/log_SR_fine.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/log_SR_fine.png", dpi=300, transparent=True)
-    fig.savefig("panels/log_SR_fine.svg", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
 
     # Plot species richness at resolution 10km
     fig, ax = plt.subplots()
     cbar_kwargs['location'] = 'right'
-    rast = np.exp(sr_dsr_rast_dict["1e+04"]["log_SR"])
-    rast = preprocess_raster(rast)
-    norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
+    name = "SR_raster_10000m"
+    rast_sr_10000m = rast_dict[name]
+    # rast = preprocess_raster(rast)
+    # norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
     plot_raster(ax, 
-                rast, 
-                cmap="BuGn", 
+                rast_sr_10000m, 
+                cmap="viridis", 
                 cbar_kwargs=cbar_kwargs, 
                 # norm=norm, 
                 title='Area = 10km$^2$')
     plot_bounding_boxes(ax, dict_sar, dict_plot)
     fig.tight_layout()
-    fig.savefig("panels/log_SR_coarse.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/log_SR_coarse.svg", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
 
-    # Plot dlogSR/dlogA at resolution 1km
+    # Plot dlogSR/dlogA at resolution 100m
     fig, ax = plt.subplots()
     cbar_kwargs['label'] = 'dlogSR/dlogA'
     cbar_kwargs['location'] = 'left'
-    rast = np.maximum(0., sr_dsr_rast_dict["1e+03"]["dlogSR_dlogA"])
-    rast = preprocess_raster(rast)
+    name = "dlogSR_dlogA_raster_100m"
+    rast_dsr_100m = np.maximum(0.,rast_dict[name])
+    # Filter to retain only positive values
+    rast_dsr_100m = rast_dsr_100m.coarsen(x=10, y=10, boundary="trim").mean()
+    rast_dsr_100m = rast_dsr_100m.where(rast_sr_100m > 0)
+
+    # rast = preprocess_raster(rast)
     plot_raster(ax, 
-                rast, 
-                cmap="OrRd", 
+                rast_dsr_100m, 
+                cmap="plasma", 
                 cbar_kwargs=cbar_kwargs, 
-                # vmax=1.
+                vmax=rast_dsr_100m.quantile(0.9)
                 )
     plot_bounding_boxes(ax, dict_sar, dict_plot)
     fig.tight_layout()
-    fig.savefig("panels/dlog_SR_fine.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/dlog_SR_fine.png", dpi=300, transparent=True)
-    fig.savefig("panels/dlog_SR_fine.svg", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
 
     # Plot dlogSR/dlogA at resolution 10km
     fig, ax = plt.subplots()
     cbar_kwargs['location'] = 'right'
-    rast = np.maximum(0., sr_dsr_rast_dict["1e+04"]["dlogSR_dlogA"])
-    rast = preprocess_raster(rast)
+    name = "dlogSR_dlogA_raster_10000m"
+    rast_dsr_10000m = np.maximum(0.,rast_dict[name])
+    rast_dsr_10000m = rast_dsr_10000m.where(rast_sr_10000m > 0)
     plot_raster(ax, 
-                rast, 
-                cmap="OrRd", 
+                rast_dsr_10000m, 
+                cmap="plasma", 
                 cbar_kwargs=cbar_kwargs, 
-                vmax=0.8
+                vmax=rast_dsr_10000m.quantile(0.9)
                 )
     plot_bounding_boxes(ax, dict_sar, dict_plot)
     fig.tight_layout()
-    fig.savefig("panels/dlog_SR_coarse.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/dlog_SR_coarse.png", dpi=300, transparent=True)
-    fig.savefig("panels/dlog_SR_coarse.svg", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
+    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
 
     # Plot SAR data on central plot
     fig, ax = plt.subplots()

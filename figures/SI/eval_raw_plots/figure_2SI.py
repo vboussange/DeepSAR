@@ -1,5 +1,5 @@
 """"
-Calculating R2 for the model on validation folds.
+Calculating MSE for the model on raw plots.
 """
 import torch
 import numpy as np
@@ -77,7 +77,8 @@ if __name__ == "__main__":
     for hab in habitats:
         checkpoint = result_modelling[hab]
         gdf = compile_training_data(data, hab, config)
-        gdf_test = gdf
+        gdf_test = gdf[gdf.megaplot_area < 1e4]
+        # gdf_test = gdf
         post_crossval = evaluate_model_all_residuals(gdf_test, checkpoint, config)
         r2_dict[hab] = post_crossval
     
@@ -96,20 +97,21 @@ if __name__ == "__main__":
         colormap="Set2",
         legend=True,
         xlab="",
-        ylab="R2",
+        ylab="MSE",
         yscale="linear",
-        yname="r2",
+        yname="mse",
         habitats=habitats,
         predictors=["area", "climate", "area+climate"],
         widths=0.1,
     )
-    ax1.set_ylim(-0.2, 0.5)
+
     label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
     for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-        ax1.text(x+0.5, -0.3, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
+        ax1.text(x+0.5, -0.01, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
     
-    fig.savefig(Path(__file__).stem + "_model_score.pdf", 
+    fig.savefig(Path(__file__).stem, 
                 transparent=True, 
                 dpi=300,
                 bbox_inches='tight')
+    fig
     
