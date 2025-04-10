@@ -66,10 +66,12 @@ if __name__ == "__main__":
         val = result_modelling[hab]
         mse_arr = []
         # removing nan values
-        for k in list(val.keys()):
+        if "power_law" in val.keys():
+            val["linear_model"] = val.pop("power_law")
+                
+        for k in val.keys():
             val2 = val[k]
-            if k == "power_law":
-                val["linear_model"] = val.pop(k)
+
             mse = val2["test_MSE"]
             if len(mse) > 0:
                 mse_arr.append(mse)

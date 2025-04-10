@@ -12,7 +12,10 @@ from src.ensemble_model import initialize_ensemble_model
 import scripts.get_true_sar as get_true_sar
 from pathlib import Path
 from src.dataset import scale_features_targets
-from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
+from src.mlp import load_model_checkpoint
+import sys
+sys.path.append(str(Path(__file__).parent / Path("../../../scripts/")))
+from cross_validate_parallel import Config, compile_training_data
 
 from sklearn.metrics import mean_squared_error
 from src.plotting import read_result
@@ -21,55 +24,52 @@ from sklearn.metrics import r2_score
 
 if __name__ == "__main__":
     # creating X_maps for different resolutions
-    seed = 1
+    seed = 2
     MODEL = "large"
-    HASH = "71f9fc7"
-    path_augmented_data = Path(__file__).parent / "../../../data/processed/EVA_CHELSA_raw_compilation/EVA_CHELSA_raw_random_state_2_d84985e.pkl"
-    data = read_result(path_augmented_data)
-    hab = "T1"
-    checkpoint_path = Path(f"../../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
-    results_fit_split_all = torch.load(checkpoint_path, map_location="cpu")    
+    HASH = "a53390d" 
+    path_results = Path(f"../../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
-    results_fit_split = results_fit_split_all[hab]
-    model = initialize_ensemble_model(results_fit_split, results_fit_split_all["config"], "cuda:0")
+    result_modelling = torch.load(path_results, map_location="cpu")
+    config = result_modelling["config"]
+    data = read_result(config.path_augmented_data)
+    
+    hab = "R2"
+    fold=3
+    checkpoint = result_modelling[hab]["area+climate"]
+    gdf = compile_training_data(data, hab, config)
+    gdf_test = gdf[gdf.megaplot_area < 1e4]
 
-    predictors = results_fit_split["predictors"]
-    feature_scaler = results_fit_split["feature_scaler"]
-    target_scaler = results_fit_split["target_scaler"]
+    predictors = checkpoint["predictors"]
+    test_partition = checkpoint["test_partition"][fold]
+    feature_scaler = checkpoint["feature_scaler"][fold]
+    target_scaler = checkpoint["target_scaler"][fold]
+    gdf_test = gdf_test[gdf_test.partition.isin(test_partition)]
+    X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
+    log_area =  gdf_test["log_area"].values
     
-
-    gdf_test = data["plot_data_all"]
-    if hab != "all":
-        gdf_test = gdf_test[gdf_test["habitat_id"] == hab]
-    
-    gdf_test["log_area"] = np.log(gdf_test["area"])
-    gdf_test["log_megaplot_area"] = np.log(gdf_test["megaplot_area"])
-    gdf_test["log_sr"] = np.log(gdf_test["sr"])
-    X_test, _, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
-    ys = np.array([])
-    batch_size = 1000
-    device = next(model.parameters()).device
-
-    for i in tqdm(range(0, len(X_test), batch_size), desc="Calculating SR and stdSR"):
-        X_batch = X_test[i:i + batch_size, :].to(device)
-        y_batch = model(X_batch).detach().cpu()
-        y_batch = target_scaler.inverse_transform(y_batch).flatten()
-        ys = np.concatenate([ys, y_batch])
-        
-    gdf_test["log_sr_pred"] = ys
-    
-    gdf_test.dropna(inplace=True)
-    r2 = r2_score(gdf_test["log_sr"], gdf_test["log_sr_pred"])
-    print(f"R^2 score: {r2}")
+    model_state = checkpoint["model_state_dict"][fold]
+    model = load_model_checkpoint(model_state, predictors, layer_sizes=config.layer_sizes)
+    with torch.no_grad():
+        y = target_scaler.inverse_transform(model(X_test))
+        y_test = target_scaler.inverse_transform(y_test)
+        mse = mean_squared_error(y, y_test)
+        print(f"MSE: {mse:.4f}")
+        r2 = r2_score(y_test, y)
+        print(f"R²: {r2:.4f}")
     
     # Plotting the results
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(gdf_test["log_sr"], gdf_test["log_sr_pred"], alpha=0.5)
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(y, y_test, alpha=0.5)
     # ax.plot([gdf_test["log_sr"].min(), gdf_test["log_sr"].max()], 
     #         [gdf_test["log_sr"].min(), gdf_test["log_sr"].max()], 
     #         'r--', lw=2)
     ax.set_xlabel("True log(SR)")
     ax.set_ylabel("Predicted log(SR)")
-    ax.set_title(f"True vs Predicted log(SR) (R^2 score: {r2:.2f})")
-    ax.grid(True)
+    ax.set_title(f"True vs predicted log(SR) (R^2 score: {r2:.2f})")
+    # Add the x=y line
+    lims = [1, 5]
+    ax.plot(lims, lims, 'r--', lw=2, label='x = y')
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    ax.legend()
     plt.show()

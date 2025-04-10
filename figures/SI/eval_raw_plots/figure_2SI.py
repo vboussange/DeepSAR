@@ -82,6 +82,7 @@ if __name__ == "__main__":
         post_crossval = evaluate_model_all_residuals(gdf_test, checkpoint, config)
         r2_dict[hab] = post_crossval
     
+    metric = "r2"
     # plotting results for test data
     fig = plt.figure(figsize=(6, 6))
     nclasses = len(list(post_crossval.keys()))
@@ -97,21 +98,21 @@ if __name__ == "__main__":
         colormap="Set2",
         legend=True,
         xlab="",
-        ylab="MSE",
+        ylab=metric.upper(),
         yscale="linear",
-        yname="mse",
+        yname=metric,
         habitats=habitats,
         predictors=["area", "climate", "area+climate"],
         widths=0.1,
     )
-
-    label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
-    for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-        ax1.text(x+0.5, -0.01, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
-    
-    fig.savefig(Path(__file__).stem, 
+    if metric == "mse":
+        label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
+        for i,x in enumerate(np.arange(1, len(habitats), step=2)):
+            ax1.text(x+0.5, -0.01, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
+    else:
+        ax1.set_ylim(-0.2, 0.5)
+    fig.savefig(Path(__file__).stem + "_" + metric + ".pdf", 
                 transparent=True, 
                 dpi=300,
                 bbox_inches='tight')
-    fig
     
