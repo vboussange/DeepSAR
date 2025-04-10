@@ -57,7 +57,7 @@ def find_best_match(row, reference_set: set) -> str:
     for field in FIELDS_PRIORITY:
         cleaned_name = clean_species_name(row[field])
         if cleaned_name in reference_set:
-            return cleaned_name
+            return cleaned_name, True
         else:
             if cleaned_name != "nan" and cleaned_name not in cleaned_names:
                 # Add cleaned name to the set for further processing
@@ -72,9 +72,9 @@ def find_best_match(row, reference_set: set) -> str:
             potential_matches.append((match, confidence))
 
     if potential_matches:
-        return max(potential_matches, key=lambda x: x[1])[0]
+        return max(potential_matches, key=lambda x: x[1])[0], False
 
-    return "NA"
+    return "NA", False
 
 
 # ---------------------- DATA LOADING ---------------------- #
@@ -88,15 +88,18 @@ def load_data():
 # ---------------------- MAIN PROCESSING FUNCTION ---------------------- #
 def process_species_matching():
     species_eva_df, gift_df = load_data()
+    # for testing purposes
+    # species_eva_df = species_eva_df.sample(1000, random_state=42)
 
     # Filtering vascular plants
     eva_vascular_df = species_eva_df[species_eva_df["Taxon group"] == "Vascular plant"].copy()
 
-    print(f"Original dataset species count: {species_eva_df['Matched concept'].nunique()}")
     print(f"Filtered vascular dataset rows: {len(eva_vascular_df)}")
+    print(f"Original dataset species count: {species_eva_df['Matched concept'].nunique()}")
     
     # Create a unique dataset of species entries to process
     unique_species_df = eva_vascular_df[FIELDS_PRIORITY].drop_duplicates()
+    unique_species_df["Cleaned name"] = unique_species_df["Matched concept"].apply(clean_species_name)
     print(f"Unique species combinations to process: {len(unique_species_df)}")
     
     # Preparing GIFT species set
@@ -104,9 +107,14 @@ def process_species_matching():
     
     # Matching with GIFT names on the unique dataset only
     tqdm.pandas(desc="Matching unique species")
-    unique_species_df["Matched GIFT name"] = unique_species_df.progress_apply(
+    # Apply function and unpack tuple result into separate columns
+    result_tuples = unique_species_df.progress_apply(
         lambda row: find_best_match(row, gift_species_set), axis=1
     )
+    
+    # Extract the matched name and exact match flag from the tuples
+    unique_species_df["Matched GIFT name"] = result_tuples.apply(lambda x: x[0])
+    unique_species_df["Exact match"] = result_tuples.apply(lambda x: x[1])
     
     # Merge the matched names back to the full dataset
     eva_vascular_df = eva_vascular_df.merge(
@@ -116,17 +124,20 @@ def process_species_matching():
     )
     
     # Logging unmatched cases
-    unmatched_df = unique_species_df[unique_species_df["Matched GIFT name"] == "NA"]
-    print(f"\nUnmatched unique species: {len(unmatched_df)} / {len(unique_species_df)}")
+    total_eva_species = unique_species_df['Cleaned name'].nunique()
+    print(f"Exact match: {unique_species_df.drop_duplicates(subset=['Cleaned name'])['Exact match'].sum()} / {total_eva_species}")
     
     # Match summary
+    # TODO: it could be that there is a bug here, we expect matched_unique_species <= total_eva_species but we observe the reverse
     matched_unique_species = unique_species_df[unique_species_df["Matched GIFT name"] != "NA"]["Matched GIFT name"].nunique()
-    print(f"Matched unique species: {matched_unique_species} / {unique_species_df['Cleaned name'].nunique()}")
+    print(f"Approximate match: {matched_unique_species} / {total_eva_species}")
     
     # Output DataFrame
     output_df = eva_vascular_df[["Matched GIFT name", "Matched concept", "PlotObservationID"]].rename(
-        columns={"Matched GIFT name": "species", "Matched concept": "original_species_name", "PlotObservationID": "plot_id"}
+        columns={"Matched GIFT name": "gift_species_name", "Matched concept": "eva_species_name", "PlotObservationID": "plot_id"}
     )
+    # Convert plot_id column to integer type
+    output_df["plot_id"] = output_df["plot_id"].astype(int)
     
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
     output_df.to_parquet(OUTPUT_FOLDER / 'eva_gift_matched_species.parquet', index=False)
