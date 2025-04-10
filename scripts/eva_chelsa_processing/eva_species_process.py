@@ -22,8 +22,7 @@ from pathlib import Path
 # ---------------------- CONFIGURATION ---------------------- #
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/EVA/raw/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/GIFT/gift_checklists.csv"
-OUTPUT_FILE = Path(__file__).parent / "../../data/EVA/processed/eva_gift_matched_species"
-
+OUTPUT_FOLDER = Path(__file__).parent / "../../data/EVA/processed/"
 FIELDS_PRIORITY = ["Turboveg2 concept", "Matched concept", "Original taxon concept"]
 
 
@@ -54,14 +53,15 @@ assert clean_species_name("x_Abies alba subsp. alba s.l. s.s. aggr. (syn)") == "
 
 def find_best_match(row, reference_set: set) -> str:
     # Exact matching
+    cleaned_names = set()
     for field in FIELDS_PRIORITY:
         cleaned_name = clean_species_name(row[field])
         if cleaned_name in reference_set:
             return cleaned_name
-
-    # Approximate matching
-    cleaned_names = {clean_species_name(row[field]) for field in FIELDS_PRIORITY}
-    cleaned_names.discard('nan')
+        else:
+            if cleaned_name != "nan" and cleaned_name not in cleaned_names:
+                # Add cleaned name to the set for further processing
+                cleaned_names.add(cleaned_name)
 
     potential_matches = []
     for name in cleaned_names:
@@ -92,37 +92,45 @@ def process_species_matching():
     # Filtering vascular plants
     eva_vascular_df = species_eva_df[species_eva_df["Taxon group"] == "Vascular plant"].copy()
 
-    # Cleaning species names
-    eva_vascular_df['Cleaned name'] = eva_vascular_df['Matched concept'].apply(clean_species_name)
-
     print(f"Original dataset species count: {species_eva_df['Matched concept'].nunique()}")
-    print(f"Filtered dataset species count: {eva_vascular_df['Cleaned name'].nunique()}")
-
+    print(f"Filtered vascular dataset rows: {len(eva_vascular_df)}")
+    
+    # Create a unique dataset of species entries to process
+    unique_species_df = eva_vascular_df[FIELDS_PRIORITY].drop_duplicates()
+    print(f"Unique species combinations to process: {len(unique_species_df)}")
+    
     # Preparing GIFT species set
     gift_species_set = set(gift_df["work_species"].dropna().apply(clean_species_name).unique())
-
-    # Matching with GIFT names
-    tqdm.pandas(desc="Matching species")
-    eva_vascular_df["Matched GIFT name"] = eva_vascular_df.progress_apply(
+    
+    # Matching with GIFT names on the unique dataset only
+    tqdm.pandas(desc="Matching unique species")
+    unique_species_df["Matched GIFT name"] = unique_species_df.progress_apply(
         lambda row: find_best_match(row, gift_species_set), axis=1
     )
-
+    
+    # Merge the matched names back to the full dataset
+    eva_vascular_df = eva_vascular_df.merge(
+        unique_species_df[FIELDS_PRIORITY + ["Matched GIFT name"]], 
+        on=FIELDS_PRIORITY, 
+        how="left"
+    )
+    
     # Logging unmatched cases
-    unmatched_df = eva_vascular_df[eva_vascular_df["Matched GIFT name"] == "NA"]
-    print(f"\nUnmatched rows: {len(unmatched_df)}")
-
+    unmatched_df = unique_species_df[unique_species_df["Matched GIFT name"] == "NA"]
+    print(f"\nUnmatched unique species: {len(unmatched_df)} / {len(unique_species_df)}")
+    
     # Match summary
-    matched_unique_species = eva_vascular_df[eva_vascular_df["Matched GIFT name"] != "NA"]["Matched GIFT name"].nunique()
-    print(f"Matched species: {matched_unique_species} / {eva_vascular_df['Cleaned name'].nunique()}")
-
+    matched_unique_species = unique_species_df[unique_species_df["Matched GIFT name"] != "NA"]["Matched GIFT name"].nunique()
+    print(f"Matched unique species: {matched_unique_species} / {unique_species_df['Cleaned name'].nunique()}")
+    
     # Output DataFrame
     output_df = eva_vascular_df[["Matched GIFT name", "Matched concept", "PlotObservationID"]].rename(
-        columns={"Matched GIFT name": "species", "Matched concept": "original_species", "PlotObservationID": "plot_id"}
+        columns={"Matched GIFT name": "species", "Matched concept": "original_species_name", "PlotObservationID": "plot_id"}
     )
-
-    # Save to parquet format for better compression and performance
-    output_df.to_parquet(OUTPUT_FILE.with_suffix('.parquet'), index=False)
-    print(f"\nSaved {len(output_df)} matched entries to {OUTPUT_FILE.with_suffix('.parquet')}")
+    
+    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+    output_df.to_parquet(OUTPUT_FOLDER / 'eva_gift_matched_species.parquet', index=False)
+    print(f"\nSaved {len(output_df)} matched entries to {OUTPUT_FOLDER / 'eva_gift_matched_species.parquet'}")
 
 
 # ---------------------- ENTRY POINT ---------------------- #
