@@ -23,7 +23,7 @@ from pathlib import Path
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/EVA/raw/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/GIFT/gift_checklists.csv"
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/EVA/processed/"
-FIELDS_PRIORITY = ["Turboveg2 concept", "Matched concept", "Original taxon concept"]
+FIELDS_PRIORITY = ["Matched concept", "Turboveg2 concept", "Original taxon concept"]
 
 
 # ---------------------- UTILITY FUNCTIONS ---------------------- #
@@ -123,18 +123,16 @@ def process_species_matching():
         how="left"
     )
     
-    # Logging unmatched cases
-    total_eva_species = unique_species_df['Cleaned name'].nunique()
-    print(f"Exact match: {unique_species_df.drop_duplicates(subset=['Cleaned name'])['Exact match'].sum()} / {total_eva_species}")
+    total_eva_species = unique_species_df.drop_duplicates(subset=['Cleaned name'])
+    print(f"Exact match: {total_eva_species['Exact match'].sum()} / {len(total_eva_species)}")
     
     # Match summary
-    # TODO: it could be that there is a bug here, we expect matched_unique_species <= total_eva_species but we observe the reverse
-    matched_unique_species = unique_species_df[unique_species_df["Matched GIFT name"] != "NA"]["Matched GIFT name"].nunique()
-    print(f"Approximate match: {matched_unique_species} / {total_eva_species}")
+    matched_unique_species = len(total_eva_species[total_eva_species["Matched GIFT name"] != "NA"])
+    print(f"Approximate match: {matched_unique_species} / {len(total_eva_species)}")
     
     # Output DataFrame
     output_df = eva_vascular_df[["Matched GIFT name", "Matched concept", "PlotObservationID"]].rename(
-        columns={"Matched GIFT name": "gift_species_name", "Matched concept": "eva_species_name", "PlotObservationID": "plot_id"}
+        columns={"Matched GIFT name": "gift_matched_species_name", "Matched concept": "eva_original_species_name", "Cleaned name" : "eva_species_name", "PlotObservationID": "plot_id", "Exact match": "exact_match"}
     )
     # Convert plot_id column to integer type
     output_df["plot_id"] = output_df["plot_id"].astype(int)
