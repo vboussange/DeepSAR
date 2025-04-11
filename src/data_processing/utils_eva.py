@@ -10,7 +10,7 @@ import xarray as xr
 
 from src.data_processing.utils_landcover import EUNISDataset
 
-EVA_DATA_DIR = Path(__file__).parent / "../../data/EVA/"
+EVA_DATA_DIR = Path(__file__).parent / "../../data/processed/EVA/"
 EVA_CACHE = EVA_DATA_DIR / "cache.pkl"
 COUNTRY_DATA = Path(__file__).parent / "../../data/NaturalEarth/ne_10m_admin_0_countries.shp"
 
@@ -48,25 +48,25 @@ class EVADataset:
         # calculate SR per plot
         print("Discarding duplicates")
         plot_gdf["SR"] = [len(dict_sp[idx]) for idx in plot_gdf.index]
-        # identify unique locations and plot_id with highest SR
+        # identify unique locations and select latest plots
         plot_idx = []
         for _, _gdf in plot_gdf.groupby("geometry"):
-            plot_idx.append(_gdf["SR"].idxmax())
-        # keep only plots with high SR
-        plot_gdf = plot_gdf.loc[plot_idx]
+            if _gdf["recording_date"].notna().any():
+                plot_idx.append(_gdf["recording_date"].idxmax())
+            else:
+                plot_idx.append(_gdf.index[np.random.randint(len(_gdf))])
 
+        # filtering for inconsistent coordinates 
         print("Filtering by landcover and extent")
         countries_gdf = gpd.read_file(COUNTRY_DATA)
         eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
         missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
         assert len(missing_countries) == 0
         
-        
         _n = len(plot_gdf)
         if plot_gdf.crs != eva_countries_gdf.crs:
             eva_countries_gdf = eva_countries_gdf.to_crs(plot_gdf.crs)
         plot_gdf = plot_gdf.clip(eva_countries_gdf)
-
         print(f"Discarded {_n - len(plot_gdf)} plots for inconsistent coordinates")
         
         # filtering for uncertainty in meter
@@ -90,6 +90,9 @@ class EVADataset:
                 plot_data.Longitude, plot_data.Latitude, crs="EPSG:4326"
             )
             plot_gdf = gpd.GeoDataFrame(plot_data, geometry="geometry", crs="EPSG:4326")
+            # Convert date strings to datetime objects
+            plot_gdf["recording_date"] = pd.to_datetime(plot_gdf["Date of recording"], format="%d.%m.%Y", errors='coerce')
+            plot_gdf = plot_gdf.drop(columns=["Date of recording"])
 
             # making dict from biodiv data
             biodiv_df = self.read_biodiv_data()
