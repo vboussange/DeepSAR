@@ -133,8 +133,8 @@ def process_species_matching():
     print(f"Approximate match: {matched_unique_species} / {total_eva_species}")
     
     # Output DataFrame
-    output_df = eva_vascular_df[["Matched GIFT name", "Matched concept", "PlotObservationID"]].rename(
-        columns={"Matched GIFT name": "gift_species_name", "Matched concept": "eva_species_name", "PlotObservationID": "plot_id"}
+    output_df = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]].rename(
+        columns={"PlotObservationID": "plot_id", "Matched GIFT name": "gift_matched_species_name", "Matched concept": "eva_original_species_name", "Cleaned name" : "eva_species_name"}
     )
     # Convert plot_id column to integer type
     output_df["plot_id"] = output_df["plot_id"].astype(int)
