@@ -16,23 +16,23 @@ class GIFTDataset:
     def __init__(self, data_dir=GIFT_DATA_DIR):
         self.data_dir = data_dir
 
-    def read_biodiv_data(self):
+    def read_species_data(self):
         species_data = self.data_dir / "species_data.parquet"
         if species_data.exists():
             return pd.read_parquet(species_data)
         else:
-            raise FileNotFoundError("Anoymised species data not found, did you download/anonymise the data?")
+            raise FileNotFoundError(f"Anoymised species data at {GIFT_DATA_DIR.resolve()} not found, did you download/anonymise the data?")
     
     def read_plot_data(self):
         plot_data_file = self.data_dir / "plot_data.gpkg"
         if plot_data_file.exists():
             return gpd.read_file(plot_data_file)
         else:
-            raise FileNotFoundError("Plot data not found, did you download/anonymise the data?")
+            raise FileNotFoundError(f"Plot data at {GIFT_DATA_DIR.resolve()} not found, did you download/anonymise the data?")
 
     def load(self):
             plot_data = self.read_plot_data()
-            species_data = self.read_biodiv_data()
+            species_data = self.read_species_data()
             return plot_data, species_data
         
 if __name__ == "__main__":

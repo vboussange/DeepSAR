@@ -30,7 +30,7 @@ class EVADataset:
         self.data_dir = data_dir
         self.cache = cache
 
-    def read_biodiv_data(self):
+    def read_species_data(self):
         species_data = self.data_dir / "anonymised/species_data.parquet"
         if species_data.exists():
             return pd.read_parquet(species_data)
@@ -91,11 +91,11 @@ class EVADataset:
             )
             plot_gdf = gpd.GeoDataFrame(plot_data, geometry="geometry", crs="EPSG:4326")
             # Convert date strings to datetime objects
-            plot_gdf["recording_date"] = pd.to_datetime(plot_gdf["Date of recording"], format="%d.%m.%Y", errors='coerce')
-            plot_gdf = plot_gdf.drop(columns=["Date of recording"])
+            plot_gdf["recording_date"] = pd.to_datetime(plot_gdf["recording_date"], format="%d.%m.%Y", errors='coerce')
+            # plot_gdf = plot_gdf.drop(columns=["Date of recording"])
 
             # making dict from biodiv data
-            biodiv_df = self.read_biodiv_data()
+            biodiv_df = self.read_species_data()
             biodiv_gdf = biodiv_df.groupby("plot_id")
             dict_sp = {}
             for k, df in biodiv_gdf:
@@ -121,5 +121,5 @@ class EVADataset:
 
 if __name__ == "__main__":
     dataset = EVADataset()
-    df_sp = dataset.read_biodiv_data()
+    df_sp = dataset.read_species_data()
     dataset.load()

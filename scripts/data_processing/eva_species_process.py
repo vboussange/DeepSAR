@@ -20,8 +20,8 @@ from pathlib import Path
 
 
 # ---------------------- CONFIGURATION ---------------------- #
-EVA_SPECIES_FILE = Path(__file__).parent / "../../data/EVA/raw/172_SpeciesAreaRel20230227_notJUICE_species.csv"
-GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/GIFT/gift_checklists.csv"
+EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
+GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/gift_checklists.csv"
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/matched"
 FIELDS_PRIORITY = ["Turboveg2 concept", "Matched concept", "Original taxon concept"]
 
@@ -118,7 +118,7 @@ def process_species_matching():
     
     # Merge the matched names back to the full dataset
     eva_vascular_df = eva_vascular_df.merge(
-        unique_species_df[FIELDS_PRIORITY + ["Matched GIFT name"]], 
+        unique_species_df[FIELDS_PRIORITY + ["Matched GIFT name", "Cleaned name", "Exact match"]], 
         on=FIELDS_PRIORITY, 
         how="left"
     )
@@ -134,13 +134,20 @@ def process_species_matching():
     
     # Output DataFrame
     output_df = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]].rename(
-        columns={"PlotObservationID": "plot_id", "Matched GIFT name": "gift_matched_species_name", "Matched concept": "eva_original_species_name", "Cleaned name" : "eva_species_name"}
+        columns={"PlotObservationID": "plot_id", 
+                 "Matched GIFT name": "gift_matched_species_name", 
+                 "Cleaned name": "eva_species_name", 
+                 "Matched concept" : "eva_original_species_name",
+                 "Exact match": "exact_match"}
     )
     # Convert plot_id column to integer type
     output_df["plot_id"] = output_df["plot_id"].astype(int)
     
+    # ensure that the merged dataframe has the same number of species as the backbone
+    assert output_df["eva_species_name"].nunique() == unique_species_df["Cleaned name"].nunique()
+    
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-    output_df.to_parquet(OUTPUT_FOLDER / 'eva_gift_matched_species.parquet', index=False)
+    output_df.to_parquet(OUTPUT_FOLDER / 'species_data.parquet', index=False)
     print(f"\nSaved {len(output_df)} matched entries to {OUTPUT_FOLDER / 'species_data.parquet'}")
 
 
