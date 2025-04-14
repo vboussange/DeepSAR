@@ -40,7 +40,15 @@ class EVADataset:
     def read_plot_data(self):
         plot_data_file = self.data_dir / "anonymised/plot_data.parquet"
         if plot_data_file.exists():
-            return pd.read_parquet(plot_data_file)
+            plot_data = pd.read_parquet(plot_data_file)
+            plot_data["geometry"] = gpd.points_from_xy(
+                plot_data.Longitude, plot_data.Latitude, crs="EPSG:4326"
+            )
+            plot_gdf = gpd.GeoDataFrame(plot_data, geometry="geometry", crs="EPSG:4326")
+            # Convert date strings to datetime objects
+            plot_gdf["recording_date"] = pd.to_datetime(plot_gdf["recording_date"], format="%d.%m.%Y", errors='coerce')
+            # plot_gdf = plot_gdf.drop(columns=["Date of recording"])
+            return plot_data
         else:
             raise FileNotFoundError("Plot data not found, did you download/anonymise the data?")
 
@@ -86,14 +94,6 @@ class EVADataset:
         if not self.cache.exists():
             # loading plot data
             plot_data = self.read_plot_data()
-            plot_data["geometry"] = gpd.points_from_xy(
-                plot_data.Longitude, plot_data.Latitude, crs="EPSG:4326"
-            )
-            plot_gdf = gpd.GeoDataFrame(plot_data, geometry="geometry", crs="EPSG:4326")
-            # Convert date strings to datetime objects
-            plot_gdf["recording_date"] = pd.to_datetime(plot_gdf["recording_date"], format="%d.%m.%Y", errors='coerce')
-            # plot_gdf = plot_gdf.drop(columns=["Date of recording"])
-
             # making dict from biodiv data
             biodiv_df = self.read_species_data()
             biodiv_gdf = biodiv_df.groupby("plot_id")

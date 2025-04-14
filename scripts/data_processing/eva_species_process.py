@@ -17,7 +17,7 @@ import numpy as np
 from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
-
+import geopandas as gpd
 
 # ---------------------- CONFIGURATION ---------------------- #
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
@@ -76,12 +76,47 @@ def find_best_match(row, reference_set: set) -> str:
 
     return "NA", False
 
+def clean_eva_plots(plot_gdf):
+        # calculate SR per plot
+        print("Discarding duplicates")
+        # identify unique locations and select latest plots
+        plot_idx = []
+        for _, _gdf in plot_gdf.groupby("geometry"):
+            if _gdf["recording_date"].notna().any():
+                plot_idx.append(_gdf["recording_date"].idxmax())
+            else:
+                plot_idx.append(_gdf.index[np.random.randint(len(_gdf))])
 
+        # filtering for inconsistent coordinates 
+        print("Filtering by landcover and extent")
+        countries_gdf = gpd.read_file(COUNTRY_DATA)
+        eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
+        missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
+        assert len(missing_countries) == 0
+        
+        _n = len(plot_gdf)
+        if plot_gdf.crs != eva_countries_gdf.crs:
+            eva_countries_gdf = eva_countries_gdf.to_crs(plot_gdf.crs)
+        plot_gdf = plot_gdf.clip(eva_countries_gdf)
+        print(f"Discarded {_n - len(plot_gdf)} plots for inconsistent coordinates")
+        
+        # filtering for uncertainty in meter
+        print("Filtering for coordinate uncertainty")
+        plot_gdf = plot_gdf[(plot_gdf.uncertainty_m.isna()) | (plot_gdf.uncertainty_m < 1000)]
+
+        # filtering for plot size
+        print("Filtering for plot size")
+        plot_gdf = plot_gdf[
+            ((plot_gdf.Level_1.isin(['Q', 'S', 'R'])) & (plot_gdf.plot_size.between(1, 100))) |
+            ((plot_gdf.Level_1 == 'T') & (plot_gdf.plot_size.between(100, 1000)))
+        ]
+
+        return plot_gdf
 # ---------------------- DATA LOADING ---------------------- #
 def load_data():
     eva_species_df = pd.read_csv(EVA_SPECIES_FILE, sep="\t", engine="python", on_bad_lines='skip')
     gift_species_df = pd.read_csv(GIFT_CHECKLIST_FILE)
-
+    
     return eva_species_df, gift_species_df
 
 

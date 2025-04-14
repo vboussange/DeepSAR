@@ -13,7 +13,7 @@ ENV_VARS = [
 
 def test_EVADataset():
     dataset = EVADataset()
-    biodiv_df = dataset.read_biodiv_data()
+    biodiv_df = dataset.read_species_data()
     plot_df = dataset.read_plot_data()
     assert len(biodiv_df) > 0
     assert len(plot_df) > 0

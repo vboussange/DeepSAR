@@ -85,16 +85,18 @@ def load_and_preprocess_data():
     logging.info("Cropping plot_gdf to the extent of climate_raster...")
     climate_bounds = climate_raster.rio.bounds()
     plot_gdf = plot_gdf.cx[climate_bounds[0]:climate_bounds[2], climate_bounds[1]:climate_bounds[3]]
+    species_df = species_df[species_df["entity_ID"].isin(plot_gdf["entity_ID"])]
     return plot_gdf, species_df, climate_raster
 
 def clip_GIFT_SR(plot_gdf, species_df):
     species_gdf = species_df.groupby("entity_ID")
-    for plot_id in plot_gdf.index:
+    for i, row in plot_gdf.iterrows():
+        plot_id = row["entity_ID"]
         if plot_id in species_gdf.groups:
             species = species_gdf.get_group(plot_id).anonymised_species_name.unique()
-            plot_gdf.loc[plot_id, "sr"] = len(species)
+            plot_gdf.loc[i, "sr"] = len(species)
         else:
-            plot_gdf.loc[plot_id, "sr"] = 0
+            plot_gdf.loc[i, "sr"] = 0
     plot_gdf["area"] = plot_gdf.geometry.area
     return plot_gdf
 
@@ -155,6 +157,7 @@ if __name__ == "__main__":
     CONFIG["output_file_name"] = Path(f"augmented_data.pkl")
     
     plot_gdf, species_df, climate_raster = load_and_preprocess_data()
+    assert set(species_df.entity_ID).issubset(set(plot_gdf.entity_ID)), "species_df.entity_ID is not a subset of plot_gdf.entity_ID"
     
     logging.info("Partitioning...")
     plot_gdf["polygon"] = plot_gdf.geometry
@@ -194,11 +197,6 @@ if __name__ == "__main__":
     # aggregating results and final save
     megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
        
-       
-    # --------- FINAL EXPORT ---------
-    # Save the indices of plot_data_all as a CSV for custodianship
-    plot_gdf.index.to_series().to_csv(CONFIG["output_file_path"] / "plot_id.csv", index=False)
-    
     # exporting megaplot_data to gpkg
     output_path = CONFIG["output_file_path"] / "megaplot_data.gpkg"
     print(f"Exporting {output_path}")
