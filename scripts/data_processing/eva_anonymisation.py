@@ -10,6 +10,7 @@ from eva_species_process import clean_species_name
 from tqdm import tqdm
 import geopandas as gpd
 import numpy as np
+from src.utils_eunis import extract_habitat_lev1
 
 RAW_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/matched/"
 RAW_GIFT_DATA = Path(__file__).parent / "../../data/raw/GIFT/"
@@ -44,42 +45,6 @@ def generate_spid(species_name: str) -> str:
     hash_bytes = hashlib.sha256(species_name.encode()).digest()
     spid = base64.b32encode(hash_bytes).decode('utf-8')[:7]
     return spid
-
-def extract_habitat_lev1(ESyhab: str):
-    def is_valid(s: str) -> bool:
-        if len(s) >= 2:
-            return s[1].isdigit() and s[0].isupper()
-        elif len(s) == 1:
-            return s.isupper()
-        return False
-
-    if ',' in ESyhab:
-        parts = [part.strip() for part in ESyhab.split(',')]
-        valid_parts = [p for p in parts if is_valid(p)]
-        if valid_parts:
-            return valid_parts[0][0]
-        else:
-            return None
-    else:
-        if is_valid(ESyhab):
-            return ESyhab[0]
-        else:
-            return None
-
-# 🔍 Example usage
-examples = [
-    'R5',       # → 'R'
-    'Sa',       # → None
-    'T',        # → None
-    'S21',      # → 'S'
-    'S21, R23', # → 'S' (both valid, returns first)
-    'Sa, T5',   # → 'T' (only T5 is valid)
-    'ab, Cd',   # → 'C' (Cd is valid)
-    'a',        # → None
-]
-
-result = [extract_habitat_lev1(x) for x in examples]
-assert result == ['R', None, "T", 'S', 'S', 'T', None, None], f"Unexpected result: {result}"
 
 def clean_eva_plots(plot_gdf):
     # calculate SR per plot
