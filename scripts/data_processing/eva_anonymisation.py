@@ -186,6 +186,9 @@ print(spid_dict)
 eva_species_df['anonymised_species_name'] = eva_species_df['gift_matched_species_name'].map(spid_dict)
 gift_species_df['anonymised_species_name'] = gift_species_df['work_species'].map(spid_dict)
 
+# filtering eva plots against species selected
+eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_df.plot_id.unique())]
+
 # assigning habitats to eva_species_data and gift_species_data
 # TODO; we should add as many columns as habitats, and mark them with 1 or 0 should they have appeared once in a plot with corresponding habitat
 # it would probably be best if we had were only considering EUNIS habitats at level 1

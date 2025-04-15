@@ -9,6 +9,7 @@ from src.data_processing.utils_polygons import random_size_from_range, place_ran
 from shapely.geometry import Point, MultiPoint, box
 from scipy.spatial import KDTree
 import logging 
+import warnings
 
 def batch_indices(N, batch_size):
     """Yield successive batch-sized chunks of indices from 0 to N."""
@@ -16,16 +17,29 @@ def batch_indices(N, batch_size):
         yield range(i, min(i + batch_size, N))
 
 # working with dictionnary of species
-def clip_EVA_SR(plot_gdf, dict_sp, polygons_gdf, verbose=False):
-    data = pd.DataFrame({"area" : pd.Series(int), "sr": pd.Series(int), "num_plots" : pd.Series(int)})
+def clip_EVA_SR(plot_gdf, species_data, polygons_gdf, env_vars, verbose=False):
+    std_labels = [f"std_{var}" for var in env_vars]
+    species_data_grouped = species_data.groupby("plot_id")
+    data = pd.DataFrame({
+        "area": pd.Series(int),
+        "sr": pd.Series(int),
+        "num_plots": pd.Series(int),
+        **{var: pd.Series(float) for var in env_vars},
+        **{label: pd.Series(float) for label in std_labels}
+    })
     for i, poly in tqdm(enumerate(polygons_gdf.geometry), desc="Clipping SR", total=len(polygons_gdf), disable=not verbose):
         df_samp = plot_gdf[plot_gdf.within(poly)]
-        species = np.concatenate([dict_sp[idx] for idx in df_samp.index])
+        species = np.concatenate([species_data_grouped.get_group(idx).anonymised_species_name for idx in df_samp.index])
+        climate = df_samp[env_vars]
         sr = len(np.unique(species))
-        a = np.sum(df_samp['plot_size'])
+        a = np.sum(df_samp['area'])
         # geom = MultiPoint(df_samp.geometry.to_list())
         num_plots = len(df_samp)
         data.loc[i, ["area", "sr", "num_plots"]] = [a, sr, num_plots]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            data.loc[i, env_vars] = np.nanmean(climate, axis=0)
+            data.loc[i, std_labels] = np.nanstd(climate, axis=0)
     return data
 
 
