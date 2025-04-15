@@ -106,8 +106,8 @@ class EUNISDataset():
         habitat_map = habitat_map.astype(int)
         return habitat_map
     
-    def get_fraction_habitat_landcover(habitat_map):
-        return (habitat_map == 1).sum() / ((habitat_map == 1).sum() + (habitat_map == 0).sum())
+def get_fraction_habitat_landcover(habitat_map):
+    return (habitat_map == 1).sum() / ((habitat_map == 1).sum() + (habitat_map == 0).sum())
         
         
 if __name__ == "__main__":
