@@ -20,13 +20,25 @@ from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
+from src.data_processing.utils_eunis import extract_habitat_lev1
 
 # ---------------------- CONFIGURATION ---------------------- #
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/gift_checklists.csv"
-OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/matched"
+OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/preprocessing"
 FIELDS_PRIORITY = ["Turboveg2 concept", "Matched concept", "Original taxon concept"]
 
+COUNTRY_DATA = Path(__file__).parent / "../../data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
+COUNTRY_LIST = [
+    "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
+    "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", 
+    "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", 
+    "Liechtenstein", "Lithuania", "Luxembourg", "North Macedonia", "Malta", 
+    "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", 
+    "Portugal", "Romania", "San Marino", "Republic of Serbia", 
+    "Slovakia", "Slovenia", "Spain", "Sweden", 
+    "Switzerland", "Turkey", "Ukraine", "United Kingdom"
+]
 
 # ---------------------- UTILITY FUNCTIONS ---------------------- #
 def clean_species_name(name):
@@ -79,55 +91,85 @@ def find_best_match(row, reference_set: set) -> str:
     return "NA", False
 
 def clean_eva_plots(plot_gdf):
-        # calculate SR per plot
-        print("Discarding duplicates")
-        # identify unique locations and select latest plots
-        plot_idx = []
-        for _, _gdf in plot_gdf.groupby("geometry"):
-            if _gdf["recording_date"].notna().any():
-                plot_idx.append(_gdf["recording_date"].idxmax())
-            else:
-                plot_idx.append(_gdf.index[np.random.randint(len(_gdf))])
+    # calculate SR per plot
+    print("Discarding duplicates")
+    # identify unique locations and select latest plots
+    plot_idx = []
+    for _, _gdf in plot_gdf.groupby("geometry"):
+        if _gdf["recording_date"].notna().any():
+            plot_idx.append(_gdf["recording_date"].idxmax())
+        else:
+            plot_idx.append(_gdf.plot_id.iloc[np.random.randint(len(_gdf))])
 
-        # filtering for inconsistent coordinates 
-        print("Filtering by landcover and extent")
-        countries_gdf = gpd.read_file(COUNTRY_DATA)
-        eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
-        missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
-        assert len(missing_countries) == 0
-        
-        _n = len(plot_gdf)
-        if plot_gdf.crs != eva_countries_gdf.crs:
-            eva_countries_gdf = eva_countries_gdf.to_crs(plot_gdf.crs)
-        plot_gdf = plot_gdf.clip(eva_countries_gdf)
-        print(f"Discarded {_n - len(plot_gdf)} plots for inconsistent coordinates")
-        
-        # filtering for uncertainty in meter
-        print("Filtering for coordinate uncertainty")
-        plot_gdf = plot_gdf[(plot_gdf.uncertainty_m.isna()) | (plot_gdf.uncertainty_m < 1000)]
+    # filtering for inconsistent coordinates 
+    print("Filtering by landcover and extent")
+    countries_gdf = gpd.read_file(COUNTRY_DATA)
+    eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
+    missing_countries = set(COUNTRY_LIST) - set(eva_countries_gdf["SOVEREIGNT"])
+    assert len(missing_countries) == 0
+    
+    _n = len(plot_gdf)
+    if plot_gdf.crs != eva_countries_gdf.crs:
+        eva_countries_gdf = eva_countries_gdf.to_crs(plot_gdf.crs)
+    plot_gdf = plot_gdf.clip(eva_countries_gdf)
+    print(f"Discarded {_n - len(plot_gdf)} plots for inconsistent coordinates")
+    
+    # filtering for uncertainty in meter
+    print("Filtering for coordinate uncertainty")
+    plot_gdf = plot_gdf[(plot_gdf.location_uncertainty_m.isna()) | (plot_gdf.location_uncertainty_m < 1000)]
 
-        # filtering for plot size
-        print("Filtering for plot size")
-        plot_gdf = plot_gdf[
-            ((plot_gdf.Level_1.isin(['Q', 'S', 'R'])) & (plot_gdf.plot_size.between(1, 100))) |
-            ((plot_gdf.Level_1 == 'T') & (plot_gdf.plot_size.between(100, 1000)))
-        ]
+    # sorting habitat level
+    print("Sorting habitat level")
+    plot_gdf["level_1"] = plot_gdf["EUNIS_level"].apply(lambda x: extract_habitat_lev1(x))
+    
+    # filtering for plot size
+    print("Filtering for plot size")
+    plot_gdf = plot_gdf[
+        ((plot_gdf.level_1.isin(['Q', 'S', 'R'])) & (plot_gdf.area_m2.between(1, 100))) |
+        ((plot_gdf.level_1 == 'T') & (plot_gdf.area_m2.between(100, 1000)))
+    ]
 
-        return plot_gdf
+    return plot_gdf
+    
 # ---------------------- DATA LOADING ---------------------- #
 def load_data():
     eva_species_df = pd.read_csv(EVA_SPECIES_FILE, sep="\t", engine="python", on_bad_lines='skip')
     gift_species_df = pd.read_csv(GIFT_CHECKLIST_FILE)
+    eva_plot_df = pd.read_csv("../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_header.csv",
+                            header=0,
+                            usecols=[
+                                "Relevé area (m²)",
+                                "Expert System",
+                                "Longitude",
+                                "Latitude",
+                                "Location uncertainty (m)",
+                                "PlotID",
+                                "Date of recording"
+                            ],
+                            sep="\t",
+                            engine="python",
+                            quoting=3
+                            )
+    eva_plot_df.rename(columns={"Relevé area (m²)": "area_m2",
+                                "Expert System": "EUNIS_level",
+                                "Longitude": "longitude",
+                                "Latitude": "latitude",
+                                "Location uncertainty (m)": "location_uncertainty_m",
+                                "PlotID": "plot_id",
+                                "Date of recording": "recording_date"
+                            }, inplace=True)
+
     
-    return eva_species_df, gift_species_df
+    return eva_species_df, gift_species_df, eva_plot_df
 
 
 # ---------------------- MAIN PROCESSING FUNCTION ---------------------- #
-def process_species_matching():
-    eva_species_df, gift_species_df = load_data()
+def main():
+    eva_species_df, gift_species_df, eva_plot_df = load_data()
     # for testing purposes
     # eva_species_df = eva_species_df.sample(1000, random_state=42)
 
+    # EVA SPECIES PROCESSING
     # Filtering vascular plants
     eva_vascular_df = eva_species_df[eva_species_df["Taxon group"] == "Vascular plant"].copy()
 
@@ -170,7 +212,7 @@ def process_species_matching():
     print(f"Approximate match: {matched_unique_species} / {total_eva_species}")
     
     # Output DataFrame
-    output_df = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]].rename(
+    eva_species_preprocessed = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]].rename(
         columns={"PlotObservationID": "plot_id", 
                  "Matched GIFT name": "gift_matched_species_name", 
                  "Cleaned name": "eva_species_name", 
@@ -178,16 +220,34 @@ def process_species_matching():
                  "Exact match": "exact_match"}
     )
     # Convert plot_id column to integer type
-    output_df["plot_id"] = output_df["plot_id"].astype(int)
+    eva_species_preprocessed["plot_id"] = eva_species_preprocessed["plot_id"].astype(int)
     
     # ensure that the merged dataframe has the same number of species as the backbone
-    assert output_df["eva_species_name"].nunique() == unique_species_df["Cleaned name"].nunique()
+    assert eva_species_preprocessed["eva_species_name"].nunique() == unique_species_df["Cleaned name"].nunique()
     
+    # EVA PLOTS PROCESING
+    # cleaning the EVA plot data
+    eva_plot_df["geometry"] = gpd.points_from_xy(
+        eva_plot_df.longitude, eva_plot_df.latitude, crs="EPSG:4326"
+    )
+    eva_plot_df = gpd.GeoDataFrame(eva_plot_df, geometry="geometry", crs="EPSG:4326")
+    # Convert date strings to datetime objects
+    eva_plot_df["recording_date"] = pd.to_datetime(eva_plot_df["recording_date"], format="%d.%m.%Y", errors='coerce')
+    eva_plot_df = clean_eva_plots(eva_plot_df)
+
+    # filtering species against plots selected
+    eva_species_preprocessed = eva_species_preprocessed[eva_species_preprocessed.plot_id.isin(eva_plot_df.plot_id.unique())]
+    
+    # filtering eva plots against species selected
+    eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_preprocessed.plot_id.unique())]
+
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-    output_df.to_parquet(OUTPUT_FOLDER / 'species_data.parquet', index=False)
-    print(f"\nSaved {len(output_df)} matched entries to {OUTPUT_FOLDER / 'species_data.parquet'}")
+    eva_species_preprocessed.to_parquet(OUTPUT_FOLDER / 'species_data.parquet', index=False)
+    print(f"\nSaved {len(eva_species_preprocessed)} matched entries to {OUTPUT_FOLDER / 'species_data.parquet'}")
+    eva_plot_df.to_file(OUTPUT_FOLDER / "plot_data.gpkg", driver="GPKG")
+
 
 
 # ---------------------- ENTRY POINT ---------------------- #
 if __name__ == "__main__":
-    process_species_matching()
+    main()

@@ -1,0 +1,6 @@
+execute files as follows:
+
+1. eva_preprocessing.py
+2. gift_preprocessing.py
+3. anonymisation.py
+4. compile_XX.py
