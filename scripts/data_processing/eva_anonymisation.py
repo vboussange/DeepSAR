@@ -6,7 +6,7 @@ from src.data_processing.utils_eva import EVADataset
 import base64
 from pathlib import Path
 import pandas as pd
-from eva_species_process import clean_species_name
+from scripts.data_processing.eva_preprocessing import clean_species_name
 from tqdm import tqdm
 import geopandas as gpd
 import numpy as np
@@ -116,6 +116,7 @@ eva_plot_df.rename(columns={
     "Date of recording": "recording_date"
 }, inplace=True)
 gift_species_df = pd.read_csv(RAW_GIFT_DATA / "gift_checklists.csv")
+gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
 
 # checks
 species_eva = set(eva_species_df.gift_matched_species_name.unique())
@@ -126,7 +127,8 @@ plot_species = set(eva_species_df.plot_id.unique())
 assert plot_species.issubset(eva_plot_df.plot_id), "Not all EVA plots are present in EVA plot data"
 
 
-# cleaning the plot data
+# cleaning the EVA plot data
+# TODO: everything unrelated to anonymisation should be moved to a separate script
 eva_plot_df["geometry"] = gpd.points_from_xy(
     eva_plot_df.longitude, eva_plot_df.latitude, crs="EPSG:4326"
 )
@@ -147,7 +149,7 @@ for species in tqdm(species_gift):
     spid_dict[species] = spid
 print(spid_dict)
 
-# saving the anonymised data as parquet data
+# anonymisnig species names
 eva_species_df['anonymised_species_name'] = eva_species_df['gift_matched_species_name'].map(spid_dict)
 if eva_species_df['anonymised_species_name'].isna().any():
     raise ValueError("Some species in EVA dataset could not be anonymized. Check for missing mappings in spid_dict.")
@@ -155,6 +157,37 @@ if eva_species_df['anonymised_species_name'].isna().any():
 gift_species_df['anonymised_species_name'] = gift_species_df['work_species'].apply(clean_species_name).map(spid_dict)
 if gift_species_df['anonymised_species_name'].isna().any():
     raise ValueError("Some species in GIFT dataset could not be anonymized. Check for missing mappings in spid_dict.")
+
+# creating habitat specific plots from GIFT data
+# TODO: everything unrelated to anonymisation should be moved to a separate script
+plot_id = 0
+filtered_gift_species_df = []
+filtered_gift_plot_df = []
+for hab in ["Q", "R", "S", "T", "all"]:
+    # get all species in the habitat
+    if hab == "all":
+        eva_plot_id_hab = eva_plot_df[eva_plot_df["level_1"].isin(["Q", "R", "S", "T"])].plot_id.unique() #this should be equal to eva_plot_df.plot_id.unique()
+    else:
+        eva_plot_id_hab = eva_plot_df[eva_plot_df["level_1"] == hab].plot_id.unique()
+    hab_species = eva_species_df[eva_species_df["plot_id"].isin(eva_plot_id_hab)].anonymised_species_name.unique()
+    gift_sp_df = gift_species_df[gift_species_df["anonymised_species_name"].isin(hab_species)]
+    gift_old_plot_ids = gift_sp_df["entity_ID"].dropna().unique()
+    gift_new_plot_ids = {old_id: plot_id+i for (i, old_id) in enumerate(gift_old_plot_ids)}
+    gift_sp_df["entity_ID"] = gift_sp_df["entity_ID"].map(gift_new_plot_ids)
+    gift_pl_df = gift_plot_df[gift_plot_df["entity_ID"].isin(gift_old_plot_ids)]
+    gift_pl_df["entity_ID"] = gift_pl_df["entity_ID"].map(gift_new_plot_ids)
+    gift_pl_df["level_1"] = hab
+    filtered_gift_plot_df.append(gift_pl_df)
+    filtered_gift_species_df.append(gift_sp_df)
+    plot_id = plot_id + len(gift_old_plot_ids)
+    print("Habitat: ", hab, "has ", len(gift_old_plot_ids), "plots", "and ", len(gift_sp_df.anonymised_species_name.unique()), "species")
+gift_species_df = pd.concat(filtered_gift_species_df, ignore_index=True)
+gift_plot_df = pd.concat(filtered_gift_plot_df, ignore_index=True)
+
+assert len(gift_plot_df) == len(gift_plot_df["entity_ID"].unique())
+assert set(gift_plot_df.entity_ID).issubset(set(gift_species_df.entity_ID)), " plot_gdf.entity_ID is not a subset of gift_species_df.entity_ID"
+
+
 
 # filtering eva plots against species selected
 eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_df.plot_id.unique())]
@@ -167,6 +200,6 @@ eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_df.plot_id.unique
 eva_species_df.to_parquet(ANONYMISED_EVA_DATA / "species_data.parquet")
 gift_species_df.to_parquet(ANONYMISED_GIFT_DATA / "species_data.parquet")
 eva_plot_df.to_file(ANONYMISED_EVA_DATA / "plot_data.gpkg", driver="GPKG")
-
+gift_plot_df.to_file(ANONYMISED_GIFT_DATA / "plot_data.gpkg", driver="GPKG")
 
 # no need to save to parquet gift_plot_data, it is alrady in optimized format (gpkg)

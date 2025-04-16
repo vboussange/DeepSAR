@@ -98,9 +98,12 @@ class EUNISDataset():
         """
         Get the habitat map for a specific habitat level. 1 for the habitat, 0 for other habitats, -1 for no data.
         """
-        if hab not in self.legend["level_1"].unique():
+        if hab == "all":
+            habitat_codes = self.legend[self.legend["level_1"].isin(["Q", "R", "S", "T"])]["code"]
+        elif hab in self.legend["level_1"].unique():
+            habitat_codes = self.legend[self.legend["level_1"] == hab]["code"]
+        else:
             raise ValueError(f"Habitat level {hab} not found in legend.")
-        habitat_codes = self.legend[self.legend["level_1"] == hab]["code"]
         habitat_map = xr.where(self.raster.isin(habitat_codes), 1, 0)
         habitat_map = habitat_map.where(self.raster > -1, -1)
         habitat_map = habitat_map.astype(int)

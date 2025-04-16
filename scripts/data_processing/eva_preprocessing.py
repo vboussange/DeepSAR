@@ -10,6 +10,8 @@ Further processing steps involve
 - preprocessing at the plot level (filtering out for
 duplicates, spatial locations, etc.) (`src/utils_eva.py`, but should be placed
 in `scripts`)
+
+TODO: include all steps related in `eva_anonymisation.py` in this script
 """
 import pandas as pd
 import re

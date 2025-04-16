@@ -53,7 +53,7 @@ CONFIG = {
     ],
     "block_length": 1e5, # in meters
     "crs": "EPSG:3035",
-    "habitats" : ["T", "Q", "S", "R"],
+    "habitats" : ["all", "T", "Q", "S", "R"],
     # "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
     "random_state": 2,
     
@@ -109,7 +109,7 @@ def process_partition(partition, block_plot_gdf, species_dict, climate_raster, h
     megaplot_data_partition["partition"] = partition
     megaplot_data_partition = gpd.GeoDataFrame(megaplot_data_partition, crs = block_plot_gdf.crs, geometry="geometry")
     # print(f"Partition {partition}: Processing climate variables...")
-    megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
+    megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster, habitat_map)
     return megaplot_data_partition
 
 def generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map):
@@ -130,12 +130,14 @@ def generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map):
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
 
 
-def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
+def compile_climate_data_megaplot(megaplot_data, climate_raster, habitat_map, verbose=False):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
-    # TODO: need to account for haitat map to calcualte climate variables (crop to pixels with habitat map 1)
+    # only retain pixels which correspond to habitat map
+    habitat_map = habitat_map.where(habitat_map > 0, np.nan)
+    climate_raster = climate_raster * habitat_map
     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
         # Use the geometry directly to clip the climate raster
@@ -170,34 +172,24 @@ if __name__ == "__main__":
     logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
     # save raw plot SR and climate data
     
-    megaplot_ar = []    
+    megaplot_ar = []
     
-    # compiling data for all habitats
-    logging.info(f"Generating megaplot dataset for habitat: all")
-    habitat_map = eunis.raster.where(eunis.raster< 0, eunis.raster > -1)
-    megaplot_data_hab = generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map)
-    megaplot_data_hab["habitat_id"] = "all"
-    megaplot_ar.append(megaplot_data_hab)
-    checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + "_checkpoint_all.pkl")
-    save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
-    print(f"Checkpoint saved for habitat `all` at {checkpoint_path}")
-
-    # for hab in CONFIG["habitats"]:
-    #     logging.info(f"Generating megaplot dataset for habitat: {hab}")
-    #     # TODO: need to filter out species not in habitat, by creating specific plot ID
-    #     gdf_hab = plot_gdf[plot_gdf["level_1"] == hab]
-    #     habitat_map = eunis.get_habitat_map(hab)
-    #     megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster, habitat_map)
-    #     megaplot_data_hab["habitat_id"] = hab
+    for hab in CONFIG["habitats"]:
+        logging.info(f"Generating megaplot dataset for habitat: {hab}")
+        # TODO: need to filter out species not in habitat, by creating specific plot ID
+        gdf_hab = plot_gdf[plot_gdf["level_1"] == hab]
+        habitat_map = eunis.get_habitat_map(hab).where(eunis.raster > -1, np.nan).rio.reproject_match(climate_raster)
+        megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster, habitat_map)
+        megaplot_data_hab["habitat_id"] = hab
         
-    #     assert (megaplot_data_hab.sr > 0).all()
+        assert (megaplot_data_hab.sr > 0).all()
 
-    #     megaplot_ar.append(megaplot_data_hab)
+        megaplot_ar.append(megaplot_data_hab)
         
-    #     # Save checkpoint
-    #     checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
-    #     save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
-    #     logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
+        # Save checkpoint
+        checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
+        save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
+        logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
 
     # aggregating results and final save
     megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
