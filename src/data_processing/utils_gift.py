@@ -7,6 +7,7 @@ import geopandas as gpd
 from tqdm import tqdm
 import pickle
 import xarray as xr
+import json
 
 from src.data_processing.utils_landcover import EUNISDataset
 
@@ -17,11 +18,23 @@ class GIFTDataset:
         self.data_dir = data_dir
 
     def read_species_data(self):
-        species_data = self.data_dir / "species_data.parquet"
-        if species_data.exists():
-            return pd.read_parquet(species_data)
+        species_dataframe_path = self.data_dir / "species_data.parquet"
+        species_dict_path = self.data_dir / "species_data.json"
+        if species_dict_path.exists():
+            with open(species_dict_path, 'r') as f:
+                species_dict = {int(k): v for k, v in json.load(f).items()}
+                return species_dict
+        elif species_dataframe_path.exists():
+            species_dict = {}
+            species_df = pd.read_parquet(species_dataframe_path)
+            species_gdf = species_df.groupby("entity_ID")
+            species_dict = {}
+            for k, v in tqdm(species_gdf, desc="Processing species data"):
+                species_dict[k] = list(v["anonymised_species_name"].unique())
+            json.dump(species_dict, open(species_dict_path, "w"))
+            return species_dict
         else:
-            raise FileNotFoundError(f"Anoymised species data at {GIFT_DATA_DIR.resolve()} not found, did you download/anonymise the data?")
+            raise FileNotFoundError("Anoymised species data not found, did you download/anonymise the data?")
     
     def read_plot_data(self):
         plot_data_file = self.data_dir / "plot_data.gpkg"

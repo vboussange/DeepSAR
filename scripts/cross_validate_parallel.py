@@ -18,10 +18,12 @@ import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
 from joblib import Parallel, delayed
+import geopandas as gpd
 
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
 from src.dataset import create_dataloader
 from src.plotting import read_result
+from sklearn.metrics import r2_score
 
 def setup_logger():
     logger = logging.getLogger()
@@ -41,7 +43,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "a53390d" 
+HASH = "2ac9b04" 
 @dataclass
 class Config:
     device: str
@@ -57,11 +59,12 @@ class Config:
     val_size: float = 0.2
     seed: int = 2
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
+    habitats: list = field(default_factory=lambda: ["all"])
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/{HASH}/augmented_data.pkl"
+    path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
+    path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
 
 class Trainer:
@@ -71,7 +74,8 @@ class Trainer:
         self.results = {}
         self.habitat_agnostic_model = None
         self.habitat_agnostic_scalers = {}
-        self.data = read_result(config.path_augmented_data)
+        self.eva_data = read_result(config.path_eva_data)
+        self.gift_data = gpd.read_file(config.path_gift_data)
         
     def train(self):
         self.prepare_run()
@@ -104,10 +108,10 @@ class Trainer:
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = compile_training_data(self.data, hab, config)
+        gdf = self.compile_training_data(hab, config)
 
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
-            gdf_train_val, gdf_test = (compile_training_data(self.data, "all", config), gdf) if agnostic else (gdf, gdf)
+            gdf_train_val, gdf_test = (self.compile_training_data("all", config), gdf) if agnostic else (gdf, gdf)
 
             print(f"Training model with predictors: {predictors_name}")
 
@@ -155,6 +159,7 @@ class Trainer:
             "train_MSE": epoch_metrics['train_MSE'][best_epoch],
             "val_MSE": epoch_metrics['val_MSE'][best_epoch],
             "test_MSE": epoch_metrics['test_MSE'][best_epoch],
+            "test_R2": epoch_metrics['test_R2'][best_epoch],
             "test_partition": test_partitions.tolist(),
             "val_partition": val_partitions.tolist(),
             "model_state_dict": best_model.state_dict(),
@@ -196,7 +201,8 @@ class Trainer:
             "train_loss": [],
             "train_MSE": [],
             "val_MSE": [],
-            "test_MSE": []
+            "test_MSE": [],
+            "test_R2": [],
         }
         best_val_MSE = float('inf')
         best_model = None
@@ -234,10 +240,11 @@ class Trainer:
 
             # Validation and Test
             model.eval()
-            avg_val_MSE = self.evaluate_model(model, val_loader, target_scaler, device)
-            avg_test_MSE = self.evaluate_model(model, test_loader, target_scaler, device)
+            avg_val_MSE = self.evaluate_model(model, val_loader, target_scaler, device)[0]
+            avg_test_MSE, test_R2 = self.evaluate_model(model, test_loader, target_scaler, device)
             epoch_metrics["val_MSE"].append(avg_val_MSE)
             epoch_metrics["test_MSE"].append(avg_test_MSE)
+            epoch_metrics["test_R2"].append(test_R2)
 
             logger.info(f"Device: {device} | Fold: {fold} || Epoch {epoch + 1}/{self.config.n_epochs} | Training Loss: {avg_train_loss:.4f} | Training MSE: {avg_train_MSE:.4f} | Validation MSE: {avg_val_MSE:.4f} | Test MSE: {avg_test_MSE:.4f}")
 
@@ -251,16 +258,23 @@ class Trainer:
 
     def evaluate_model(self, model, loader, target_scaler, device):
         running_MSE = 0.0
+        all_y_true = []
+        all_y_pred = []
         with torch.no_grad():
             for log_sr, inputs in loader:
                 inputs, log_sr = inputs.to(device), log_sr.to(device)
                 outputs = model(inputs)
                 y_pred = inverse_transform_scale_feature_tensor(outputs, target_scaler)
                 y_true = inverse_transform_scale_feature_tensor(log_sr, target_scaler)
+                all_y_true.append(y_true.cpu().numpy())
+                all_y_pred.append(y_pred.cpu().numpy())
                 MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
                 running_MSE += MSE.item()
         avg_MSE = running_MSE / len(loader.dataset)
-        return avg_MSE
+        all_y_true = np.concatenate(all_y_true, axis=0)
+        all_y_pred = np.concatenate(all_y_pred, axis=0)
+        R2 = r2_score(all_y_true, all_y_pred)
+        return avg_MSE, R2
 
     def save_results(self):
         self.results["config"] = self.config
@@ -269,22 +283,24 @@ class Trainer:
         torch.save(self.results, save_path)
         
         
-def compile_training_data(data, hab, config):
-    megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
-    if hab == "all":
-        plot_data = data["plot_data_all"]
-    else:
-        plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
+    def compile_training_data(self, hab, config):
+        eva_megaplot_data = self.eva_data["megaplot_data"][self.eva_data["megaplot_data"]["habitat_id"] == hab]
+        gift_plot_data = self.gift_data[self.gift_data["habitat_id"] == hab]
         
-    augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
-    
-    # stack with raw plot data
-    augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
-    augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
-    augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
-    augmented_data = augmented_data.dropna()
-    augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
-    return augmented_data
+        if hab == "all":
+            eva_plot_data = self.eva_data["plot_data_all"]
+        else:
+            eva_plot_data = self.eva_data["plot_data_all"][self.eva_data["plot_data_all"]["habitat_id"] == hab]
+            
+        augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
+        
+        # stack with raw plot data
+        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
+        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
+        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
+        augmented_data = augmented_data.dropna()
+        augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
+        return augmented_data
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -302,3 +318,20 @@ if __name__ == "__main__":
 
     trainer = Trainer(config)
     trainer.train()
+
+
+
+    # # testing
+    # compiled_data = trainer.compile_training_data("all", config)
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(10, 6))
+    # data = compiled_data["log_megaplot_area"]
+    # # data = np.log(trainer.gift_data["area"])
+    # plt.hist(data, bins=50, log=True, alpha=0.7, color='blue', edgecolor='black')
+    # plt.xlabel("Area")
+    # plt.ylabel("Frequency (log scale)")
+    # plt.title("Distribution of Area")
+    # plt.grid(axis='y', linestyle='--', alpha=0.7)
+    # plt.show()
+    
+    

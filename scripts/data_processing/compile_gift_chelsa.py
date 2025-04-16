@@ -53,7 +53,7 @@ CONFIG = {
     ],
     "block_length": 1e5, # in meters
     "crs": "EPSG:3035",
-    # "habitats" : ["T1"]
+    "habitats" : ["T", "Q", "S", "R"],
     # "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
     "random_state": 2,
     
@@ -71,7 +71,7 @@ def load_and_preprocess_data():
     Returns processed GIFT and climate datasets.
     """
     logging.info("Loading EVA data...")
-    plot_gdf, species_df = GIFTDataset().load()
+    plot_gdf, species_dict = GIFTDataset().load()
     logging.info("Loading climate raster...")
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
 
@@ -86,25 +86,23 @@ def load_and_preprocess_data():
     logging.info("Cropping plot_gdf to the extent of climate_raster...")
     climate_bounds = climate_raster.rio.bounds()
     plot_gdf = plot_gdf.cx[climate_bounds[0]:climate_bounds[2], climate_bounds[1]:climate_bounds[3]]
-    species_df = species_df[species_df["entity_ID"].isin(plot_gdf["entity_ID"])]
-    return plot_gdf, species_df, climate_raster
+    # species_dict = species_dict[species_dict["entity_ID"].isin(plot_gdf["entity_ID"])]
+    return plot_gdf, species_dict, climate_raster
 
-def clip_GIFT_SR(plot_gdf, species_df, habitat_map):
-    species_gdf = species_df.groupby("entity_ID")
+def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
     for i, row in plot_gdf.iterrows():
         plot_id = row["entity_ID"]
         clipped_habitat_map = habitat_map.rio.clip([row.geometry], drop=True, all_touched=True)
         proportion_area = get_fraction_habitat_landcover(clipped_habitat_map)
-        if plot_id in species_gdf.groups:
-            species = species_gdf.get_group(plot_id).anonymised_species_name.unique()
-            plot_gdf.loc[i, "sr"] = len(species)
-        else:
-            plot_gdf.loc[i, "sr"] = 0
+        species = species_dict[plot_id]
+        sr = len(np.unique(species))
+        plot_gdf.loc[i, "sr"] = sr
+
     plot_gdf["area"] = plot_gdf.geometry.area * proportion_area
     return plot_gdf
 
-def process_partition(partition, block_plot_gdf, species_df, climate_raster, habitat_map):
-    megaplot_data_partition = clip_GIFT_SR(block_plot_gdf, species_df, habitat_map)
+def process_partition(partition, block_plot_gdf, species_dict, climate_raster, habitat_map):
+    megaplot_data_partition = clip_GIFT_SR(block_plot_gdf, species_dict, habitat_map)
     # megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
     megaplot_data_partition["megaplot_area"] = block_plot_gdf.geometry.area
     megaplot_data_partition["geometry"] = block_plot_gdf.geometry
@@ -114,7 +112,7 @@ def process_partition(partition, block_plot_gdf, species_df, climate_raster, hab
     megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster)
     return megaplot_data_partition
 
-def generate_megaplots(plot_gdf, species_df, climate_raster, habitat_map):
+def generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map):
     """
     Process EVA data and generate synthetic megaplots data based on landcover.
     Returns GeoDataFrame of SAR data.
@@ -123,7 +121,7 @@ def generate_megaplots(plot_gdf, species_df, climate_raster, habitat_map):
     miniters = max(total // 100, 1)  # Refresh every 1%
     megaplot_data_hab_ar = []
     for partition, block_plot_gdf in tqdm(plot_gdf.groupby("partition"), desc="Processing partitions", total=total, miniters=miniters):
-        megaplot_data_hab_ar.append(process_partition(partition, block_plot_gdf, species_df, climate_raster, habitat_map))
+        megaplot_data_hab_ar.append(process_partition(partition, block_plot_gdf, species_dict, climate_raster, habitat_map))
                 
     megaplot_data_hab = pd.concat(megaplot_data_hab_ar, ignore_index=True)
 
@@ -137,6 +135,7 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
+    # TODO: need to account for haitat map to calcualte climate variables (crop to pixels with habitat map 1)
     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
         # Use the geometry directly to clip the climate raster
@@ -159,9 +158,9 @@ if __name__ == "__main__":
     CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
     CONFIG["output_file_name"] = Path(f"augmented_data.pkl")
     
-    plot_gdf, species_df, climate_raster = load_and_preprocess_data()
+    plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
     eunis = EUNISDataset()
-    assert set(species_df.entity_ID).issubset(set(plot_gdf.entity_ID)), "species_df.entity_ID is not a subset of plot_gdf.entity_ID"
+    assert set(plot_gdf.entity_ID).issubset(set(species_dict.keys())), " plot_gdf.entity_ID is not a subset of species_dict.entity_ID"
     
     logging.info("Partitioning...")
     plot_gdf["polygon"] = plot_gdf.geometry
@@ -176,29 +175,29 @@ if __name__ == "__main__":
     # compiling data for all habitats
     logging.info(f"Generating megaplot dataset for habitat: all")
     habitat_map = eunis.raster.where(eunis.raster< 0, eunis.raster > -1)
-    megaplot_data_hab = generate_megaplots(plot_gdf, species_df, climate_raster, habitat_map)
+    megaplot_data_hab = generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map)
     megaplot_data_hab["habitat_id"] = "all"
     megaplot_ar.append(megaplot_data_hab)
     checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + "_checkpoint_all.pkl")
     save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
     print(f"Checkpoint saved for habitat `all` at {checkpoint_path}")
 
-    # TODO: to implement compiling data for each separate habitat
-    for hab in CONFIG["habitats"]:
-        logging.info(f"Generating megaplot dataset for habitat: {hab}")
-        gdf_hab = plot_gdf[plot_gdf["level_1"] == hab]
-        habitat_map = eunis.get_habitat_map(hab)
-        megaplot_data_hab = generate_megaplots(gdf_hab, species_df, climate_raster, habitat_map)
-        megaplot_data_hab["habitat_id"] = hab
+    # for hab in CONFIG["habitats"]:
+    #     logging.info(f"Generating megaplot dataset for habitat: {hab}")
+    #     # TODO: need to filter out species not in habitat, by creating specific plot ID
+    #     gdf_hab = plot_gdf[plot_gdf["level_1"] == hab]
+    #     habitat_map = eunis.get_habitat_map(hab)
+    #     megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster, habitat_map)
+    #     megaplot_data_hab["habitat_id"] = hab
         
-        assert (megaplot_data_hab.sr > 0).all()
+    #     assert (megaplot_data_hab.sr > 0).all()
 
-        megaplot_ar.append(megaplot_data_hab)
+    #     megaplot_ar.append(megaplot_data_hab)
         
-        # Save checkpoint
-        checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
-        save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
-        logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
+    #     # Save checkpoint
+    #     checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
+    #     save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
+    #     logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
 
     # aggregating results and final save
     megaplot_data = pd.concat(megaplot_ar, ignore_index=True)

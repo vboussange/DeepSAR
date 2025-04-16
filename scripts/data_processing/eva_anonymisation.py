@@ -10,7 +10,7 @@ from eva_species_process import clean_species_name
 from tqdm import tqdm
 import geopandas as gpd
 import numpy as np
-from src.utils_eunis import extract_habitat_lev1
+from src.data_processing.utils_eunis import extract_habitat_lev1
 
 RAW_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/matched/"
 RAW_GIFT_DATA = Path(__file__).parent / "../../data/raw/GIFT/"
@@ -149,7 +149,12 @@ print(spid_dict)
 
 # saving the anonymised data as parquet data
 eva_species_df['anonymised_species_name'] = eva_species_df['gift_matched_species_name'].map(spid_dict)
-gift_species_df['anonymised_species_name'] = gift_species_df['work_species'].map(spid_dict)
+if eva_species_df['anonymised_species_name'].isna().any():
+    raise ValueError("Some species in EVA dataset could not be anonymized. Check for missing mappings in spid_dict.")
+
+gift_species_df['anonymised_species_name'] = gift_species_df['work_species'].apply(clean_species_name).map(spid_dict)
+if gift_species_df['anonymised_species_name'].isna().any():
+    raise ValueError("Some species in GIFT dataset could not be anonymized. Check for missing mappings in spid_dict.")
 
 # filtering eva plots against species selected
 eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_df.plot_id.unique())]
