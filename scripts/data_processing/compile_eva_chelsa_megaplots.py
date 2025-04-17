@@ -51,7 +51,6 @@ CONFIG = {
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     "habitats" : ["all", "T", "Q", "S", "R"],
-    # "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
     "random_state": 2,
 }
 mean_labels = CONFIG["env_vars"]
@@ -122,12 +121,12 @@ def generate_megaplots(plot_gdf, species_dict):
 
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
 
-def compile_climate_data_plot(plot_data, climate_raster):
+def generate_plot_data(plot_data, species_data, climate_raster):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
-    # climate
+    print("Calculating climate vars...")
     y = plot_data.geometry.y
     x = plot_data.geometry.x
     env_vars = climate_raster.sel(
@@ -137,26 +136,20 @@ def compile_climate_data_plot(plot_data, climate_raster):
     )
     env_vars = env_vars.to_numpy().transpose()
     plot_data[CONFIG["env_vars"]] = env_vars
-    return plot_data
-
-
-def format_plot_data(plot_data, species_data):
-    """
-    Calculate area and convert landcover binary raster to multipoint for each SAR data row.
-    Returns processed SAR data.
-    """
+    
     for i, row in tqdm(plot_data.iterrows(), desc="Compiling species richness", total=plot_data.shape[0]):
         plot_id = row["plot_id"]
         species = species_data[plot_id]
         sr = len(np.unique(species))
         plot_data.loc[i, "sr"] = sr
 
-    plot_data = plot_data.rename({"SR":"sr", "plot_size": "area", "Level_2":"habitat_id"}, axis=1)
+    plot_data = plot_data.rename({"area_m2": "area", "level_1":"habitat_id"}, axis=1)
     plot_data = plot_data.set_index("plot_id")
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data["megaplot_area"] = plot_data["area_m2"]
-    plot_data["area"] = plot_data["area_m2"]
-    plot_data["habitat_id"] = plot_data["level_1"]
+    plot_data["megaplot_area"] = plot_data["area"]
+    
+    print("Partitioning...")
+    plot_data = partition_polygon_gdf(plot_data, CONFIG["block_length"])
     
     plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id", "partition"] + CLIMATE_COL_NAMES]
 
@@ -174,19 +167,12 @@ if __name__ == "__main__":
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
     # Sample 1000 rows for debugging purposes
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
-    plot_gdf = compile_climate_data_plot(plot_gdf, climate_raster)
-    
-    logging.info("Partitioning...")
-    plot_gdf = partition_polygon_gdf(plot_gdf, CONFIG["block_length"])
+    plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
+
     logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
     
-    # save raw plot SR and climate data
-    logging.info("Compiling plot dataset.")
-    plot_data_all = format_plot_data(plot_gdf, species_dict)
-    
     megaplot_ar = []
-    plot_gdf_by_hab = plot_data_all.groupby("level_1")
-
+    plot_gdf_by_hab = plot_data_all.groupby("habitat_id")
     # compiling data for each separate habitat
     for hab in CONFIG["habitats"]:
         logging.info(f"Generating megaplot dataset for habitat: {hab}")
@@ -194,7 +180,7 @@ if __name__ == "__main__":
             gdf_hab = plot_data_all
         else:
             gdf_hab = plot_gdf_by_hab.get_group(hab)
-        megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster)
+        megaplot_data_hab = generate_megaplots(gdf_hab, species_dict)
         megaplot_data_hab["habitat_id"] = hab
         
         assert (megaplot_data_hab.sr > 0).all()
