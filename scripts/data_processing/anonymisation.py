@@ -13,6 +13,16 @@ RAW_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/preprocessing/"
 RAW_GIFT_DATA = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"
 ANONYMISED_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/anonymised"
 ANONYMISED_GIFT_DATA = Path(__file__).parent / "../../data/processed/GIFT/anonymised"
+if ANONYMISED_EVA_DATA.exists():
+    for file in ANONYMISED_EVA_DATA.iterdir():
+        file.unlink()
+    ANONYMISED_EVA_DATA.rmdir()
+
+if ANONYMISED_GIFT_DATA.exists():
+    for file in ANONYMISED_GIFT_DATA.iterdir():
+        file.unlink()
+    ANONYMISED_GIFT_DATA.rmdir()
+
 ANONYMISED_EVA_DATA.mkdir(parents=True, exist_ok=True)
 ANONYMISED_GIFT_DATA.mkdir(parents=True, exist_ok=True)
 

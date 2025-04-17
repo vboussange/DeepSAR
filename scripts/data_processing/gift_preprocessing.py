@@ -7,6 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
 from eva_preprocessing import clean_species_name
+from src.data_processing.utils_env_pred import EXTENT_DATASET
 
 # ---------------------- CONFIGURATION ---------------------- #
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"
@@ -15,7 +16,7 @@ RAW_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/preprocessing/"
 RAW_GIFT_DATA = Path(__file__).parent / "../../data/raw/GIFT"
 
 eva_species_df = pd.read_parquet(RAW_EVA_DATA / "species_data.parquet")
-gift_species_df = pd.read_csv(RAW_GIFT_DATA / "gift_checklists.csv")
+gift_species_df = pd.read_csv(RAW_GIFT_DATA / "species_data.csv")
 gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
 eva_plot_df = gpd.read_file(RAW_EVA_DATA / "plot_data.gpkg")
 
@@ -23,8 +24,12 @@ OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 gift_species_df['work_species_cleaned'] = gift_species_df['work_species'].apply(clean_species_name)
 
+
+# # Crop plot_gdf to the extent of climate_raster
+print("Cropping plot_gdf to the extent of climate_raster...")
+gift_plot_df = gift_plot_df.cx[EXTENT_DATASET[0]:EXTENT_DATASET[2], EXTENT_DATASET[1]:EXTENT_DATASET[3]]
+
 # creating habitat specific plots from GIFT data
-# TODO: everything unrelated to anonymisation should be moved to a separate script
 plot_id = 0
 filtered_gift_species_df = []
 filtered_gift_plot_df = []

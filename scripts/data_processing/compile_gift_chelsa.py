@@ -80,13 +80,6 @@ def load_and_preprocess_data():
     climate_dataset = climate_dataset.rio.reproject(CONFIG["crs"]).sortby("y")
     climate_raster = climate_dataset.to_array()
     climate_raster = climate_raster.sel(variable=CONFIG["env_vars"])
-    
-    # # Crop plot_gdf to the extent of climate_raster
-    # TODO: this could be done as a preprocessing step
-    logging.info("Cropping plot_gdf to the extent of climate_raster...")
-    climate_bounds = climate_raster.rio.bounds()
-    plot_gdf = plot_gdf.cx[climate_bounds[0]:climate_bounds[2], climate_bounds[1]:climate_bounds[3]]
-    # species_dict = species_dict[species_dict["entity_ID"].isin(plot_gdf["entity_ID"])]
     return plot_gdf, species_dict, climate_raster
 
 def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):

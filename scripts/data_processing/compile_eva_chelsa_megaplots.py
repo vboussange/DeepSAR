@@ -50,7 +50,7 @@ CONFIG = {
     # "side_range": (1e2, 1e5), # in m
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
-    "habitats" : [],
+    "habitats" : ["all", "T", "Q", "S", "R"],
     # "habitats": ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"],
     "random_state": 2,
 }
@@ -122,28 +122,6 @@ def generate_megaplots(plot_gdf, species_dict):
 
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
 
-
-# def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
-#     """
-#     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
-#     Returns processed SAR data.
-#     """
-#     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
-#         # climate
-#         minx, miny, maxx, maxy = row.geometry.bounds
-#         env_vars = climate_raster.sel(
-#             x=slice(minx, maxx),
-#             y=slice(miny, maxy) 
-#         )
-#         env_vars = env_vars.to_numpy()
-#         with warnings.catch_warnings():
-#             warnings.simplefilter("ignore", category=RuntimeWarning)
-#             _m = np.nanmean(env_vars, axis=(1, 2))
-#             _std = np.nanstd(env_vars, axis=(1, 2))
-#         env_pred_stats = np.concatenate([_m, _std])
-#         megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
-#     return megaplot_data
-
 def compile_climate_data_plot(plot_data, climate_raster):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
@@ -201,26 +179,21 @@ if __name__ == "__main__":
     logging.info("Partitioning...")
     plot_gdf = partition_polygon_gdf(plot_gdf, CONFIG["block_length"])
     logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
+    
     # save raw plot SR and climate data
+    logging.info("Compiling plot dataset.")
     plot_data_all = format_plot_data(plot_gdf, species_dict)
     
     megaplot_ar = []
-    plot_gdf_by_hab = plot_gdf.groupby("level_1")
-    
-    
-    # compiling data for all habitats
-    logging.info(f"Generating megaplot dataset for habitat: all")
-    megaplot_data_hab = generate_megaplots(plot_data_all, species_dict)
-    megaplot_data_hab["habitat_id"] = "all"
-    megaplot_ar.append(megaplot_data_hab)
-    checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + "_checkpoint_all.pkl")
-    save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
-    print(f"Checkpoint saved for habitat `all` at {checkpoint_path}")
+    plot_gdf_by_hab = plot_data_all.groupby("level_1")
 
     # compiling data for each separate habitat
     for hab in CONFIG["habitats"]:
         logging.info(f"Generating megaplot dataset for habitat: {hab}")
-        gdf_hab = plot_gdf_by_hab.get_group(hab)
+        if hab == "all":
+            gdf_hab = plot_data_all
+        else:
+            gdf_hab = plot_gdf_by_hab.get_group(hab)
         megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster)
         megaplot_data_hab["habitat_id"] = hab
         

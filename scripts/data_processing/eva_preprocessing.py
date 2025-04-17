@@ -10,8 +10,6 @@ Further processing steps involve
 - preprocessing at the plot level (filtering out for
 duplicates, spatial locations, etc.) (`src/utils_eva.py`, but should be placed
 in `scripts`)
-
-TODO: include all steps related in `eva_anonymisation.py` in this script
 """
 import pandas as pd
 import re
@@ -135,7 +133,7 @@ def clean_eva_plots(plot_gdf):
 def load_data():
     eva_species_df = pd.read_csv(EVA_SPECIES_FILE, sep="\t", engine="python", on_bad_lines='skip')
     gift_species_df = pd.read_csv(GIFT_CHECKLIST_FILE)
-    eva_plot_df = pd.read_csv("../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_header.csv",
+    eva_plot_df = pd.read_csv(Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_header.csv",
                             header=0,
                             usecols=[
                                 "Relevé area (m²)",
