@@ -22,7 +22,7 @@ from src.data_processing.utils_eunis import extract_habitat_lev1
 
 # ---------------------- CONFIGURATION ---------------------- #
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
-GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/gift_checklists.csv"
+GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/species_data.csv"
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/preprocessing"
 FIELDS_PRIORITY = ["Turboveg2 concept", "Matched concept", "Original taxon concept"]
 
@@ -177,10 +177,14 @@ def main():
     # Create a unique dataset of species entries to process
     unique_species_df = eva_vascular_df[FIELDS_PRIORITY].drop_duplicates()
     unique_species_df["Cleaned name"] = unique_species_df["Matched concept"].apply(clean_species_name)
-    print(f"Unique species combinations to process: {len(unique_species_df)}")
     
     # Preparing GIFT species set
     gift_species_set = set(gift_species_df["work_species"].dropna().apply(clean_species_name).unique())
+    
+    # Filtering out all non resolved species level entries
+    gift_species_set = {sp for sp in gift_species_set if "spec." not in sp}
+    unique_species_df = unique_species_df[~unique_species_df["Cleaned name"].str.contains("spec.", na=False)]
+    print(f"Unique species combinations to process: {len(unique_species_df)}")
     
     # Matching with GIFT names on the unique dataset only
     tqdm.pandas(desc="Matching unique species")
