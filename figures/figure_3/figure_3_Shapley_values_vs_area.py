@@ -15,7 +15,7 @@ from pathlib import Path
 import sys
 
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from train import Config, compile_training_data
+from train import Config, Trainer
 
 def get_df_shap_val(model, results_fit_split, gdf):
     predictors = results_fit_split["predictors"]
@@ -46,12 +46,12 @@ def compute_shap_values(seed, model_name, hash_value, habitats):
     path_results = Path(__file__).parent / Path(f"../../scripts/results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{model_name}_model_full_physics_informed_constraint_{hash_value}.pth")    
     results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
-    data = read_result(config.path_augmented_data)
+    trainer = Trainer(config)
     shap_values = {}
     for hab in habitats:
         results_fit_split = results_fit_split_all[hab]
         model = initialize_ensemble_model(results_fit_split, config, "cuda")
-        gdf = compile_training_data(data, hab, config)
+        gdf = trainer.compile_training_data(hab)
         df_shap = get_df_shap_val(model, results_fit_split, gdf)
         
         std_labs = ["std_" + env for env in config.climate_variables]
@@ -66,7 +66,7 @@ def compute_shap_values(seed, model_name, hash_value, habitats):
     
     return shap_values, config
 
-def plot_shap_values(shap_values, config, habitats, config_plot):
+def plot_shap_values(shap_values, habitats, config_plot):
     fig, axs = plt.subplots(2, 5, figsize=(8, 4))
     
     for i, hab in enumerate(habitats):
@@ -101,9 +101,12 @@ def plot_shap_values(shap_values, config, habitats, config_plot):
 if __name__ == "__main__":
     seed = 1
     model_name = "large"
-    hash_value = "a53390d"
-    habitats = ["T1", "R1", "Q5", "S2", "all", "T3", "R2", "Q2", "S3"]
+    hash_value = "ee40db7"
+    habitats = ["all", "T", "R", "Q", "S"]
+    habitat_labels = ["all", "Forests", "Grasslands", "Wetlands", "Shrublands"]
     config_plot = [("Area", "tab:green"), ("Mean climate", "tab:blue"), ("Climate heterogeneity", "tab:red")]
 
     shap_values, config = compute_shap_values(seed, model_name, hash_value, habitats)
-    plot_shap_values(shap_values, config, habitats, config_plot)
+    # TODO: rename habitats with habitat_labels
+    # shap_values = ...
+    plot_shap_values(shap_values, habitats, config_plot)
