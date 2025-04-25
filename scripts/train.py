@@ -13,6 +13,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 import pandas as pd
+import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
@@ -28,7 +29,7 @@ MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                     "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]}
 MODEL = "large"
-HASH = "a53390d"
+HASH = "ee40db7"
 @dataclass
 class Config:
     device: str
@@ -44,13 +45,14 @@ class Config:
     seed: int = 1
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    habitats: list = field(default_factory=lambda: ["all", "T", "Q", "S", "R"])
     n_ensembles: int = 5  # Number of models in the ensemble
     run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
     test_partitions: list = field(default_factory=lambda: [684, 546, 100, 880, 1256, 296]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
-    path_augmented_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_raw_compilation/{HASH}/augmented_data.pkl"
+    path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
+    path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
 class Trainer:
     def __init__(self, config: Config):
@@ -59,6 +61,14 @@ class Trainer:
         self.models = []
         self.feature_scaler = None
         self.target_scaler = None
+        self.eva_data = read_result(config.path_eva_data)
+        self.gift_data = gpd.read_file(config.path_gift_data)
+        
+        climate_vars = config.climate_variables
+        std_climate_vars = ["std_" + env for env in climate_vars]
+        climate_features = climate_vars + std_climate_vars
+        
+        self.predictors = ["log_area", "log_megaplot_area"] + climate_features
 
     def train_model(self, model, train_loader, val_loader, criterion, optimizer, scheduler):
         best_val_MSE = float('inf')
@@ -125,7 +135,7 @@ class Trainer:
 
         return best_model, best_val_MSE, epoch_metrics
 
-    def train_and_evaluate_ensemble(self, gdf_full, predictors, criterion):
+    def train_and_evaluate_ensemble(self, gdf_full, criterion):
         self.models = []
         ensemble_metrics = []
 
@@ -137,21 +147,21 @@ class Trainer:
             np.random.seed(self.config.seed + ensemble_idx)
             random.seed(self.config.seed + ensemble_idx)
 
-            test_idx = gdf_full.partition.isin(self.config.test_partitions)
-            # train_idx, test_idx = train_test_split(
-            #     gdf_full.index,
-            #     test_size=self.config.test_size,
-            #     random_state=self.config.seed + ensemble_idx,
-            # )
-
-            gdf_train, gdf_test = gdf_full.loc[~test_idx], gdf_full.loc[test_idx]
+            # test_idx = gdf_full.partition.isin(self.config.test_partitions)
+            # gdf_train, gdf_test = gdf_full.loc[~test_idx], gdf_full.loc[test_idx]
+            train_idx, test_idx = train_test_split(
+                gdf_full.index,
+                test_size=self.config.test_size,
+                random_state=self.config.seed + ensemble_idx,
+            )
+            gdf_train, gdf_test = gdf_full.loc[train_idx], gdf_full.loc[test_idx]
             logger.info(f"Ratio of test data: {len(gdf_test) / len(gdf_full):.2f}")
 
-            train_loader, self.feature_scaler, self.target_scaler = create_dataloader(gdf_train, predictors, self.config.batch_size, self.config.num_workers)
-            val_loader, _, _ = create_dataloader(gdf_test, predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
+            train_loader, self.feature_scaler, self.target_scaler = create_dataloader(gdf_train, self.predictors, self.config.batch_size, self.config.num_workers)
+            val_loader, _, _ = create_dataloader(gdf_test, self.predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
 
 
-            model = MLP(len(predictors), config.layer_sizes).to(self.device)
+            model = MLP(len(self.predictors), config.layer_sizes).to(self.device)
             optimizer = optim.AdamW(
                 model.parameters(),
                 lr=self.config.lr,
@@ -171,7 +181,7 @@ class Trainer:
         ensemble_model = EnsembleModel(self.models).to(self.device)
 
         # Evaluate ensemble model on full data
-        loader, _, _ = create_dataloader(gdf_full, predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
+        loader, _, _ = create_dataloader(gdf_full, self.predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
 
         ensemble_model.eval()
         running_MSE = 0.0
@@ -193,26 +203,29 @@ class Trainer:
             "best_validation_loss": avg_MSE,
             "feature_scaler": self.feature_scaler,
             "target_scaler": self.target_scaler,
-            "predictors": predictors,
             "ensemble_metrics": ensemble_metrics,
         }
         
-def compile_training_data(data, hab, config):
-    megaplot_data = data["megaplot_data"][data["megaplot_data"]["habitat_id"] == hab]
-    if hab == "all":
-        plot_data = data["plot_data_all"]
-    else:
-        plot_data = data["plot_data_all"][data["plot_data_all"]["habitat_id"] == hab]
+    def compile_training_data(self, hab):
+        eva_data = self.eva_data
+        gift_data = self.gift_data
+        seed = self.config.seed
+        if hab == "all":
+            eva_plot_data = eva_data["plot_data_all"]
+        else:
+            eva_plot_data = eva_data["plot_data_all"][eva_data["plot_data_all"]["habitat_id"] == hab]
+        eva_megaplot_data = eva_data["megaplot_data"][eva_data["megaplot_data"]["habitat_id"] == hab]
+        gift_plot_data = gift_data[gift_data["habitat_id"] == hab]
+        augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
         
-    augmented_data = pd.concat([plot_data, megaplot_data], ignore_index=True)
-    
-    # stack with raw plot data
-    augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
-    augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
-    augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
-    augmented_data = augmented_data.dropna()
-    augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
-    return augmented_data
+        # stack with raw plot data
+        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32)) 
+        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))
+        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))
+        augmented_data = augmented_data.dropna()
+        augmented_data = augmented_data[~augmented_data.isin([np.inf, -np.inf]).any(axis=1)]
+        augmented_data = augmented_data.sample(frac=1, random_state=seed).reset_index(drop=True)
+        return augmented_data
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -226,19 +239,16 @@ if __name__ == "__main__":
     config = Config(device=device)
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
-
-    data = read_result(config.path_augmented_data)
-
+    trainer = Trainer(config)
     results_all = {}
-    predictors = ["log_area", "log_megaplot_area"] + config.climate_variables
     for hab in config.habitats:
         logger.info(f"Training ensemble model with habitat {hab}")
-        augmented_data = compile_training_data(data, hab, config)
+        augmented_data = trainer.compile_training_data(hab)
 
         trainer = Trainer(config)
+
         results = trainer.train_and_evaluate_ensemble(
             augmented_data,
-            predictors,
             CustomMSELoss(config.dSRdA_weight).to(device),
         )
         results_all[hab] = results

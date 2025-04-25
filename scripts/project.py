@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     seed = 1
     MODEL = "large"
-    HASH = "a53390d"  
+    HASH = "ee40db7"  
     path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
@@ -127,12 +127,12 @@ if __name__ == "__main__":
         print(f"Calculating SR, and stdSR for resolution: {res}m")
         features, SR, std_SR, dlogSR_dlogA = get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
-        print("Projection predictions on map.")
         SR_rast = create_raster(features, SR)
+        SR_rast.rio.to_raster(results_path/ HASH / f"SR_raster_{res:.0f}m.tif")
+
         std_SR_rast = create_raster(features, std_SR)
-        
-        SR_rast.rio.to_raster(results_path/f"SR_raster_{res:.0f}m.tif")
-        std_SR_rast.rio.to_raster(results_path/f"std_SR_raster_{res:.0f}m.tif")
+        std_SR_rast.rio.to_raster(results_path/ HASH / f"std_SR_raster_{res:.0f}m.tif")
         
         dlogSR_dlogA_rast = create_raster(features, dlogSR_dlogA)
-        dlogSR_dlogA_rast.rio.to_raster(results_path/f"dlogSR_dlogA_raster_{res:.0f}m.tif")
+        dlogSR_dlogA_rast.rio.to_raster(results_path/ HASH / f"dlogSR_dlogA_raster_{res:.0f}m.tif")
+        print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {results_path}")

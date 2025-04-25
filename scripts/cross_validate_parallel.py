@@ -43,7 +43,7 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "2ac9b04" 
+HASH = "ee40db7" 
 @dataclass
 class Config:
     device: str
@@ -59,7 +59,7 @@ class Config:
     val_size: float = 0.2
     seed: int = 2
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["all"])
+    habitats: list = field(default_factory=lambda: ["all", "T", "Q", "S", "R"])
     run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
@@ -108,10 +108,10 @@ class Trainer:
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = self.compile_training_data(hab, config)
+        gdf = self.compile_training_data(hab)
 
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
-            gdf_train_val, gdf_test = (self.compile_training_data("all", config), gdf) if agnostic else (gdf, gdf)
+            gdf_train_val, gdf_test = (self.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
 
             print(f"Training model with predictors: {predictors_name}")
 
@@ -126,8 +126,6 @@ class Trainer:
             )
 
             self.results[hab][predictors_name] = metrics
-
-
     
     def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, criterion, optimizer_cls, scheduler_cls, device, fold):
         torch.cuda.set_device(device)
@@ -187,6 +185,23 @@ class Trainer:
             )
             for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
         )
+        
+        # results = [
+        #     self.train_and_evaluate_fold(
+        #     train_idx,
+        #     test_idx,
+        #     gdf_train_val,
+        #     gdf_test,
+        #     model,
+        #     predictors,
+        #     criterion,
+        #     optimizer_cls,
+        #     scheduler_cls,
+        #     self.devices[fold % len(self.devices)], 
+        #     fold
+        #     )
+        #     for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
+        # ]
 
         aggregated_results = {key: [result[key] for result in results] for key in results[0]}
         aggregated_results["predictors"] = predictors
@@ -196,7 +211,6 @@ class Trainer:
     def train_model(self, model, train_loader, val_loader, test_loader, criterion, optimizer, scheduler, target_scaler, device, fold):
         logger = setup_logger()
 
-        
         epoch_metrics = {
             "train_loss": [],
             "train_MSE": [],
@@ -283,22 +297,22 @@ class Trainer:
         torch.save(self.results, save_path)
         
         
-    def compile_training_data(self, hab, config):
-        eva_megaplot_data = self.eva_data["megaplot_data"][self.eva_data["megaplot_data"]["habitat_id"] == hab]
-        gift_plot_data = self.gift_data[self.gift_data["habitat_id"] == hab]
-        
+    def compile_training_data(self, hab):
+        config = self.config
         if hab == "all":
             eva_plot_data = self.eva_data["plot_data_all"]
         else:
             eva_plot_data = self.eva_data["plot_data_all"][self.eva_data["plot_data_all"]["habitat_id"] == hab]
-            
+        eva_megaplot_data = self.eva_data["megaplot_data"][self.eva_data["megaplot_data"]["habitat_id"] == hab]
+        gift_plot_data = self.gift_data[self.gift_data["habitat_id"] == hab]
         augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
         
         # stack with raw plot data
-        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32))  # area
-        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))  # area
-        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))  # area
+        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32)) 
+        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))
+        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))
         augmented_data = augmented_data.dropna()
+        augmented_data = augmented_data[~augmented_data.isin([np.inf, -np.inf]).any(axis=1)]
         augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
         return augmented_data
 

@@ -14,7 +14,7 @@ import scipy.stats as stats
 
 import sys
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from cross_validate_parallel import Config, compile_training_data
+from cross_validate_parallel import Config, Trainer
 from src.mlp import load_model_checkpoint
 from src.dataset import scale_features_targets
 from src.plotting import read_result
@@ -52,15 +52,17 @@ def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
 
 
 if __name__ == "__main__":
-    habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    habitats = ["all", "T", "R", "Q", "S"]
+    habitat_labels = ["all", "Forests", "Grasslands", "Wetlands", "Shrublands"]
     # habitats = ["all", "T1"]
     seed = 2
     MODEL = "large"
-    HASH = "a53390d"
+    HASH = "ee40db7"
     path_results = Path(f"../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
     config = result_modelling["config"]
+    metric = "test_R2"
     
     for hab in habitats:
         val = result_modelling[hab]
@@ -72,28 +74,29 @@ if __name__ == "__main__":
         for k in val.keys():
             val2 = val[k]
 
-            mse = val2["test_MSE"]
+            mse = val2[metric]
             if len(mse) > 0:
                 mse_arr.append(mse)
         mse = np.stack(mse_arr)
         non_nan_columns = ~np.isnan(mse).any(axis=0)
         matrix_no_nan_columns = mse[:, non_nan_columns]
         for i, val2 in enumerate(val.values()):
-            if len(val2["test_MSE"]) > 0:
-                val2["test_MSE"] = mse[i,:]
+            if len(val2[metric]) > 0:
+                val2[metric] = mse[i,:]
             else:
-                val2["test_MSE"] = np.array([])
+                val2[metric] = np.array([])
                 
     # Calculating residuals
     hab = "all"
     config = result_modelling["config"]
-    data = read_result(config.path_augmented_data)
-    gdf = compile_training_data(data, hab, config)
+    trainer = Trainer(config)
+    gdf = trainer.compile_training_data(hab, config)
 
     results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab, config)
     
-        
-    result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
+    # Replace habitat keys with habitat_labels in result_modelling
+    result_modelling = {habitat_labels[i]: result_modelling[hab] for i, hab in enumerate(habitats)}
+    result_modelling["all"]['area+climate, habitat agnostic'] = {metric:[]}
     PREDICTORS = ["linear_model", 
                   "area", 
                   "climate", 
@@ -109,7 +112,7 @@ if __name__ == "__main__":
     
     # first axis
     ax1 = fig.add_subplot(gs[0, :])
-    ax1.set_ylim(0.1, 0.8)
+    # ax1.set_ylim(0.1, 0.8)
     boxplot_bypreds(
         result_modelling,
         ax=ax1,
@@ -117,16 +120,16 @@ if __name__ == "__main__":
         colormap="Set2",
         legend=True,
         xlab="",
-        ylab="MSE",
+        ylab="R2",
         yscale="linear",
-        yname="test_MSE",
-        habitats=habitats,
+        yname=metric,
+        habitats=habitat_labels,
         predictors=PREDICTORS,
         widths=0.1,
     )
-    label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
-    for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-        ax1.text(x+0.5, -0.03, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
+    # label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
+    # for i,x in enumerate(np.arange(1, len(habitats), step=2)):
+    #     ax1.text(x+0.5, -0.03, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
     fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
     fig
     # second axis
@@ -181,13 +184,13 @@ if __name__ == "__main__":
     fig.savefig("figure_2.pdf", dpi=300, transparent=True)
     
     with open("paired_t_test_EVA_EUNIS.txt", "w") as file:
-        for j, c in enumerate(habitats[:-1]):
+        for j, c in enumerate(habitat_labels[:-1]):
             print(c, file=file)
             performance_baseline = result_modelling[c]["area"][
-                "test_MSE"
+                metric
             ]
             performance_new_features = result_modelling[c]["area+climate"][
-                "test_MSE"
+                metric
             ]
             t_statistic, p_value = stats.ttest_rel(
                 performance_baseline, performance_new_features

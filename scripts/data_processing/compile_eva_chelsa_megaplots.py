@@ -68,7 +68,7 @@ def load_and_preprocess_data(check_consistency=False):
     logging.info("Loading EVA data...")
     plot_gdf, species_dict = EVADataset().load()
     if check_consistency:
-        print("Checking data consistency...")
+        logging.info("Checking data consistency...")
         assert all([len(np.unique(species_dict[k])) == r.SR for k, r in plot_gdf.iterrows()])
 
     logging.info("Loading climate raster...")
@@ -126,7 +126,7 @@ def generate_plot_data(plot_data, species_data, climate_raster):
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
-    print("Calculating climate vars...")
+    logging.info("Calculating climate vars...")
     y = plot_data.geometry.y
     x = plot_data.geometry.x
     env_vars = climate_raster.sel(
@@ -148,9 +148,9 @@ def generate_plot_data(plot_data, species_data, climate_raster):
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
     plot_data["megaplot_area"] = plot_data["area"]
     
-    print("Partitioning...")
+    logging.info("Partitioning...")
     plot_data = partition_polygon_gdf(plot_data, CONFIG["block_length"])
-    
+    logging.info(f"Nb. partitions: {len(plot_data['partition'].unique())}")
     plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id", "partition"] + CLIMATE_COL_NAMES]
 
     return plot_data
@@ -168,9 +168,7 @@ if __name__ == "__main__":
     # Sample 1000 rows for debugging purposes
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
     plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
-
-    logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
-    
+        
     megaplot_ar = []
     plot_gdf_by_hab = plot_data_all.groupby("habitat_id")
     # compiling data for each separate habitat
@@ -197,7 +195,7 @@ if __name__ == "__main__":
        
     # export the full compilation to pickle
     output_path = CONFIG["output_file_path"] / CONFIG["output_file_name"]
-    print(f"Exporting {output_path}")
+    logging.info(f"Exporting {output_path}")
     save_to_pickle(output_path, 
                    megaplot_data=megaplot_data, 
                    plot_data_all=plot_data_all,
@@ -205,12 +203,12 @@ if __name__ == "__main__":
     
     # exporting megaplot_data to gpkg
     output_path = CONFIG["output_file_path"] / "eva_chelsa_megaplot_data.gpkg"
-    print(f"Exporting {output_path}")
+    logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
     
     # exporting raw plot data tp gpkg
     output_path = CONFIG["output_file_path"] / "eva_chelsa_plot_data.gpkg"
-    print(f"Exporting {output_path}")
+    logging.info(f"Exporting {output_path}")
     plot_data_all.to_file(output_path, driver="GPKG")
     
     logging.info(f'Full compilation saved at {CONFIG["output_file_path"]}.')
