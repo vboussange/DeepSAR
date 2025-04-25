@@ -1,4 +1,4 @@
-execute files as follows:
+Execute files as follows to obtain training datasets:
 
 1. eva_preprocessing.py
 2. gift_preprocessing.py

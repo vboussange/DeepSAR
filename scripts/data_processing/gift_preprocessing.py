@@ -12,17 +12,20 @@ from src.data_processing.utils_env_pred import EXTENT_DATASET
 # ---------------------- CONFIGURATION ---------------------- #
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"
 
-RAW_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/preprocessing/"
+PROCESSED_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/preprocessing/"
 RAW_GIFT_DATA = Path(__file__).parent / "../../data/raw/GIFT"
 
-eva_species_df = pd.read_parquet(RAW_EVA_DATA / "species_data.parquet")
+eva_species_df = pd.read_parquet(PROCESSED_EVA_DATA / "species_data.parquet")
 gift_species_df = pd.read_csv(RAW_GIFT_DATA / "species_data.csv")
 gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
-eva_plot_df = gpd.read_file(RAW_EVA_DATA / "plot_data.gpkg")
+eva_plot_df = gpd.read_file(PROCESSED_EVA_DATA / "plot_data.gpkg")
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 gift_species_df['work_species_cleaned'] = gift_species_df['work_species'].apply(clean_species_name)
+
+# Filtering out all non resolved species level entries
+gift_species_df = gift_species_df[~gift_species_df["work_species_cleaned"].str.contains("spec.", na=False)]
 
 
 # # Crop plot_gdf to the extent of climate_raster
