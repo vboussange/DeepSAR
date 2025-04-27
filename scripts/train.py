@@ -12,14 +12,16 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
+from src.trainer import Trainer
 from src.ensemble_model import EnsembleModel
-from src.dataset import create_dataloader
-from src.plotting import read_result
+from src.dataset import AugmentedDataset, create_dataloader
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +38,7 @@ class Config:
     batch_size: int = 1024
     num_workers: int = 0
     test_size: float = 0.1
+    val_size: float = 0.1
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
@@ -54,179 +57,73 @@ class Config:
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
     path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
-class Trainer:
-    def __init__(self, config: Config):
-        self.config = config
-        self.device = config.device
-        self.models = []
-        self.feature_scaler = None
-        self.target_scaler = None
-        self.eva_data = read_result(config.path_eva_data)
-        self.gift_data = gpd.read_file(config.path_gift_data)
+
+def train_and_evaluate_ensemble(config, df):
+    
+    climate_vars = config.climate_variables
+    std_climate_vars = ["std_" + env for env in climate_vars]
+    climate_features = climate_vars + std_climate_vars
+    predictors = ["log_area", "log_megaplot_area"] + climate_features
+            
+    train_val_idx, test_idx = train_test_split(df.index,
+                                            test_size= config.test_size,
+                                            random_state=config.seed)
+    gdf_train_val = df.loc[train_val_idx]
+    _, feature_scaler, target_scaler = create_dataloader(gdf_train_val, predictors, config.batch_size, config.num_workers)
+
+    models = []
+
+    for ensemble_idx in range(config.n_ensembles):
+        logger.info(f"Training model {ensemble_idx + 1}/{config.n_ensembles}")
+
+        # Set random seeds for reproducibility
+        torch.manual_seed(config.seed + ensemble_idx)
+        np.random.seed(config.seed + ensemble_idx)
+        random.seed(config.seed + ensemble_idx)
+
+        train_idx, val_idx = train_test_split(train_val_idx,
+                                            test_size=config.val_size,
+                                            random_state=config.seed + ensemble_idx,)
+        gdf_train, gdf_val, gdf_test = df.loc[train_idx], df.loc[val_idx], df.loc[test_idx]
+
+        train_loader, _, _ = create_dataloader(gdf_train, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
+        val_loader, _, _ = create_dataloader(gdf_val, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
+        test_loader, _, _ = create_dataloader(gdf_test, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
+
+        model = MLP(len(predictors), config.layer_sizes)
+
+        trainer = Trainer(config=config, 
+                          model=model, 
+                          feature_scaler=feature_scaler, 
+                          target_scaler=target_scaler, 
+                          train_loader=train_loader, 
+                          val_loader=val_loader, 
+                          test_loader=test_loader, 
+                          compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
+        best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["MSE"])
+        models.append(best_model)
+
+    # Create ensemble model
+    ensemble_model = EnsembleModel(models)
+    ensemble_trainer = Trainer(config=config,
+                               model=ensemble_model,
+                               feature_scaler=feature_scaler,
+                               target_scaler=target_scaler,
+                               train_loader=train_loader,
+                               val_loader=val_loader,
+                               test_loader=test_loader,
+                               compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
+    ensemble_mse = ensemble_trainer.evaluate_SR_metric(mean_squared_error, test_loader)
+
+    logger.info(f"Ensemble MSE on test dataset: {ensemble_mse:.4f}")
+
+    return {
+        "ensemble_model_state_dict": ensemble_model.state_dict(),
+        "feature_scaler": feature_scaler,
+        "target_scaler": target_scaler,
+        "mean_squared_error_test": ensemble_mse,
+    }
         
-        climate_vars = config.climate_variables
-        std_climate_vars = ["std_" + env for env in climate_vars]
-        climate_features = climate_vars + std_climate_vars
-        
-        self.predictors = ["log_area", "log_megaplot_area"] + climate_features
-
-    def train_model(self, model, train_loader, val_loader, criterion, optimizer, scheduler):
-        best_val_MSE = float('inf')
-        best_model = None
-        epoch_metrics = {'train_loss': [], 'train_MSE': [], 'val_MSE': []}
-
-        for epoch in range(self.config.n_epochs):
-            model.train()
-            running_train_loss = 0.0
-            running_train_MSE = 0.0
-
-            for log_sr, inputs in train_loader:
-                inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
-
-                if isinstance(criterion, torch.nn.MSELoss):
-                    outputs = model(inputs)
-                    loss = criterion(outputs, log_sr)
-                else:
-                    inputs.requires_grad_(True)
-                    outputs = model(inputs)
-                    loss = criterion(model, outputs, inputs, log_sr)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                running_train_loss += loss.item() * inputs.size(0)
-
-                with torch.no_grad():
-                    model.eval()
-                    y_pred = inverse_transform_scale_feature_tensor(outputs, self.target_scaler)
-                    y_true = inverse_transform_scale_feature_tensor(log_sr, self.target_scaler)
-                    train_MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
-                    running_train_MSE += train_MSE.item()
-
-            avg_train_loss = running_train_loss / len(train_loader.dataset)
-            avg_train_MSE = running_train_MSE / len(train_loader.dataset)
-            epoch_metrics['train_loss'].append(avg_train_loss)
-            epoch_metrics['train_MSE'].append(avg_train_MSE)
-
-            # Validation
-            model.eval()
-            running_val_MSE = 0.0
-            with torch.no_grad():
-                for log_sr, inputs in val_loader:
-                    inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
-                    outputs = model(inputs)
-
-                    y_pred = inverse_transform_scale_feature_tensor(outputs, self.target_scaler)
-                    y_true = inverse_transform_scale_feature_tensor(log_sr, self.target_scaler)
-                    val_MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
-                    running_val_MSE += val_MSE.item()
-
-            avg_val_MSE = running_val_MSE / len(val_loader.dataset)
-            epoch_metrics['val_MSE'].append(avg_val_MSE)
-
-            logger.info(f"Epoch {epoch + 1}/{self.config.n_epochs} | Training Loss: {avg_train_loss:.4f} | Training MSE: {avg_train_MSE:.4f} | Validation MSE: {avg_val_MSE:.4f}")
-
-            if avg_val_MSE < best_val_MSE:
-                best_val_MSE = avg_val_MSE
-                best_model = copy.deepcopy(model).to('cpu')
-
-            scheduler.step(avg_val_MSE)
-
-        return best_model, best_val_MSE, epoch_metrics
-
-    def train_and_evaluate_ensemble(self, gdf_full, criterion):
-        self.models = []
-        ensemble_metrics = []
-
-        for ensemble_idx in range(self.config.n_ensembles):
-            logger.info(f"Training model {ensemble_idx + 1}/{self.config.n_ensembles}")
-
-            # Set random seeds for reproducibility
-            torch.manual_seed(self.config.seed + ensemble_idx)
-            np.random.seed(self.config.seed + ensemble_idx)
-            random.seed(self.config.seed + ensemble_idx)
-
-            # test_idx = gdf_full.partition.isin(self.config.test_partitions)
-            # gdf_train, gdf_test = gdf_full.loc[~test_idx], gdf_full.loc[test_idx]
-            train_idx, test_idx = train_test_split(
-                gdf_full.index,
-                test_size=self.config.test_size,
-                random_state=self.config.seed + ensemble_idx,
-            )
-            gdf_train, gdf_test = gdf_full.loc[train_idx], gdf_full.loc[test_idx]
-            logger.info(f"Ratio of test data: {len(gdf_test) / len(gdf_full):.2f}")
-
-            train_loader, self.feature_scaler, self.target_scaler = create_dataloader(gdf_train, self.predictors, self.config.batch_size, self.config.num_workers)
-            val_loader, _, _ = create_dataloader(gdf_test, self.predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
-
-
-            model = MLP(len(self.predictors), config.layer_sizes).to(self.device)
-            optimizer = optim.AdamW(
-                model.parameters(),
-                lr=self.config.lr,
-                weight_decay=self.config.weight_decay,
-            )
-            scheduler = ReduceLROnPlateau(
-                optimizer,
-                factor=self.config.lr_scheduler_factor,
-                patience=self.config.lr_scheduler_patience,
-            )
-
-            best_model, best_val_MSE, epoch_metrics = self.train_model(model, train_loader, val_loader, criterion, optimizer, scheduler)
-            self.models.append(best_model)
-            ensemble_metrics.append(epoch_metrics)
-
-        # Create ensemble model
-        ensemble_model = EnsembleModel(self.models).to(self.device)
-
-        # Evaluate ensemble model on full data
-        loader, _, _ = create_dataloader(gdf_full, self.predictors, self.config.batch_size, self.config.num_workers, self.feature_scaler, self.target_scaler)
-
-        ensemble_model.eval()
-        running_MSE = 0.0
-        with torch.no_grad():
-            for log_sr, inputs in loader:
-                inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
-                outputs = ensemble_model(inputs)
-
-                y_pred = inverse_transform_scale_feature_tensor(outputs, self.target_scaler)
-                y_true = inverse_transform_scale_feature_tensor(log_sr, self.target_scaler)
-                val_MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
-                running_MSE += val_MSE.item()
-
-        avg_MSE = running_MSE / len(loader.dataset)
-        logger.info(f"Ensemble MSE: {avg_MSE:.4f}")
-
-        return {
-            "ensemble_model_state_dict": ensemble_model.state_dict(),
-            "best_validation_loss": avg_MSE,
-            "feature_scaler": self.feature_scaler,
-            "target_scaler": self.target_scaler,
-            "ensemble_metrics": ensemble_metrics,
-        }
-        
-    def compile_training_data(self, hab):
-        eva_data = self.eva_data
-        gift_data = self.gift_data
-        seed = self.config.seed
-        if hab == "all":
-            eva_plot_data = eva_data["plot_data_all"]
-        else:
-            eva_plot_data = eva_data["plot_data_all"][eva_data["plot_data_all"]["habitat_id"] == hab]
-        eva_megaplot_data = eva_data["megaplot_data"][eva_data["megaplot_data"]["habitat_id"] == hab]
-        gift_plot_data = gift_data[gift_data["habitat_id"] == hab]
-        augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
-        
-        # stack with raw plot data
-        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32)) 
-        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))
-        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))
-        augmented_data = augmented_data.dropna()
-        augmented_data = augmented_data[~augmented_data.isin([np.inf, -np.inf]).any(axis=1)]
-        augmented_data = augmented_data.sample(frac=1, random_state=seed).reset_index(drop=True)
-        return augmented_data
-
 if __name__ == "__main__":
     if torch.cuda.is_available():
         device = "cuda:1"
@@ -235,22 +132,20 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
-    # Create Config instance
     config = Config(device=device)
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
-    trainer = Trainer(config)
+    
+    augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
+                                         path_gift_data = config.path_gift_data,
+                                         seed = config.seed)
+    
+    
     results_all = {}
     for hab in config.habitats:
         logger.info(f"Training ensemble model with habitat {hab}")
-        augmented_data = trainer.compile_training_data(hab)
-
-        trainer = Trainer(config)
-
-        results = trainer.train_and_evaluate_ensemble(
-            augmented_data,
-            CustomMSELoss(config.dSRdA_weight).to(device),
-        )
+        df = augmented_dataset.compile_training_data(hab)
+        results = train_and_evaluate_ensemble(config, df)
         results_all[hab] = results
 
     results_all["config"] = config

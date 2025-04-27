@@ -222,11 +222,11 @@ class Trainer:
         best_model = None
 
         for epoch in range(self.config.n_epochs):
-            model.train()
             running_train_loss = 0.0
             running_train_MSE = 0.0
 
             for log_sr, inputs in train_loader:
+                model.train()
                 inputs, log_sr = inputs.to(device), log_sr.to(device)
                 if isinstance(criterion, torch.nn.MSELoss):
                     outputs = model(inputs)
@@ -240,13 +240,6 @@ class Trainer:
                 optimizer.step()
                 running_train_loss += loss.item() * inputs.size(0)
 
-                with torch.no_grad():
-                    model.eval()
-                    y_pred = inverse_transform_scale_feature_tensor(outputs, target_scaler)
-                    y_true = inverse_transform_scale_feature_tensor(log_sr, target_scaler)
-                    train_MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
-                    running_train_MSE += train_MSE.item()
-
             avg_train_loss = running_train_loss / len(train_loader.dataset)
             avg_train_MSE = running_train_MSE / len(train_loader.dataset)
             epoch_metrics["train_loss"].append(avg_train_loss)
@@ -254,6 +247,7 @@ class Trainer:
 
             # Validation and Test
             model.eval()
+            avg_train_loss, avg_train_MSE = self.evaluate_model(model, train_loader, target_scaler, device)
             avg_val_MSE = self.evaluate_model(model, val_loader, target_scaler, device)[0]
             avg_test_MSE, test_R2 = self.evaluate_model(model, test_loader, target_scaler, device)
             epoch_metrics["val_MSE"].append(avg_val_MSE)
@@ -270,19 +264,13 @@ class Trainer:
 
         return best_model, epoch_metrics
 
-    def evaluate_model(self, model, loader, target_scaler, device):
+    def evaluate_model(self, metrics, model, loader, target_scaler, device):
         running_MSE = 0.0
         all_y_true = []
         all_y_pred = []
         with torch.no_grad():
             for log_sr, inputs in loader:
                 inputs, log_sr = inputs.to(device), log_sr.to(device)
-                outputs = model(inputs)
-                y_pred = inverse_transform_scale_feature_tensor(outputs, target_scaler)
-                y_true = inverse_transform_scale_feature_tensor(log_sr, target_scaler)
-                all_y_true.append(y_true.cpu().numpy())
-                all_y_pred.append(y_pred.cpu().numpy())
-                MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
                 running_MSE += MSE.item()
         avg_MSE = running_MSE / len(loader.dataset)
         all_y_true = np.concatenate(all_y_true, axis=0)
@@ -315,6 +303,20 @@ class Trainer:
         augmented_data = augmented_data[~augmented_data.isin([np.inf, -np.inf]).any(axis=1)]
         augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
         return augmented_data
+    
+def myMSE(model, inputs, y_true, target_scaler):
+        y_pred = inverse_transform_scale_feature_tensor(outputs, target_scaler)
+        y_true = inverse_transform_scale_feature_tensor(log_sr, target_scaler)
+        all_y_true.append(y_true.cpu().numpy())
+        all_y_pred.append(y_pred.cpu().numpy())
+        MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
+
+    
+def myR2(model, ytrue):
+    return r2_score(ytrue, ypred)
+
+def myLoss(model, ytrue):
+    return torch.mean((ypred - ytrue) ** 2)
 
 if __name__ == "__main__":
     if torch.cuda.is_available():

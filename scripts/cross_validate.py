@@ -1,6 +1,7 @@
 """
 Cross-validation script for training and evaluating models on the EVA-CHELSA dataset for different habitats and predictors.
 
+/!\ this script is deprecated for `cross_validate_parallel.py` which is more efficient and faster
 # TODO: significant work is performed on CPU, consider identifying and moving to GPU
 """
 import copy
@@ -12,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from sklearn.model_selection import train_test_split, GroupKFold
+from sklearn.model_selection import GroupShuffleSplit, GroupKFold
 import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -38,13 +39,13 @@ class Config:
     batch_size: int = 1024
     num_workers: int = 0
     k_folds: int = 10
-    n_epochs: int = 100
+    n_epochs: int = 50
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
     dSRdA_weight: float = 1e0
     weight_decay: float = 1e-3
-    val_size: float = 0.2
+    val_size: float = 0.1
     seed: int = 2
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     habitats: list = field(default_factory=lambda: ["all", "T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3"])
@@ -133,7 +134,10 @@ class Trainer:
             logger.info(f"Fold {fold + 1}/{self.config.k_folds}")
             try:
                 gdf_train_val_fold = gdf_train_val.iloc[train_idx]
-                gdf_train_fold, gdf_val_fold = train_test_split(gdf_train_val_fold, test_size=config.val_size, random_state=config.seed)
+                gss = GroupShuffleSplit(n_splits=1, test_size=config.val_size, random_state=config.seed)
+                train_idx, val_idx = next(gss.split(gdf_train_val_fold, groups=gdf_train_val_fold.partition))
+                gdf_train_fold = gdf_train_val_fold.iloc[train_idx]
+                gdf_val_fold = gdf_train_val_fold.iloc[val_idx]
                 # we subset in the test data the partitions corresponding to the ones from the fold, indexed in test_idx
                 test_partitions = gdf_train_val.iloc[test_idx].partition.unique()
                 test_idx_fold = gdf_test.partition.isin(test_partitions)
