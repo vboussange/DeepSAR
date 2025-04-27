@@ -63,3 +63,4 @@ assert set(gift_plot_df.entity_ID).issubset(set(gift_species_df.entity_ID)), " p
 
 gift_species_df.to_parquet(OUTPUT_FOLDER / "species_data.parquet")
 gift_plot_df.to_file(OUTPUT_FOLDER / "plot_data.gpkg", driver="GPKG")
+print(f"\nSaved preprocessed data to {OUTPUT_FOLDER / 'species_data.parquet'} and {OUTPUT_FOLDER / 'plot_data.gpkg'}")
