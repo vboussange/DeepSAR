@@ -78,5 +78,4 @@ eva_species_df.to_parquet(ANONYMISED_EVA_DATA / "species_data.parquet")
 gift_species_df.to_parquet(ANONYMISED_GIFT_DATA / "species_data.parquet")
 eva_plot_df.to_file(ANONYMISED_EVA_DATA / "plot_data.gpkg", driver="GPKG")
 gift_plot_df.to_file(ANONYMISED_GIFT_DATA / "plot_data.gpkg", driver="GPKG")
-
-# no need to save to parquet gift_plot_data, it is alrady in optimized format (gpkg)
+print("Anonymisation completed successfully.")
