@@ -21,12 +21,15 @@ gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
 eva_plot_df = gpd.read_file(PROCESSED_EVA_DATA / "plot_data.gpkg")
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-
+gift_species_df = gift_species_df[~gift_species_df.work_species.isna()]
 gift_species_df['work_species_cleaned'] = gift_species_df['work_species'].apply(clean_species_name)
 
 # Filtering out all non resolved species level entries
-gift_species_df = gift_species_df[~gift_species_df["work_species_cleaned"].str.contains("spec.", na=False)]
+gift_species_df = gift_species_df[~gift_species_df["work_species_cleaned"].str.contains("spec.", regex=False)]
 
+species_eva = set(eva_species_df.gift_matched_species_name.unique())
+species_gift =  set(gift_species_df['work_species_cleaned'].unique())
+assert species_eva.issubset(species_gift), "Not all EVA species are present in GIFT dataset"
 
 # # Crop plot_gdf to the extent of climate_raster
 print("Cropping plot_gdf to the extent of climate_raster...")

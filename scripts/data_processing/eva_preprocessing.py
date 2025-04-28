@@ -183,7 +183,7 @@ def main():
     
     # Filtering out all non resolved species level entries
     gift_species_set = {sp for sp in gift_species_set if "spec." not in sp}
-    unique_species_df = unique_species_df[~unique_species_df["Cleaned name"].str.contains("spec.", na=False)]
+    unique_species_df = unique_species_df[~unique_species_df["Cleaned name"].str.contains("spec.", regex=False)]
     print(f"Unique species combinations to process: {len(unique_species_df)}")
     
     # Matching with GIFT names on the unique dataset only
@@ -201,8 +201,11 @@ def main():
     eva_vascular_df = eva_vascular_df.merge(
         unique_species_df[FIELDS_PRIORITY + ["Matched GIFT name", "Cleaned name", "Exact match"]], 
         on=FIELDS_PRIORITY, 
-        how="left"
+        how="left",
     )
+    
+    # those entries which did not get a match correspond to e.g. genus resolved entries and must be dropped
+    eva_vascular_df = eva_vascular_df.dropna()
     
     # Logging unmatched cases
     total_eva_species = unique_species_df['Cleaned name'].nunique()
