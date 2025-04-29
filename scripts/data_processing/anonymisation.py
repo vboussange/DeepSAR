@@ -50,7 +50,7 @@ eva_plot_df = gpd.read_file(RAW_EVA_DATA / "plot_data.gpkg")
 
 # checks
 species_eva = set(eva_species_df.gift_matched_species_name.unique())
-species_gift =  gift_species_df['work_species_cleaned'].unique()
+species_gift =  set(gift_species_df['work_species_cleaned'].unique())
 assert species_eva.issubset(species_gift), "Not all EVA species are present in GIFT dataset"
 
 plot_species = set(eva_species_df.plot_id.unique())

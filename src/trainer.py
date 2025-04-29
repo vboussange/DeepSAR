@@ -80,6 +80,7 @@ class Trainer:
 
         for log_sr, inputs in self.train_loader:
             inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
+            self.optimizer.zero_grad()
             if isinstance(self.compute_loss, torch.nn.MSELoss):
                 outputs = self.model(inputs)
                 batch_loss = self.compute_loss(outputs, log_sr)
@@ -107,6 +108,8 @@ class Trainer:
             val_loss +=  batch_loss.item() * inputs.size(0)
         avg_val_loss = val_loss / len(self.val_loader.dataset)
         
+        self.scheduler.step(avg_val_loss)
+
         return avg_train_loss, avg_val_loss
     
     def train(self, n_epochs, metrics = []):
@@ -131,4 +134,68 @@ class Trainer:
         return best_model, best_model_log
 
 
-# TODO: implement a test
+
+if __name__ == "__main__":
+    # TODO: it feels like there is a problem : The training loss and validation loss do not return the same number, although they should after the model has converged
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import mean_squared_error
+    from torch.utils.data import DataLoader, TensorDataset
+    
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    X = torch.randn(1000, 3)
+    y = X.sum(dim=1, keepdim=True)  # Mock target variable
+    
+    class MockConfig:
+        device: str = "cpu"
+        num_workers: int = 0
+        test_size: float = 0.1
+        val_size: float = 0.1
+        lr: float = 1e-1
+        lr_scheduler_factor: float = 0.5
+        lr_scheduler_patience: int = 20
+        n_epochs: int = 100
+        weight_decay: float = 1e-3
+        seed: int = 1
+
+    
+    # Create mock scalers
+    feature_scaler = StandardScaler()
+    X_scaled = torch.tensor(feature_scaler.fit_transform(X.numpy()), dtype=torch.float32)
+    
+    target_scaler = StandardScaler()  
+    y_scaled = torch.tensor(target_scaler.fit_transform(y.numpy()), dtype=torch.float32)
+    
+    # Use the scaled data for the model
+    X = X_scaled
+    y = y_scaled
+    
+    # Create mock dataloaders
+    dataset = TensorDataset(y, X)
+    train_loader = DataLoader(dataset, batch_size=256)
+    val_loader = DataLoader(dataset, batch_size=256)
+    test_loader = DataLoader(dataset, batch_size=256)
+    
+    # Initialize model and trainer
+    model = MLP(3, [16, 16, 16])
+
+    compute_loss = nn.MSELoss()
+    
+    trainer = Trainer(
+        config=MockConfig(),
+        model=model,
+        feature_scaler=feature_scaler,
+        target_scaler=target_scaler,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        compute_loss=compute_loss,
+    )
+    
+    # # Override evaluate_SR_metric to avoid eval() call
+    # trainer.evaluate_SR_metric = lambda metric, loader: 0.5
+    
+
+    # Test train method
+    best_model, best_model_log = trainer.train(n_epochs=100, metrics=["mean_squared_error"])

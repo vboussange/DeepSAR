@@ -205,7 +205,7 @@ def main():
     )
     
     # those entries which did not get a match correspond to e.g. genus resolved entries and must be dropped
-    eva_vascular_df = eva_vascular_df.dropna()
+    eva_vascular_df = eva_vascular_df[~eva_vascular_df["Matched GIFT name"].isna()]
     
     # Logging unmatched cases
     total_eva_species = unique_species_df['Cleaned name'].nunique()
