@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                     "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]}
-MODEL = "large"
+MODEL = "small" #TODO: to change
 HASH = "ee40db7"
 @dataclass
 class Config:
@@ -42,7 +42,7 @@ class Config:
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
-    n_epochs: int = 100
+    n_epochs: int = 1 # TODO: to change
     dSRdA_weight: float = 1e0
     weight_decay: float = 1e-3
     seed: int = 1
@@ -100,7 +100,7 @@ def train_and_evaluate_ensemble(config, df):
                           val_loader=val_loader, 
                           test_loader=test_loader, 
                           compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
-        best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["MSE"])
+        best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error"])
         models.append(best_model)
 
     # Create ensemble model

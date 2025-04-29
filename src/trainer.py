@@ -16,6 +16,7 @@ from src.ensemble_model import EnsembleModel
 from src.dataset import create_dataloader
 from src.plotting import read_result
 
+from sklearn.metrics import mean_squared_error, r2_score
 
 class Trainer:
     def __init__(self, 
@@ -26,8 +27,7 @@ class Trainer:
                  train_loader,
                  val_loader,
                  test_loader,
-                 compute_loss, 
-                 predictors):
+                 compute_loss):
         
         self.model = model.to(config.device)
         self.feature_scaler = feature_scaler
@@ -36,7 +36,6 @@ class Trainer:
         self.val_loader = val_loader
         self.test_loader = test_loader
         self.compute_loss = compute_loss
-        self.predictors = predictors
         self.optimizer = optim.AdamW(
                 model.parameters(),
                 lr=config.lr,
@@ -61,6 +60,20 @@ class Trainer:
         preds = torch.cat(preds, dim=0)
         return preds
 
+    def evaluate_SR_metric(self, metric, loader):
+        preds = self.get_model_predictions(loader)
+        preds = preds.cpu()
+
+        target = [y for y, _ in loader]
+        target = torch.cat(target, dim=0)
+        target = target.cpu()
+        
+        sr_pred = self.target_scaler.inverse_transform(preds)
+        sr_target = self.target_scaler.inverse_transform(target)
+        
+        metric_value = metric(sr_pred, sr_target)
+        return metric_value
+    
     def train_step(self):
         self.model.train()
         running_train_loss = 0.0
@@ -78,28 +91,23 @@ class Trainer:
             batch_loss.backward()
             self.optimizer.step()
             running_train_loss += batch_loss.item() * inputs.size(0)
-
         avg_train_loss = running_train_loss / len(self.train_loader.dataset)
 
         self.model.eval()
-        avg_val_loss = self.get_model_predictions(self.val_loader)
-        self.scheduler.step(avg_val_loss)
-
+        val_loss = 0.0
+        for log_sr, inputs in self.val_loader:
+            inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
+            if isinstance(self.compute_loss, torch.nn.MSELoss):
+                outputs = self.model(inputs)
+                batch_loss = self.compute_loss(outputs, log_sr)
+            else:
+                inputs.requires_grad_(True)
+                outputs = self.model(inputs)
+                batch_loss = self.compute_loss(self.model, outputs, inputs, log_sr)
+            val_loss +=  batch_loss.item() * inputs.size(0)
+        avg_val_loss = val_loss / len(self.val_loader.dataset)
+        
         return avg_train_loss, avg_val_loss
-    
-    def evaluate_SR_metric(self, metric, loader):
-        preds = self.get_model_predictions(loader)
-        preds = preds.cpu()
-
-        target = [y for y, _ in loader]
-        target = torch.cat(target, dim=0)
-        target = target.cpu()
-        
-        sr_pred = self.target_scaler.inverse_transform(preds)
-        sr_target = self.target_scaler.inverse_transform(target)
-        
-        metric_value = metric(sr_pred, sr_target)
-        return metric_value
     
     def train(self, n_epochs, metrics = []):
         best_val_loss = float('inf')
@@ -110,10 +118,10 @@ class Trainer:
             train_loss, val_loss = self.train_step()
             logging.info(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
             metric_log = {}
-            for name, loader in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
+            for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
                 for m in metrics:
-                    metric_log[m + "_" + name] = self.evaluate_SR_metric(eval(m), loader)
-                    logging.info(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[m + '_' + name]:.4f}")
+                    metric_log[name + "_" + m] = self.evaluate_SR_metric(eval(m), loader)
+                    logging.info(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}")
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -121,3 +129,6 @@ class Trainer:
                 best_model_log = metric_log
 
         return best_model, best_model_log
+
+
+# TODO: implement a test

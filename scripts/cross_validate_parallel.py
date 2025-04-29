@@ -2,6 +2,7 @@
 Cross-validation script for training and evaluating models on the EVA-CHELSA dataset for different habitats and predictors.
 
 # TODO: significant work is performed on CPU, consider identifying and moving to GPU
+# TODO: WORK IN PROGRESS, script must be checked
 """
 import copy
 import random
@@ -21,9 +22,9 @@ from joblib import Parallel, delayed
 import geopandas as gpd
 
 from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.dataset import create_dataloader
+from src.dataset import create_dataloader, AugmentedDataset
 from src.plotting import read_result
-from sklearn.metrics import r2_score
+from src.trainer import Trainer
 
 def setup_logger():
     logger = logging.getLogger()
@@ -36,6 +37,8 @@ def setup_logger():
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
     return logger
+
+logger = setup_logger()
 
 MODEL_ARCHITECTURE = {
                       "small":[16, 16, 16],
@@ -67,29 +70,15 @@ class Config:
     path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
 
-class Trainer:
+class ParallelCrossValidator:
     def __init__(self, config: Config):
         self.config = config
+        self.augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
+                                                path_gift_data = config.path_gift_data,
+                                                seed = config.seed)
         self.devices = ["cuda:0", "cuda:2", "cuda:3", "cuda:4", "cuda:5"]
-        self.results = {}
-        self.habitat_agnostic_model = None
-        self.habitat_agnostic_scalers = {}
-        self.eva_data = read_result(config.path_eva_data)
-        self.gift_data = gpd.read_file(config.path_gift_data)
-        
-    def train(self):
-        self.prepare_run()
-        for hab in self.config.habitats:
-            print(f"Training models for habitat: {hab}")
-            self.results[hab] = {}
-            self.train_models_for_habitat(hab)
-            self.save_results() # checkpointing after each habitat
 
-    def prepare_run(self):
-        self.config.run_folder = Path(Path(__file__).parent,'results', f"{Path(__file__).stem}_dSRdA_weight_{self.config.dSRdA_weight:.0e}_seed_{self.config.seed}")
-        self.config.run_folder.mkdir(exist_ok=True)
-
-    def train_models_for_habitat(self, hab):
+    def run_CV_for_habitat(self, hab):
         climate_vars = self.config.climate_variables
         std_climate_vars = ["std_" + env for env in climate_vars]
         climate_features = climate_vars + std_climate_vars
@@ -108,14 +97,14 @@ class Trainer:
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
-        gdf = self.compile_training_data(hab)
+        gdf = self.augmented_dataset.compile_training_data(hab)
 
         for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
-            gdf_train_val, gdf_test = (self.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
+            gdf_train_val, gdf_test = (self.augmented_dataset.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
 
-            print(f"Training model with predictors: {predictors_name}")
+            logger.info(f"Training model with predictors: {predictors_name}")
 
-            trained_model, metrics = self.train_and_evaluate(
+            metrics = self.train_and_evaluate(
                 model,
                 predictors,
                 criterion,
@@ -125,7 +114,7 @@ class Trainer:
                 gdf_test,
             )
 
-            self.results[hab][predictors_name] = metrics
+            return metrics
     
     def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, criterion, optimizer_cls, scheduler_cls, device, fold):
         torch.cuda.set_device(device)
@@ -150,18 +139,26 @@ class Trainer:
         val_loader, _, _ = create_dataloader(gdf_val_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
         test_loader, _, _ = create_dataloader(gdf_test_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
 
-        best_model, epoch_metrics = self.train_model(model, train_loader, val_loader, test_loader, criterion, optimizer, scheduler, target_scaler, device, fold)
-        best_epoch = np.argmin(epoch_metrics['val_MSE'])
+        trainer = Trainer(config=config, 
+                          model=model, 
+                          feature_scaler=feature_scaler, 
+                          target_scaler=target_scaler, 
+                          train_loader=train_loader, 
+                          val_loader=val_loader, 
+                          test_loader=test_loader, 
+                          compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
+        
+        best_model, best_metrics = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
+
 
         return {
-            "train_MSE": epoch_metrics['train_MSE'][best_epoch],
-            "val_MSE": epoch_metrics['val_MSE'][best_epoch],
-            "test_MSE": epoch_metrics['test_MSE'][best_epoch],
-            "test_R2": epoch_metrics['test_R2'][best_epoch],
+            "train_MSE": best_metrics['train_mean_squared_error'],
+            "val_MSE": best_metrics['val_mean_squared_error'],
+            "test_MSE": best_metrics['test_mean_squared_error'],
+            "test_R2": best_metrics['test_r2_score'],
             "test_partition": test_partitions.tolist(),
             "val_partition": val_partitions.tolist(),
             "model_state_dict": best_model.state_dict(),
-            "epoch_metrics": epoch_metrics,
             "feature_scaler": feature_scaler,
             "target_scaler": target_scaler
         }
@@ -206,117 +203,9 @@ class Trainer:
         aggregated_results = {key: [result[key] for result in results] for key in results[0]}
         aggregated_results["predictors"] = predictors
 
-        return model, aggregated_results
-    
-    def train_model(self, model, train_loader, val_loader, test_loader, criterion, optimizer, scheduler, target_scaler, device, fold):
-        logger = setup_logger()
-
-        epoch_metrics = {
-            "train_loss": [],
-            "train_MSE": [],
-            "val_MSE": [],
-            "test_MSE": [],
-            "test_R2": [],
-        }
-        best_val_MSE = float('inf')
-        best_model = None
-
-        for epoch in range(self.config.n_epochs):
-            running_train_loss = 0.0
-            running_train_MSE = 0.0
-
-            for log_sr, inputs in train_loader:
-                model.train()
-                inputs, log_sr = inputs.to(device), log_sr.to(device)
-                if isinstance(criterion, torch.nn.MSELoss):
-                    outputs = model(inputs)
-                    loss = criterion(outputs, log_sr)
-                else:
-                    inputs.requires_grad_(True)
-                    outputs = model(inputs)
-                    loss = criterion(model, outputs, inputs, log_sr)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                running_train_loss += loss.item() * inputs.size(0)
-
-            avg_train_loss = running_train_loss / len(train_loader.dataset)
-            avg_train_MSE = running_train_MSE / len(train_loader.dataset)
-            epoch_metrics["train_loss"].append(avg_train_loss)
-            epoch_metrics["train_MSE"].append(avg_train_MSE)
-
-            # Validation and Test
-            model.eval()
-            avg_train_loss, avg_train_MSE = self.evaluate_model(model, train_loader, target_scaler, device)
-            avg_val_MSE = self.evaluate_model(model, val_loader, target_scaler, device)[0]
-            avg_test_MSE, test_R2 = self.evaluate_model(model, test_loader, target_scaler, device)
-            epoch_metrics["val_MSE"].append(avg_val_MSE)
-            epoch_metrics["test_MSE"].append(avg_test_MSE)
-            epoch_metrics["test_R2"].append(test_R2)
-
-            logger.info(f"Device: {device} | Fold: {fold} || Epoch {epoch + 1}/{self.config.n_epochs} | Training Loss: {avg_train_loss:.4f} | Training MSE: {avg_train_MSE:.4f} | Validation MSE: {avg_val_MSE:.4f} | Test MSE: {avg_test_MSE:.4f}")
-
-            if avg_val_MSE < best_val_MSE:
-                best_val_MSE = avg_val_MSE
-                best_model = copy.deepcopy(model).to("cpu")
-
-            scheduler.step(avg_val_MSE)
-
-        return best_model, epoch_metrics
-
-    def evaluate_model(self, metrics, model, loader, target_scaler, device):
-        running_MSE = 0.0
-        all_y_true = []
-        all_y_pred = []
-        with torch.no_grad():
-            for log_sr, inputs in loader:
-                inputs, log_sr = inputs.to(device), log_sr.to(device)
-                running_MSE += MSE.item()
-        avg_MSE = running_MSE / len(loader.dataset)
-        all_y_true = np.concatenate(all_y_true, axis=0)
-        all_y_pred = np.concatenate(all_y_pred, axis=0)
-        R2 = r2_score(all_y_true, all_y_pred)
-        return avg_MSE, R2
-
-    def save_results(self):
-        self.results["config"] = self.config
-        save_path = self.config.run_folder / f"{self.config.run_name}.pth"
-        print(f"Saving results to {save_path}")
-        torch.save(self.results, save_path)
+        return aggregated_results
         
         
-    def compile_training_data(self, hab):
-        config = self.config
-        if hab == "all":
-            eva_plot_data = self.eva_data["plot_data_all"]
-        else:
-            eva_plot_data = self.eva_data["plot_data_all"][self.eva_data["plot_data_all"]["habitat_id"] == hab]
-        eva_megaplot_data = self.eva_data["megaplot_data"][self.eva_data["megaplot_data"]["habitat_id"] == hab]
-        gift_plot_data = self.gift_data[self.gift_data["habitat_id"] == hab]
-        augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
-        
-        # stack with raw plot data
-        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32)) 
-        augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))
-        augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))
-        augmented_data = augmented_data.dropna()
-        augmented_data = augmented_data[~augmented_data.isin([np.inf, -np.inf]).any(axis=1)]
-        augmented_data = augmented_data.sample(frac=1, random_state=config.seed).reset_index(drop=True)
-        return augmented_data
-    
-def myMSE(model, inputs, y_true, target_scaler):
-        y_pred = inverse_transform_scale_feature_tensor(outputs, target_scaler)
-        y_true = inverse_transform_scale_feature_tensor(log_sr, target_scaler)
-        all_y_true.append(y_true.cpu().numpy())
-        all_y_pred.append(y_pred.cpu().numpy())
-        MSE = torch.mean((y_pred - y_true) ** 2) * inputs.size(0)
-
-    
-def myR2(model, ytrue):
-    return r2_score(ytrue, ypred)
-
-def myLoss(model, ytrue):
-    return torch.mean((ypred - ytrue) ** 2)
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -331,9 +220,25 @@ if __name__ == "__main__":
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     random.seed(config.seed)
-
-    trainer = Trainer(config)
-    trainer.train()
+    
+    config.run_folder = Path(Path(__file__).parent,'results', f"{Path(__file__).stem}_dSRdA_weight_{self.config.dSRdA_weight:.0e}_seed_{self.config.seed}")
+    config.run_folder.mkdir(exist_ok=True)
+    
+    validator = ParallelCrossValidator(config)
+    
+    results_all = {}
+    for hab in config.habitats:
+        logger.info(f"Training models for habitat: {hab}")
+        cv_results = validator.run_CV_for_habitat(hab)
+        results_all[hab] = cv_results
+        
+        # checkpointing
+        save_path = config.run_folder / f"{config.run_name}_{hab}.pth"
+        torch.save(cv_results, save_path)
+        
+    results_all["config"] = config
+    logger.info(f"Saving results in {config.run_folder}")
+    torch.save(results_all, config.run_folder / f"{config.run_name}.pth")
 
 
 
