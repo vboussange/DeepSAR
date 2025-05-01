@@ -27,15 +27,16 @@ class Trainer:
                  train_loader,
                  val_loader,
                  test_loader,
-                 compute_loss):
+                 compute_loss,
+                 device):
         
-        self.model = model.to(config.device)
+        self.model = model.to(device)
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
-        self.compute_loss = compute_loss.to(config.device)
+        self.compute_loss = compute_loss.to(device)
         self.optimizer = optim.AdamW(
                 model.parameters(),
                 lr=config.lr,
@@ -46,7 +47,7 @@ class Trainer:
                 factor=config.lr_scheduler_factor,
                 patience=config.lr_scheduler_patience,
             )
-        self.device = config.device
+        self.device = device
         
     def get_model_predictions(self, loader):
         # we expect the loader to return transformed data
@@ -111,14 +112,15 @@ class Trainer:
             train_loss, val_loss = self.train_step()
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}") #todo: change for print
             metric_log = {}
-            for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
-                targets, preds = self.get_model_predictions(loader)
-                pred_trs = self.target_scaler.inverse_transform(preds)
-                target_trs = self.target_scaler.inverse_transform(targets)
-                for m in metrics:
-                    metric_value = eval(m)(target_trs, pred_trs)
-                    metric_log[name + "_" + m] = metric_value
-                    print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}") #todo: change for print
+            # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
+            loader, name = self.test_loader, "test"
+            targets, preds = self.get_model_predictions(loader)
+            pred_trs = self.target_scaler.inverse_transform(preds)
+            target_trs = self.target_scaler.inverse_transform(targets)
+            for m in metrics:
+                metric_value = eval(m)(target_trs, pred_trs)
+                metric_log[name + "_" + m] = metric_value
+                print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}") #todo: change for print
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss

@@ -36,7 +36,7 @@ HASH = "fb8bc71"
 class Config:
     device: str
     batch_size: int = 1024
-    num_workers: int = 0
+    num_workers: int = 10
     test_size: float = 0.1
     val_size: float = 0.1
     lr: float = 5e-3
@@ -99,8 +99,9 @@ def train_and_evaluate_ensemble(config, df):
                           train_loader=train_loader, 
                           val_loader=val_loader, 
                           test_loader=test_loader, 
-                        #   compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device)
-                        compute_loss = nn.MSELoss()
+                          compute_loss=CustomMSELoss(config.dSRdA_weight),
+                          device=config.device,
+                        # compute_loss = nn.MSELoss()
                           )
         best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
         models.append(best_model)

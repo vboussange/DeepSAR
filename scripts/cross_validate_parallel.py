@@ -49,10 +49,9 @@ MODEL = "large"
 HASH = "fb8bc71" 
 @dataclass
 class Config:
-    device: str
     batch_size: int = 1024
     num_workers: int = 0
-    k_folds: int = 10
+    k_folds: int = 10 #todo: to change
     n_epochs: int = 100 #todo: to change
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
@@ -76,7 +75,7 @@ class ParallelCrossValidator:
         self.augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
                                                 path_gift_data = config.path_gift_data,
                                                 seed = config.seed)
-        self.devices = ["cuda:0", "cuda:2", "cuda:3", "cuda:4", "cuda:5"]
+        self.devices = ["cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5"]
 
     def run_CV_for_habitat(self, hab):
         climate_vars = self.config.climate_variables
@@ -99,20 +98,21 @@ class ParallelCrossValidator:
 
         gdf = self.augmented_dataset.compile_training_data(hab)
 
+        cv_results = {}
         for predictors_name, (model, predictors, compute_loss, agnostic) in model_list.items():
             gdf_train_val, gdf_test = (self.augmented_dataset.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
 
             logger.info(f"Training model with predictors: {predictors_name}")
 
-            metrics = self.train_and_evaluate(
+            res = self.train_and_evaluate(
                 model,
                 predictors,
                 compute_loss,
                 gdf_train_val,
                 gdf_test,
             )
-
-            return metrics
+            cv_results[predictors_name] = res
+        return cv_results
         
     
     def train_and_evaluate(self, model, predictors, compute_loss, gdf_train_val, gdf_test):
@@ -128,7 +128,6 @@ class ParallelCrossValidator:
                 predictors,
                 compute_loss,
                 self.devices[fold % len(self.devices)], 
-                fold
             )
             for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
         )
@@ -155,9 +154,9 @@ class ParallelCrossValidator:
 
         return aggregated_results
     
-    def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, compute_loss, device, fold):
+    def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, compute_loss, device):
         torch.cuda.set_device(device)
-        model = copy.deepcopy(model).to(device)
+        model = copy.deepcopy(model)
 
         gdf_train_val_fold = gdf_train_val.iloc[train_idx]
         ttrain_idx, val_idx = next(GroupShuffleSplit(test_size=self.config.val_size, random_state=self.config.seed).split(gdf_train_val_fold, groups=gdf_train_val_fold.partition))
@@ -182,14 +181,14 @@ class ParallelCrossValidator:
                           train_loader=train_loader, 
                           val_loader=val_loader, 
                           test_loader=test_loader, 
-                          compute_loss=compute_loss)
+                          compute_loss=compute_loss,
+                          device=device)
         
         best_model, best_metrics = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
 
-
-        return {
-            "train_MSE": best_metrics['train_mean_squared_error'],
-            "val_MSE": best_metrics['val_mean_squared_error'],
+        results = {
+            # "train_loss": best_metrics['train_mean_squared_error'],
+            # "val_MSE": best_metrics['val_mean_squared_error'],
             "test_MSE": best_metrics['test_mean_squared_error'],
             "test_R2": best_metrics['test_r2_score'],
             "test_partition": test_partitions.tolist(),
@@ -199,18 +198,33 @@ class ParallelCrossValidator:
             "target_scaler": target_scaler
         }
 
+        # calculating the test loss for the best model
+        best_model.eval()
+        best_model.to(device)
+        for loss_name, compute_loss in zip(["test_physics_informed_loss", "test_standard_loss"], [CustomMSELoss(self.config.dSRdA_weight), torch.nn.MSELoss()]):
+            val_loss = 0.0
+            for X, y in test_loader:
+                X, y = X.to(device), y.to(device)
+                if isinstance(compute_loss, torch.nn.MSELoss):
+                        outputs = best_model(X)
+                        batch_loss = compute_loss(outputs, y)
+                else:
+                    X = X.requires_grad_(True)
+                    outputs = best_model(X)
+                    batch_loss = compute_loss(best_model, outputs, X, y)
+                    
+                val_loss +=  batch_loss.item() * X.size(0)
+            avg_val_loss = val_loss / len(test_loader.dataset)
+            results[loss_name] = avg_val_loss
+
+
+        return results
+
         
         
 
 if __name__ == "__main__":
-    if torch.cuda.is_available():
-        device = "cuda:2"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
-
-    config = Config(device=device)
+    config = Config()
     
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
