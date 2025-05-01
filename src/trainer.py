@@ -35,7 +35,7 @@ class Trainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
-        self.compute_loss = compute_loss
+        self.compute_loss = compute_loss.to(config.device)
         self.optimizer = optim.AdamW(
                 model.parameters(),
                 lr=config.lr,
@@ -60,7 +60,7 @@ class Trainer:
         preds = torch.cat(preds, dim=0)
         return preds
 
-    def evaluate_SR_metric(self, metric, loader):
+    def get_true_pred_target(self, loader):
         preds = self.get_model_predictions(loader)
         preds = preds.cpu()
 
@@ -71,8 +71,7 @@ class Trainer:
         sr_pred = self.target_scaler.inverse_transform(preds)
         sr_target = self.target_scaler.inverse_transform(target)
         
-        metric_value = metric(sr_pred, sr_target)
-        return metric_value
+        return sr_pred, sr_target
     
     def train_step(self):
         self.model.train()
@@ -91,7 +90,7 @@ class Trainer:
 
             batch_loss.backward()
             self.optimizer.step()
-            running_train_loss += batch_loss.item() * inputs.size(0)
+            running_train_loss += float(batch_loss.item()) * inputs.size(0)
         avg_train_loss = running_train_loss / len(self.train_loader.dataset)
 
         self.model.eval()
@@ -99,8 +98,9 @@ class Trainer:
         for log_sr, inputs in self.val_loader:
             inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
             if isinstance(self.compute_loss, torch.nn.MSELoss):
-                outputs = self.model(inputs)
-                batch_loss = self.compute_loss(outputs, log_sr)
+                with torch.no_grad():
+                    outputs = self.model(inputs)
+                    batch_loss = self.compute_loss(outputs, log_sr)
             else:
                 inputs.requires_grad_(True)
                 outputs = self.model(inputs)
@@ -119,12 +119,14 @@ class Trainer:
 
         for epoch in range(n_epochs):
             train_loss, val_loss = self.train_step()
-            logging.info(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
+            print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}") #todo: change for print
             metric_log = {}
             for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
+                true_pred, true_target = self.get_true_pred_target(loader)
                 for m in metrics:
-                    metric_log[name + "_" + m] = self.evaluate_SR_metric(eval(m), loader)
-                    logging.info(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}")
+                    metric_value = eval(m)(true_pred, true_target)
+                    metric_log[name + "_" + m] = metric_value
+                    print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}") #todo: change for print
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -138,13 +140,13 @@ class Trainer:
 if __name__ == "__main__":
     # TODO: it feels like there is a problem : The training loss and validation loss do not return the same number, although they should after the model has converged
     from sklearn.preprocessing import StandardScaler
-    from sklearn.metrics import mean_squared_error
+    from sklearn.metrics import mean_squared_error, r2_score
     from torch.utils.data import DataLoader, TensorDataset
+    from src.mlp import CustomMSELoss
     
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
 
-    X = torch.randn(1000, 3)
+    X = torch.randn(1000, 3) + 10
     y = X.sum(dim=1, keepdim=True)  # Mock target variable
     
     class MockConfig:
@@ -152,7 +154,7 @@ if __name__ == "__main__":
         num_workers: int = 0
         test_size: float = 0.1
         val_size: float = 0.1
-        lr: float = 1e-1
+        lr: float = 1e-2
         lr_scheduler_factor: float = 0.5
         lr_scheduler_patience: int = 20
         n_epochs: int = 100
@@ -180,7 +182,7 @@ if __name__ == "__main__":
     # Initialize model and trainer
     model = MLP(3, [16, 16, 16])
 
-    compute_loss = nn.MSELoss()
+    compute_loss = CustomMSELoss(0.5)
     
     trainer = Trainer(
         config=MockConfig(),
@@ -198,4 +200,4 @@ if __name__ == "__main__":
     
 
     # Test train method
-    best_model, best_model_log = trainer.train(n_epochs=100, metrics=["mean_squared_error"])
+    best_model, best_model_log = trainer.train(n_epochs=100, metrics=["mean_squared_error", "r2_score"])

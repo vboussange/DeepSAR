@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                     "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]}
-MODEL = "small" #TODO: to change
-HASH = "ee40db7"
+MODEL = "large"
+HASH = "fb8bc71"
 @dataclass
 class Config:
     device: str
@@ -42,7 +42,7 @@ class Config:
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
-    n_epochs: int = 1 # TODO: to change
+    n_epochs: int = 100
     dSRdA_weight: float = 1e0
     weight_decay: float = 1e-3
     seed: int = 1
@@ -99,8 +99,10 @@ def train_and_evaluate_ensemble(config, df):
                           train_loader=train_loader, 
                           val_loader=val_loader, 
                           test_loader=test_loader, 
-                          compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
-        best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error"])
+                        #   compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device)
+                        compute_loss = nn.MSELoss()
+                          )
+        best_model, _ = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
         models.append(best_model)
 
     # Create ensemble model
@@ -109,10 +111,10 @@ def train_and_evaluate_ensemble(config, df):
                                model=ensemble_model,
                                feature_scaler=feature_scaler,
                                target_scaler=target_scaler,
-                               train_loader=train_loader,
-                               val_loader=val_loader,
+                               train_loader=None,
+                               val_loader=None,
                                test_loader=test_loader,
-                               compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
+                               compute_loss=None)
     ensemble_mse = ensemble_trainer.evaluate_SR_metric(mean_squared_error, test_loader)
 
     logger.info(f"Ensemble MSE on test dataset: {ensemble_mse:.4f}")
@@ -126,7 +128,7 @@ def train_and_evaluate_ensemble(config, df):
         
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda:1"
+        device = "cuda:0"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:

@@ -25,7 +25,7 @@ from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
 from src.dataset import create_dataloader, AugmentedDataset
 from src.plotting import read_result
 from src.trainer import Trainer
-
+# TODO: can we use logging.info instead of logger.info?
 def setup_logger():
     logger = logging.getLogger()
     if not logger.handlers:
@@ -46,14 +46,14 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "ee40db7" 
+HASH = "fb8bc71" 
 @dataclass
 class Config:
     device: str
     batch_size: int = 1024
     num_workers: int = 0
     k_folds: int = 10
-    n_epochs: int = 100
+    n_epochs: int = 100 #todo: to change
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
@@ -84,7 +84,7 @@ class ParallelCrossValidator:
         climate_features = climate_vars + std_climate_vars
         num_climate_features = len(climate_features)
 
-        predictors_list = {
+        model_list = {
             "power_law": (MLP(2, []), ["log_area", "log_megaplot_area"], torch.nn.MSELoss(), False),
             "area": (MLP(2, config.layer_sizes), ["log_area", "log_megaplot_area"], CustomMSELoss(config.dSRdA_weight), False),
             "climate": (MLP(num_climate_features, config.layer_sizes), climate_features, torch.nn.MSELoss(), False),
@@ -93,13 +93,13 @@ class ParallelCrossValidator:
         }
 
         if hab != "all":
-            predictors_list["area+climate, habitat agnostic"] = (
+            model_list["area+climate, habitat agnostic"] = (
                 MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, CustomMSELoss(config.dSRdA_weight), True
             )
 
         gdf = self.augmented_dataset.compile_training_data(hab)
 
-        for predictors_name, (model, predictors, criterion, agnostic) in predictors_list.items():
+        for predictors_name, (model, predictors, compute_loss, agnostic) in model_list.items():
             gdf_train_val, gdf_test = (self.augmented_dataset.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
 
             logger.info(f"Training model with predictors: {predictors_name}")
@@ -107,21 +107,57 @@ class ParallelCrossValidator:
             metrics = self.train_and_evaluate(
                 model,
                 predictors,
-                criterion,
-                optim.AdamW,
-                ReduceLROnPlateau,
+                compute_loss,
                 gdf_train_val,
                 gdf_test,
             )
 
             return metrics
+        
     
-    def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, criterion, optimizer_cls, scheduler_cls, device, fold):
+    def train_and_evaluate(self, model, predictors, compute_loss, gdf_train_val, gdf_test):
+        kfold = GroupKFold(n_splits=self.config.k_folds)
+
+        results = Parallel(n_jobs=len(self.devices))(
+            delayed(self.train_and_evaluate_fold)(
+                train_idx,
+                test_idx,
+                gdf_train_val,
+                gdf_test,
+                model,
+                predictors,
+                compute_loss,
+                self.devices[fold % len(self.devices)], 
+                fold
+            )
+            for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
+        )
+        
+        # results = [
+        #     self.train_and_evaluate_fold(
+        #     train_idx,
+        #     test_idx,
+        #     gdf_train_val,
+        #     gdf_test,
+        #     model,
+        #     predictors,
+        #     compute_loss,
+        #     optimizer_cls,
+        #     scheduler_cls,
+        #     self.devices[fold % len(self.devices)], 
+        #     fold
+        #     )
+        #     for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
+        # ]
+
+        aggregated_results = {key: [result[key] for result in results] for key in results[0]}
+        aggregated_results["predictors"] = predictors
+
+        return aggregated_results
+    
+    def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, compute_loss, device, fold):
         torch.cuda.set_device(device)
         model = copy.deepcopy(model).to(device)
-        criterion = criterion.to(device)
-        optimizer = optimizer_cls(model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
-        scheduler = scheduler_cls(optimizer, factor=self.config.lr_scheduler_factor, patience=self.config.lr_scheduler_patience)
 
         gdf_train_val_fold = gdf_train_val.iloc[train_idx]
         ttrain_idx, val_idx = next(GroupShuffleSplit(test_size=self.config.val_size, random_state=self.config.seed).split(gdf_train_val_fold, groups=gdf_train_val_fold.partition))
@@ -146,7 +182,7 @@ class ParallelCrossValidator:
                           train_loader=train_loader, 
                           val_loader=val_loader, 
                           test_loader=test_loader, 
-                          compute_loss=CustomMSELoss(config.dSRdA_weight).to(config.device))
+                          compute_loss=compute_loss)
         
         best_model, best_metrics = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
 
@@ -163,47 +199,6 @@ class ParallelCrossValidator:
             "target_scaler": target_scaler
         }
 
-    def train_and_evaluate(self, model, predictors, criterion, optimizer_cls, scheduler_cls, gdf_train_val, gdf_test):
-        kfold = GroupKFold(n_splits=self.config.k_folds)
-
-        results = Parallel(n_jobs=len(self.devices))(
-            delayed(self.train_and_evaluate_fold)(
-                train_idx,
-                test_idx,
-                gdf_train_val,
-                gdf_test,
-                model,
-                predictors,
-                criterion,
-                optimizer_cls,
-                scheduler_cls,
-                self.devices[fold % len(self.devices)], 
-                fold
-            )
-            for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
-        )
-        
-        # results = [
-        #     self.train_and_evaluate_fold(
-        #     train_idx,
-        #     test_idx,
-        #     gdf_train_val,
-        #     gdf_test,
-        #     model,
-        #     predictors,
-        #     criterion,
-        #     optimizer_cls,
-        #     scheduler_cls,
-        #     self.devices[fold % len(self.devices)], 
-        #     fold
-        #     )
-        #     for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
-        # ]
-
-        aggregated_results = {key: [result[key] for result in results] for key in results[0]}
-        aggregated_results["predictors"] = predictors
-
-        return aggregated_results
         
         
 
@@ -221,7 +216,7 @@ if __name__ == "__main__":
     np.random.seed(config.seed)
     random.seed(config.seed)
     
-    config.run_folder = Path(Path(__file__).parent,'results', f"{Path(__file__).stem}_dSRdA_weight_{self.config.dSRdA_weight:.0e}_seed_{self.config.seed}")
+    config.run_folder = Path(Path(__file__).parent,'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True)
     
     validator = ParallelCrossValidator(config)
