@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 from src.plotting import read_result
 import geopandas as gpd
@@ -43,7 +43,7 @@ class CustomDataLoader(Dataset):
         return len(self.features)
 
     def __getitem__(self, index):
-        return self.targets[index], self.features[index]
+        return self.features[index], self.targets[index]
     
 
 def scale_features_targets(gdf, predictors, feature_scaler=None, target_scaler=None):
@@ -51,7 +51,7 @@ def scale_features_targets(gdf, predictors, feature_scaler=None, target_scaler=N
     target = gdf["log_sr"].values.astype(np.float32)
 
     if feature_scaler is None:
-        feature_scaler, target_scaler = StandardScaler(), StandardScaler()
+        feature_scaler, target_scaler = MinMaxScaler(), MinMaxScaler()
         features = feature_scaler.fit_transform(features)
         target = target_scaler.fit_transform(target.reshape(-1,1))
     else:

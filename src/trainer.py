@@ -52,60 +52,50 @@ class Trainer:
         # we expect the loader to return transformed data
         self.model.eval()
         preds = []
+        targets = []
         with torch.no_grad():
-            for log_sr, inputs in loader:
-                inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
-                outputs = self.model(inputs)
-                preds.append(outputs.cpu())
+            for X, y in loader:
+                X, y_true = X.to(self.device), y.to(self.device)
+                y_pred = self.model(X)
+                preds.append(y_pred.cpu())
+                targets.append(y_true.cpu())
+                
         preds = torch.cat(preds, dim=0)
-        return preds
-
-    def get_true_pred_target(self, loader):
-        preds = self.get_model_predictions(loader)
-        preds = preds.cpu()
-
-        target = [y for y, _ in loader]
-        target = torch.cat(target, dim=0)
-        target = target.cpu()
-        
-        sr_pred = self.target_scaler.inverse_transform(preds)
-        sr_target = self.target_scaler.inverse_transform(target)
-        
-        return sr_pred, sr_target
+        targets = torch.cat(targets, dim=0)
+        return targets, preds
     
     def train_step(self):
         self.model.train()
         running_train_loss = 0.0
 
-        for log_sr, inputs in self.train_loader:
-            inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
+        for X, y in self.train_loader:
+            X, y = X.to(self.device), y.to(self.device)
             self.optimizer.zero_grad()
             if isinstance(self.compute_loss, torch.nn.MSELoss):
-                outputs = self.model(inputs)
-                batch_loss = self.compute_loss(outputs, log_sr)
+                outputs = self.model(X)
+                batch_loss = self.compute_loss(outputs, y)
             else:
-                inputs.requires_grad_(True)
-                outputs = self.model(inputs)
-                batch_loss = self.compute_loss(self.model, outputs, inputs, log_sr)
+                X = X.requires_grad_(True)
+                outputs = self.model(X)
+                batch_loss = self.compute_loss(self.model, outputs, X, y)
 
             batch_loss.backward()
             self.optimizer.step()
-            running_train_loss += float(batch_loss.item()) * inputs.size(0)
+            running_train_loss += float(batch_loss.item()) * X.size(0)
         avg_train_loss = running_train_loss / len(self.train_loader.dataset)
 
         self.model.eval()
         val_loss = 0.0
-        for log_sr, inputs in self.val_loader:
-            inputs, log_sr = inputs.to(self.device), log_sr.to(self.device)
+        for X, y in self.val_loader:
+            X, y = X.to(self.device), y.to(self.device)
             if isinstance(self.compute_loss, torch.nn.MSELoss):
-                with torch.no_grad():
-                    outputs = self.model(inputs)
-                    batch_loss = self.compute_loss(outputs, log_sr)
+                    outputs = self.model(X)
+                    batch_loss = self.compute_loss(outputs, y)
             else:
-                inputs.requires_grad_(True)
-                outputs = self.model(inputs)
-                batch_loss = self.compute_loss(self.model, outputs, inputs, log_sr)
-            val_loss +=  batch_loss.item() * inputs.size(0)
+                X = X.requires_grad_(True)
+                outputs = self.model(X)
+                batch_loss = self.compute_loss(self.model, outputs, X, y)
+            val_loss +=  batch_loss.item() * X.size(0)
         avg_val_loss = val_loss / len(self.val_loader.dataset)
         
         self.scheduler.step(avg_val_loss)
@@ -122,9 +112,11 @@ class Trainer:
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}") #todo: change for print
             metric_log = {}
             for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
-                true_pred, true_target = self.get_true_pred_target(loader)
+                targets, preds = self.get_model_predictions(loader)
+                pred_trs = self.target_scaler.inverse_transform(preds)
+                target_trs = self.target_scaler.inverse_transform(targets)
                 for m in metrics:
-                    metric_value = eval(m)(true_pred, true_target)
+                    metric_value = eval(m)(target_trs, pred_trs)
                     metric_log[name + "_" + m] = metric_value
                     print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}") #todo: change for print
 
@@ -133,6 +125,7 @@ class Trainer:
                 best_model = copy.deepcopy(self.model).to('cpu')
                 best_model_log = metric_log
 
+        self.model = best_model
         return best_model, best_model_log
 
 
@@ -146,8 +139,18 @@ if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO)
 
-    X = torch.randn(1000, 3) + 10
-    y = X.sum(dim=1, keepdim=True)  # Mock target variable
+
+    A1 = np.random.rand(1000) * 1000
+    A2 = np.random.rand(1000)
+    X = np.random.randn(1000, 3)
+    y =  np.exp(0.1 * X[:, 0] + 0.2 * X[:, 1] * X[:, 2]) * (A1 * A2)**(0.8)  # Mock target variable
+    
+    df = pd.DataFrame(X, columns=["feature1", "feature2", "feature3"])
+    df["log_sr"] = np.log(y)
+    df["log_area"] = np.log(A1)
+    df["log_megaplot_area"] = np.log(A2)
+    
+    predictors = ["log_area", "log_megaplot_area" , "feature1", "feature2", "feature3"]
     
     class MockConfig:
         device: str = "cpu"
@@ -160,44 +163,40 @@ if __name__ == "__main__":
         n_epochs: int = 100
         weight_decay: float = 1e-3
         seed: int = 1
+        batch_size: int = 32    
 
+    config = MockConfig()
+    train_val_df, test_df = train_test_split(df, test_size = config.test_size, random_state=42)
+    train_df, val_df = train_test_split(train_val_df, test_size = config.val_size, random_state=42)
     
-    # Create mock scalers
-    feature_scaler = StandardScaler()
-    X_scaled = torch.tensor(feature_scaler.fit_transform(X.numpy()), dtype=torch.float32)
-    
-    target_scaler = StandardScaler()  
-    y_scaled = torch.tensor(target_scaler.fit_transform(y.numpy()), dtype=torch.float32)
-    
-    # Use the scaled data for the model
-    X = X_scaled
-    y = y_scaled
-    
-    # Create mock dataloaders
-    dataset = TensorDataset(y, X)
-    train_loader = DataLoader(dataset, batch_size=256)
-    val_loader = DataLoader(dataset, batch_size=256)
-    test_loader = DataLoader(dataset, batch_size=256)
-    
+    train_loader, feature_scaler, target_scaler = create_dataloader(train_df, predictors, config.batch_size, config.num_workers)
+    val_loader, _, _ = create_dataloader(val_df, predictors, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
+    test_loader, _, _ = create_dataloader(test_df, predictors, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
+
     # Initialize model and trainer
-    model = MLP(3, [16, 16, 16])
+    model = MLP(5, [16, 16, 16])
 
-    compute_loss = CustomMSELoss(0.5)
+    # loss = CustomMSELoss(dSRdA_weight=0.)
+    loss = nn.MSELoss()
     
     trainer = Trainer(
-        config=MockConfig(),
+        config=config,
         model=model,
         feature_scaler=feature_scaler,
         target_scaler=target_scaler,
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,
-        compute_loss=compute_loss,
+        compute_loss=loss,
     )
-    
+    # sr_pred, sr_true = trainer.get_true_pred_target(test_loader)
     # # Override evaluate_SR_metric to avoid eval() call
     # trainer.evaluate_SR_metric = lambda metric, loader: 0.5
     
 
     # Test train method
     best_model, best_model_log = trainer.train(n_epochs=100, metrics=["mean_squared_error", "r2_score"])
+    for k in best_model_log.keys():
+        print(k, best_model_log[k])
+        
+    assert best_model_log["test_r2_score"] > 0.97
