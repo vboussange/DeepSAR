@@ -12,13 +12,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
+from src.mlp import MLP, CustomMSELoss
 from src.trainer import Trainer
 from src.ensemble_model import EnsembleModel
 from src.dataset import AugmentedDataset, create_dataloader
@@ -53,7 +53,7 @@ class Config:
     run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
-    test_partitions: list = field(default_factory=lambda: [684, 546, 100, 880, 1256, 296]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    # test_partitions: list = field(default_factory=lambda: [684, 546, 100, 880, 1256, 296]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
     path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
@@ -112,12 +112,15 @@ def train_and_evaluate_ensemble(config, df):
                                model=ensemble_model,
                                feature_scaler=feature_scaler,
                                target_scaler=target_scaler,
-                               train_loader=None,
-                               val_loader=None,
-                               test_loader=test_loader,
-                               compute_loss=None)
-    ensemble_mse = ensemble_trainer.evaluate_SR_metric(mean_squared_error, test_loader)
-
+                                train_loader=train_loader, 
+                                val_loader=val_loader, 
+                                test_loader=test_loader, 
+                                compute_loss=CustomMSELoss(config.dSRdA_weight),
+                                device=config.device,
+                               )
+    targets, preds = ensemble_trainer.get_model_predictions(test_loader)
+    ensemble_mse = mean_squared_error(targets, preds)
+    ensemble_r2 = r2_score(targets, preds)
     logger.info(f"Ensemble MSE on test dataset: {ensemble_mse:.4f}")
 
     return {
@@ -125,6 +128,8 @@ def train_and_evaluate_ensemble(config, df):
         "feature_scaler": feature_scaler,
         "target_scaler": target_scaler,
         "mean_squared_error_test": ensemble_mse,
+        "r2_test": ensemble_r2,
+        "predictors": predictors,
     }
         
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ import sys
 sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
 from cross_validate_parallel import Config, Trainer
 from src.mlp import load_model_checkpoint
-from src.dataset import scale_features_targets
+from src.dataset import scale_features_targets, AugmentedDataset
 from src.plotting import read_result
 
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # habitats = ["all", "T1"]
     seed = 2
     MODEL = "large"
-    HASH = "ee40db7"
+    HASH = "fb8bc71"
     path_results = Path(f"../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
@@ -87,12 +87,12 @@ if __name__ == "__main__":
                 val2[metric] = np.array([])
                 
     # Calculating residuals
-    hab = "all"
     config = result_modelling["config"]
-    trainer = Trainer(config)
-    gdf = trainer.compile_training_data(hab, config)
 
-    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, hab, config)
+    gdf = AugmentedDataset(path_eva_data = config.path_eva_data,
+                            path_gift_data = config.path_gift_data,
+                            seed = config.seed).compile_training_data("all")
+    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, "all", config)
     
     # Replace habitat keys with habitat_labels in result_modelling
     result_modelling = {habitat_labels[i]: result_modelling[hab] for i, hab in enumerate(habitats)}

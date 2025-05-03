@@ -64,27 +64,30 @@ def create_features(predictor_labels, climate_dataset, res):
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=2048):
+def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=4096):
     mean_log_SR_list = []
     std_log_SR_list = []
     dlogSR_dlogA_list = []
     features = create_features(predictors, climate_dataset, res)
     total_length = len(features)
 
-    for i in tqdm(range(0, total_length, batch_size), desc = "Calculating SR and stdSR"):
-        current_batch_size = min(batch_size, total_length - i)
-        # features = get_true_sar.interpolate_features(X_map_dict, log_area_tensor, res_climate_pixel, predictors, batch_index=slice(i, i + current_batch_size))
-        X = features.iloc[i:i+current_batch_size,:]
-        X = torch.tensor(X.values, dtype=torch.float32)
-        X = scale_feature_tensor(X, feature_scaler).to(next(model.parameters()).device)
-        ys = [m(X) for m in model.models]
-        log_SRs = [np.exp(inverse_transform_scale_feature_tensor(y, target_scaler).detach().cpu().numpy()) for y in ys]
-        mean_log_SR = np.mean(log_SRs, axis=0)
-        std_log_SR = np.std(log_SRs, axis=0)
-        mean_log_SR_list.append(mean_log_SR)
-        std_log_SR_list.append(std_log_SR)
+    percent_step = max(1, total_length // batch_size // 100)
+    
+    for i in tqdm(range(0, total_length, batch_size), desc = "Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
+        with torch.no_grad():
+            current_batch_size = min(batch_size, total_length - i)
+            # features = get_true_sar.interpolate_features(X_map_dict, log_area_tensor, res_climate_pixel, predictors, batch_index=slice(i, i + current_batch_size))
+            X = features.iloc[i:i+current_batch_size,:]
+            X = feature_scaler.transform(X.values)
+            X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
+            ys = [m(X) for m in model.models]
+            log_SRs = [np.exp(target_scaler.inverse_transform(y.cpu().numpy())) for y in ys]
+            mean_log_SR = np.mean(log_SRs, axis=0)
+            std_log_SR = np.std(log_SRs, axis=0)
+            mean_log_SR_list.append(mean_log_SR)
+            std_log_SR_list.append(std_log_SR)
         
-        # grad: dSR/dA
+        # grad: dSR/dA, getting predictions without statistics
         X = X.requires_grad_(True)
         log_SR = model(X)
         dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,:2].sum(axis=1)
@@ -108,11 +111,18 @@ if __name__ == "__main__":
 
     seed = 1
     MODEL = "large"
-    HASH = "ee40db7"  
+    HASH = "fb8bc71"  
     path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
     results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
     results_fit_split = results_fit_split_all["all"]
+    
+    # TODO: this should be in `results_fit_split`, next commit should fix this
+    climate_vars = config.climate_variables
+    std_climate_vars = ["std_" + env for env in climate_vars]
+    climate_features = climate_vars + std_climate_vars
+    results_fit_split["predictors"] = ["log_area", "log_megaplot_area"] + climate_features
+    
     model = initialize_ensemble_model(results_fit_split, config, "cuda")
     
 

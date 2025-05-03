@@ -23,6 +23,13 @@ class AugmentedDataset:
             eva_plot_data = eva_data["plot_data_all"][eva_data["plot_data_all"]["habitat_id"] == hab]
         eva_megaplot_data = eva_data["megaplot_data"][eva_data["megaplot_data"]["habitat_id"] == hab]
         gift_plot_data = gift_data[gift_data["habitat_id"] == hab]
+        
+        # tagging the data
+        eva_plot_data["type"] = "EVA_raw"
+        eva_megaplot_data["type"] = "EVA_megaplot"
+        gift_plot_data["type"] = "GIFT"
+        
+        
         augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
         
         # stack with raw plot data
