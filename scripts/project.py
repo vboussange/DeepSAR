@@ -16,6 +16,7 @@ import get_true_sar
 from pathlib import Path
 from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from src.data_processing.utils_env_pred import CHELSADataset
+from src.dataset import AugmentedDataset, create_dataloader
 import pandas as pd
 from tqdm import tqdm
 
@@ -106,17 +107,23 @@ def load_chelsa_and_reproject(predictors):
     return climate_dataset
 
 if __name__ == "__main__":
-    results_path = Path("./results/projections")
-    results_path.mkdir(parents=True, exist_ok=True)
-
     seed = 1
     MODEL = "large"
-    HASH = "fb8bc71"  
-    path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
+    HASH = "fb8bc71"
+    
+    projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{HASH}")
+    projection_path.mkdir(parents=True, exist_ok=True)
+    
+    path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")
     results_fit_split_all = torch.load(path_results, map_location="cpu")
     config = results_fit_split_all["config"]
     results_fit_split = results_fit_split_all["all"]
-    
+    augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
+                                         path_gift_data = config.path_gift_data,
+                                         seed = config.seed)
+    df = augmented_dataset.compile_training_data("all")
+    # proportion_area = df[df["type"]=="GIFT"]["area"].mean() / df[df["type"]=="GIFT"]["megaplot_area"].mean() #TODO: this is to be modified
+
     # TODO: this should be in `results_fit_split`, next commit should fix this
     climate_vars = config.climate_variables
     std_climate_vars = ["std_" + env for env in climate_vars]
@@ -133,16 +140,16 @@ if __name__ == "__main__":
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 
-    for res in [100, 1000, 10000, 100000]:
+    for res in [100000, 10000, 1000, 100, ]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
         features, SR, std_SR, dlogSR_dlogA = get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
         SR_rast = create_raster(features, SR)
-        SR_rast.rio.to_raster(results_path/ HASH / f"SR_raster_{res:.0f}m.tif")
+        SR_rast.rio.to_raster(projection_path / f"SR_raster_{res:.0f}m.tif")
 
         std_SR_rast = create_raster(features, std_SR)
-        std_SR_rast.rio.to_raster(results_path/ HASH / f"std_SR_raster_{res:.0f}m.tif")
+        std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{res:.0f}m.tif")
         
         dlogSR_dlogA_rast = create_raster(features, dlogSR_dlogA)
-        dlogSR_dlogA_rast.rio.to_raster(results_path/ HASH / f"dlogSR_dlogA_raster_{res:.0f}m.tif")
-        print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {results_path}")
+        dlogSR_dlogA_rast.rio.to_raster(projection_path / f"dlogSR_dlogA_raster_{res:.0f}m.tif")
+        print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {projection_path}")
