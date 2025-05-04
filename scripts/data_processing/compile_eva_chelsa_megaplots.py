@@ -45,8 +45,8 @@ CONFIG = {
         "bio12",
         "bio15",
     ],
-    "block_length": 1e5, # in meters
-    "area_range": (1e4, 1e10),  # in m2
+    "block_length": 1e6, # in meters
+    "area_range": (1e4, 1e12),  # in m2
     # "side_range": (1e2, 1e5), # in m
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
