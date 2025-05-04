@@ -15,46 +15,37 @@ import scipy.stats as stats
 
 import sys
 sys.path.append(str(Path(__file__).parent / Path("../../../scripts/")))
-from cross_validate_parallel import Config, compile_training_data
-from src.mlp import load_model_checkpoint
-from src.dataset import scale_features_targets
 from src.plotting import read_result
 
 if __name__ == "__main__":
-    habitats = ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
+    habitats = ["all", "T", "R", "Q", "S"]
     seed = 2
     MODEL = "large"
-    HASH = "a53390d"    
+    HASH = "fb8bc71"    
     path_results = Path(f"../../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
     
     result_modelling = torch.load(path_results, map_location="cpu")
     config = result_modelling["config"]
         
+    metric = "test_physics_informed_loss"
     for hab in habitats:
         val = result_modelling[hab]
         mse_arr = []
         # removing nan values
         for val2 in val.values():
-            mse = val2["test_MSE"]
+            mse = val2[metric]
             if len(mse) > 0:
                 mse_arr.append(mse)
         mse = np.stack(mse_arr)
         non_nan_columns = ~np.isnan(mse).any(axis=0)
         matrix_no_nan_columns = mse[:, non_nan_columns]
         for i, val2 in enumerate(val.values()):
-            if len(val2["test_MSE"]) > 0:
-                val2["test_MSE"] = mse[i,:]
+            if len(val2[metric]) > 0:
+                val2[metric] = mse[i,:]
             else:
-                val2["test_MSE"] = np.array([])
+                val2[metric] = np.array([])
                 
-    # Calculating residuals
-    hab = "all"
-    config = result_modelling["config"]
-    
-    data = read_result(config.path_augmented_data)
-    gdf = compile_training_data(data, hab, config)    
-        
-    result_modelling["all"]['area+climate, habitat agnostic'] = {"test_MSE":[]}
+    result_modelling["all"]['area+climate, habitat agnostic'] = {"metric":[]}
     PREDICTORS = [
                 #   "area", 
                 #   "climate", 
@@ -72,7 +63,7 @@ if __name__ == "__main__":
     
     # first axis
     ax1 = fig.add_subplot(gs[0, :])
-    ax1.set_ylim(0., 0.8)
+    # ax1.set_ylim(0., 0.8)
     boxplot_bypreds(
         result_modelling,
         ax=ax1,
@@ -80,9 +71,9 @@ if __name__ == "__main__":
         colormap="Set2",
         legend=True,
         xlab="",
-        ylab="MSE",
+        ylab="Physics-informed loss",
         yscale="linear",
-        yname="test_MSE",
+        yname=metric,
         habitats=habitats,
         predictors=PREDICTORS,
         widths=0.15,
