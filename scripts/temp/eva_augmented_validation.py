@@ -1,9 +1,5 @@
 """
-Projecting spatially MLP and saving to geotiff files.
-# TODO: this version is more recent than export_SR_maps.py, but 
-# 1. simplifies the code, with no interpolation of features
-# 2. loads output from train_single_habitat; should be modified to load from train.py
-# 3. We should also export sensitivity maps, which are not exported here.
+Validating EVA augmentation against GIFT data
 """
 import torch
 import numpy as np
