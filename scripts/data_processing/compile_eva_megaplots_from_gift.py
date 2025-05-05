@@ -100,55 +100,25 @@ def run_compilation(boxes_gdf, block_plot_gdf, species_dict):
     logging.info(f"Nb. megaplots: {len(megaplot_data_hab)} || Nb. plots: {len(plot_gdf)}")
     return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry"]]
 
-
-def generate_plot_data(plot_data, species_data, climate_raster):
-    """
-    Calculate area and convert landcover binary raster to multipoint for each SAR data row.
-    Returns processed SAR data.
-    """
-    logging.info("Calculating climate vars...")
-    y = plot_data.geometry.y
-    x = plot_data.geometry.x
-    env_vars = climate_raster.sel(
-        x=xr.DataArray(x, dims="z"),
-        y=xr.DataArray(y, dims="z"),
-        method="nearest",
-    )
-    env_vars = env_vars.to_numpy().transpose()
-    plot_data[CONFIG["env_vars"]] = env_vars
-    
-    for i, row in tqdm(plot_data.iterrows(), desc="Compiling species richness", total=plot_data.shape[0]):
-        plot_id = row["plot_id"]
-        species = species_data[plot_id]
-        sr = len(np.unique(species))
-        plot_data.loc[i, "sr"] = sr
-
-    plot_data = plot_data.rename({"area_m2": "area", "level_1":"habitat_id"}, axis=1)
-    plot_data = plot_data.set_index("plot_id")
-    plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data["megaplot_area"] = plot_data["area"]
-    
-    logging.info("Partitioning...")
-    plot_data = partition_polygon_gdf(plot_data, CONFIG["block_length"])
-    logging.info(f"Nb. partitions: {len(plot_data['partition'].unique())}")
-    plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id", "partition"] + CLIMATE_COL_NAMES]
-
-    return plot_data
-
 if __name__ == "__main__":    
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
+    
+    path_gift_data = Path(__file__).parent / f"../../data/processed/GIFT_CHELSA_compilation/fb8bc71/megaplot_data.gpkg"
+    
     CONFIG["output_file_path"]  = CONFIG["output_file_path"] / sha
     CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
-    CONFIG["output_file_name"] = Path(f"eva_chelsa_augmented_data.pkl")
+    CONFIG["output_file_name"] = Path(f"eva_chelsa_augmented_data.gpkg")
     
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
-    # TODO: to complete: need to load GIFT data
-    # Sample 1000 rows for debugging purposes
-    # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
-    plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
+    gift_df = gpd.read_file(path_gift_data)
+    
+    # selecting all habitat
+    gift_df = gift_df[gift_df["habitat_id"] == "all"]
+
+    megaplot_data_all = run_compilation(gift_df, species_dict, climate_raster)
         
     megaplot_ar = []
     plot_gdf_by_hab = plot_data_all.groupby("habitat_id")
