@@ -20,11 +20,12 @@ from xgboost import XGBRegressor
 from sklearn.metrics import r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
+from src.utils import choose_device
 
 
 @dataclass
 class Config:
-    device: str
+    device: str = choose_device()
     batch_size: int = 1024
     num_workers: int = 4
     test_size: float = 0.1
@@ -118,63 +119,23 @@ def load_chelsa_and_reproject():
     return climate_dataset
 
 if __name__ == "__main__":    
-    if torch.cuda.is_available():
-        device = "cuda:0"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
 
-    config = Config(device=device)
-    
-
+    config = Config()
     augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
                                          path_gift_data = config.path_gift_data,
                                          seed = config.seed)
+    
+    # used for projections
+    climate_dataset = load_chelsa_and_reproject()
+    raster_features = create_features(climate_dataset, 1e4)
     
     df = augmented_dataset.compile_training_data("all")
     df["coverage"] = df["log_area"] / df["log_megaplot_area"]
     # proportion_area = df[df["type"]=="GIFT"]["area"].mean() / df[df["type"]=="GIFT"]["megaplot_area"].mean() #TODO: this is to be modified
     
-
-    climate_dataset = load_chelsa_and_reproject()
-    raster_features = create_features(climate_dataset, 1e4)
     
+
     
-    # plotting values of raster_features vs training features
-    # n_features = len(predictors)
-    # ncols = 3
-    # nrows = int(np.ceil(n_features / ncols))
-    # fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4 * nrows), squeeze=False)
-
-    # for idx, feature in enumerate(predictors):
-    #     df_reduced = df.sample(n=10000, random_state=config.seed)
-    #     raster_features_reduced = raster_features.sample(n=10000, random_state=config.seed)
-    #     ax = axes[idx // ncols, idx % ncols]
-    #     sns.kdeplot(df_reduced[feature], ax=ax, label="Training", fill=True, color="blue")
-    #     sns.kdeplot(raster_features_reduced[feature], ax=ax, label="Raster", fill=True, color="orange")
-    #     ax.set_title(feature)
-    #     ax.legend()
-    #     ax.set_xlabel(feature)
-    #     ax.set_ylabel("Density")
-    #     # ax.set_yscale("log")
-
-    # # Hide any unused subplots
-    # for i in range(n_features, nrows * ncols):
-    #     fig.delaxes(axes[i // ncols, i % ncols])
-
-    # plt.tight_layout()
-    # plt.show()
-    # xgb_params ={
-    #     "booster": "gbtree",
-    #     "learning_rate": 0.05,
-    #     # "max_depth": 4,
-    #     # "lambda": 10,
-    #     "objective": "reg:squarederror",  # can be reg:squarederror, reg:squaredlogerror
-    #     # "min_child_weight": 1.0,
-    #     # "device" : "cuda",
-    #     "tree_method": "hist",
-    # }
     reg = XGBRegressor()
     # reg = LinearRegression()
     # reg = MLPRegressor(

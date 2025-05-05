@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pickle
 import logging
+import torch
 
 def save_to_pickle(filepath, **kwargs):
     objects_dict = kwargs
@@ -9,3 +10,16 @@ def save_to_pickle(filepath, **kwargs):
     with open(filepath, 'wb') as file:
         pickle.dump(objects_dict, file)
     logging.info(f"Results saved at {filepath}")
+    
+def choose_device():
+    """
+    Choose the device to use for computation.
+    """
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    
+    return device
