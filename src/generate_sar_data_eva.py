@@ -140,7 +140,36 @@ def generate_random_boxes_from_candidate_pairs(candidate_points, num_boxes):
         crs=candidate_points.crs
     )
     
+def generate_random_square(candidate_points, area_range):
+    """
+    Generates a random square with an area sampled from a given range. 
+    """
+    log_area_range = np.log(area_range)
+    point = np.random.choice(candidate_points.geometry)
+    # Sample log_area with probability inversely proportional to log_area
+    # Use inverse transform sampling for p(x) ∝ 1/x over [a, b]
+    # TODO: to check if this is correct
+    a, b = log_area_range
+    u = np.random.uniform(0, 1)
+    log_area = a * (b / a) ** u
+    log_length = log_area / 2
+    height = np.exp(log_length)
+    length = np.exp(log_length)
     
+    # Calculate half dimensions to center the box around the point
+    half_length = length / 2
+    half_height = height / 2
+    
+    # Create the box centered on the point
+    new_box = box(
+        point.x - half_length, 
+        point.y - half_height, 
+        point.x + half_length, 
+        point.y + half_height
+    )
+    
+    return new_box
+
 def generate_random_squares(candidate_points, num_boxes, area_range):
     """
     Generates a specified number of random squares a given
