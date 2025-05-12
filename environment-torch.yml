@@ -24,3 +24,4 @@ dependencies:
   - pyarrow
   - fastparquet
   - gitpython
+  - xgboost
