@@ -17,28 +17,20 @@ def batch_indices(N, batch_size):
         yield range(i, min(i + batch_size, N))
 
 # working with dictionnary of species
-def clip_EVA_SR(plot_gdf, species_data, polygons_gdf, env_vars, verbose=False):
-    std_labels = [f"std_{var}" for var in env_vars]
+def clip_EVA_SR(plot_gdf, species_data, polygons_gdf, verbose=False):
     data = pd.DataFrame({
         "area": pd.Series(int),
         "sr": pd.Series(int),
         "num_plots": pd.Series(int),
-        **{var: pd.Series(float) for var in env_vars},
-        **{label: pd.Series(float) for label in std_labels}
     })
     for i, poly in tqdm(enumerate(polygons_gdf.geometry), desc="Clipping SR", total=len(polygons_gdf), disable=not verbose):
         df_samp = plot_gdf[plot_gdf.within(poly)]
         species = np.concatenate([species_data[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
-        climate = df_samp[env_vars]
         a = np.sum(df_samp['area'])
         # geom = MultiPoint(df_samp.geometry.to_list())
         num_plots = len(df_samp)
         data.loc[i, ["area", "sr", "num_plots"]] = [a, sr, num_plots]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            data.loc[i, env_vars] = np.nanmean(climate, axis=0)
-            data.loc[i, std_labels] = np.nanstd(climate, axis=0)
     return data
 
 
