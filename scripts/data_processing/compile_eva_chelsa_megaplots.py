@@ -49,10 +49,10 @@ CONFIG = {
     "raw_plot_test_size": 0.1, # in fraction of total EVA records
     "megaplot_test_size": 0.005, # in fraction of total EVA train records
     # "side_range": (1e2, 1e5), # in m
-    "num_polygon_max": np.inf,
+    "num_polygon_max": np.inf, #todo to hange
     "crs": "EPSG:3035",
-    # "habitats" : ["all", "T", "Q", "S", "R"],
-    "habitats" : ["all"], # TODO: to change for full habitats
+    "habitats" : ["all", "T", "Q", "S", "R"],
+    # "habitats" : ["all"], # TODO: to change for full habitats
     "random_state": 2,
     "verbose": True,
 }
@@ -86,7 +86,11 @@ def load_and_preprocess_data(check_consistency=False):
     return plot_gdf, species_dict, climate_raster
 
 
-def run_SR_compilation(plot_gdf, species_dict, nb_megaplots, test=False, verbose=CONFIG["verbose"]):
+def run_SR_compilation(plot_gdf, 
+                       species_dict, 
+                       megaplots, # a list of geometries or an int
+                       area_range = None, 
+                       verbose=CONFIG["verbose"]):
     data = pd.DataFrame({
                         "observed_area": pd.Series(int),
                         "megaplot_area": pd.Series(int),
@@ -94,11 +98,12 @@ def run_SR_compilation(plot_gdf, species_dict, nb_megaplots, test=False, verbose
                         "num_plots": pd.Series(int),
                         "geometry": pd.Series(dtype="object"),
                         })
-    miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
-    if test:
-        area_range = CONFIG["area_range_test"]
+    if isinstance(megaplots, int):
+        nb_megaplots = megaplots
     else:
-        area_range = CONFIG["area_range_train"]
+        nb_megaplots = len(megaplots)
+    miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
+    used_plots = set()
 
     for i in tqdm(range(nb_megaplots),
                 desc="Compiling SR", 
@@ -106,24 +111,24 @@ def run_SR_compilation(plot_gdf, species_dict, nb_megaplots, test=False, verbose
                 total=nb_megaplots, 
                 miniters=miniters,
                 maxinterval=float("inf")):
-        box = generate_random_square(plot_gdf, 
-                                    area_range)
+        if isinstance(megaplots, int):
+            box = generate_random_square(plot_gdf, area_range)
+        else:
+            box = megaplots.iloc[i]
         plots_within_box = plot_gdf.within(box)
         df_samp = plot_gdf[plots_within_box]
         species = np.concatenate([species_dict[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
-        observed_area = np.sum(df_samp['area'])
-        megaplot_area = box.area
+        observed_area = np.sum(df_samp['observed_area'])
+        megaplot_area = max(box.area, observed_area)
         # geom = MultiPoint(df_samp.geometry.to_list())
         num_plots = len(df_samp)
         data.loc[i, ["observed_area", "megaplot_area", "sr", "num_plots", "geometry"]] = [observed_area, megaplot_area, sr, num_plots, box]
-        if test:
-            plot_gdf = plot_gdf[~plots_within_box]
-            assert len(plot_gdf) > 0, "Not enough plots left to sample from."
+        used_plots.update(df_samp.index)
             
     data = gpd.GeoDataFrame(data, crs = plot_gdf.crs, geometry="geometry")
-    data["test"] = test
-    return data, plot_gdf
+    data["habitat_id"] = plot_gdf["habitat_id"].iloc[0]
+    return data, used_plots
 
 def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbose"]):
     """
@@ -154,8 +159,8 @@ def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbo
         megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
     return megaplot_data
 
-def run_compilation(plot_gdf, species_dict, climate_raster, num_megaplot, test=False):
-    megaplot_data, plot_gdf = run_SR_compilation(plot_gdf, species_dict, num_megaplot, test)
+def run_compilation(plot_gdf, species_dict, climate_raster, megaplots, area_range):
+    megaplot_data, plot_gdf = run_SR_compilation(plot_gdf, species_dict, megaplots, area_range)
     assert (megaplot_data.sr > 0).all()
     megaplot_data = run_climate_compilation(megaplot_data, climate_raster)
     return megaplot_data, plot_gdf
@@ -187,12 +192,12 @@ def generate_plot_data(plot_data, species_data, climate_raster):
         sr = len(np.unique(species))
         plot_data.loc[i, "sr"] = sr
 
-    plot_data = plot_data.rename({"area_m2": "area", "level_1":"habitat_id"}, axis=1)
+    plot_data = plot_data.rename({"area_m2": "observed_area", "level_1":"habitat_id"}, axis=1)
     plot_data = plot_data.set_index("plot_id")
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data["megaplot_area"] = plot_data["area"]
-    
-    plot_data = plot_data[["sr", "area", "megaplot_area", "geometry", "habitat_id"] + CLIMATE_COL_NAMES]
+    plot_data["megaplot_area"] = plot_data["observed_area"]
+    plot_data["num_plots"] = 1
+    plot_data = plot_data[["sr", "observed_area", "megaplot_area", "geometry", "habitat_id", "num_plots"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
@@ -210,38 +215,50 @@ if __name__ == "__main__":
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
     plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
         
+    nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
+    EVA_raw_train_idx, EVA_raw_test_idx = train_test_split(plot_data_all.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
+    EVA_raw_megaplot_train_test, EVA_raw_test = plot_data_all.loc[EVA_raw_train_idx], plot_data_all.loc[EVA_raw_test_idx]
+    
     megaplot_ar = []
-    plot_gdf_by_hab = plot_data_all.groupby("habitat_id")
     # compiling data for each separate habitat
+    # CONFIG["habitats"] must contain "all" at first position
     for hab in CONFIG["habitats"]:
         logging.info(f"Generating megaplot dataset for habitat: {hab}")
         if hab == "all":
-            gdf_hab = plot_data_all
+            EVA_raw_megaplot_train_test_hab, EVA_raw_test_hab = EVA_raw_megaplot_train_test.copy(), EVA_raw_test.copy()
+            EVA_raw_megaplot_train_test_hab["habitat_id"] = "all"
+            EVA_raw_test_hab["habitat_id"] = "all"
+            nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(EVA_raw_megaplot_train_test_hab)), CONFIG["num_polygon_max"])
+            logging.info(f"Compiling megaplot test dataset...")
+            EVA_megaplot_test_hab, used_plots  = run_compilation(EVA_raw_megaplot_train_test_hab, 
+                                                                                species_dict, 
+                                                                                climate_raster, 
+                                                                                nb_megaplot_test,
+                                                                                CONFIG["area_range_test"])
+            test_geometries = EVA_megaplot_test_hab.geometry
         else:
-            gdf_hab = plot_gdf_by_hab.get_group(hab)
-        nb_raw_plots_test = min(int(CONFIG["raw_plot_test_size"] * len(gdf_hab)), CONFIG["num_polygon_max"])
-        EVA_raw_idx, EVA_raw_test_idx = train_test_split(gdf_hab.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
-        EVA_raw_test = gdf_hab.loc[EVA_raw_test_idx]
-        EVA_raw_test["type"] = "EVA_raw_test"
-        EVA_raw_megaplot_train_test = gdf_hab.loc[EVA_raw_idx]
-        nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(EVA_raw_megaplot_train_test)), CONFIG["num_polygon_max"])
-        logging.info(f"Compiling megaplot test dataset...")
-        EVA_megaplot_test, EVA_raw_megaplot_train  = run_compilation(EVA_raw_megaplot_train_test, 
-                                                                     species_dict, 
-                                                                     climate_raster, 
-                                                                     nb_megaplot_test, 
-                                                                     test=True)
-        EVA_megaplot_test["type"] = "EVA_megaplot_test"
+            EVA_raw_megaplot_train_test_hab = EVA_raw_megaplot_train_test[EVA_raw_megaplot_train_test["habitat_id"] == hab].copy()
+            EVA_raw_test_hab = EVA_raw_test[EVA_raw_test["habitat_id"] == hab].copy()
+            logging.info(f"Compiling megaplot test dataset...")
+            EVA_megaplot_test_hab, _  = run_compilation(EVA_raw_megaplot_train_test_hab, 
+                                                                    species_dict, 
+                                                                    climate_raster, 
+                                                                    test_geometries,
+                                                                    CONFIG["area_range_test"])
+
+        EVA_raw_megaplot_train_hab = EVA_raw_megaplot_train_test_hab[~EVA_raw_megaplot_train_test_hab.index.isin(used_plots)]
         logging.info(f"Compiling megaplot train dataset...")
-        nb_megaplots_train = min(len(EVA_raw_megaplot_train), CONFIG["num_polygon_max"])
-        EVA_megaplot_train, _ = run_compilation(EVA_raw_megaplot_train, 
-                                                species_dict, 
-                                                climate_raster, 
-                                                nb_megaplots_train, 
-                                                test=False)
-        EVA_megaplot_train["type"] = "EVA_megaplot_train"
+        nb_megaplots_train = min(len(EVA_raw_megaplot_train_hab), CONFIG["num_polygon_max"])
+        EVA_megaplot_train_hab, _ = run_compilation(EVA_raw_megaplot_train_hab,
+                                                    species_dict,
+                                                    climate_raster,
+                                                    nb_megaplots_train,
+                                                    CONFIG["area_range_train"])
         
-        compiled_data = pd.concat([EVA_raw_test, EVA_megaplot_test, EVA_megaplot_train], ignore_index=True)
+        EVA_megaplot_test_hab["type"] = "EVA_megaplot_test"
+        EVA_megaplot_train_hab["type"] = "EVA_megaplot_train"
+        
+        compiled_data = pd.concat([EVA_megaplot_test_hab, EVA_megaplot_train_hab], ignore_index=True, verify_integrity=True)
         # Save checkpoint
         checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
         save_to_pickle(checkpoint_path, megaplot_data=compiled_data)
@@ -250,8 +267,9 @@ if __name__ == "__main__":
         megaplot_ar.append(compiled_data)
 
     # aggregating results and final save
-    megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
-       
+    EVA_raw_test["type"] = "EVA_raw_test"
+    megaplot_data = pd.concat(megaplot_ar + [EVA_raw_test], ignore_index=True, verify_integrity=True)
+
     # export the full compilation to pickle
     output_path = CONFIG["output_file_path"] / CONFIG["output_file_name"]
     logging.info(f"Exporting {output_path}")
