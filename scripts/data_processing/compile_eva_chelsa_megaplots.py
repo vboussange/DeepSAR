@@ -49,13 +49,15 @@ CONFIG = {
     "raw_plot_test_size": 0.1, # in fraction of total EVA records
     "megaplot_test_size": 0.005, # in fraction of total EVA train records
     # "side_range": (1e2, 1e5), # in m
-    "num_polygon_max": 2, #np.inf, #todo to hange
+    "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     "habitats" : ["all", "T", "Q", "S", "R"],
     # "habitats" : ["all"], # TODO: to change for full habitats
     "random_state": 2,
     "verbose": True,
 }
+
+# Define covariate feature names based on environmental covariates
 mean_labels = CONFIG["env_vars"]
 std_labels = [f"std_{var}" for var in CONFIG["env_vars"]]
 CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels)).tolist()
@@ -65,8 +67,10 @@ CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels)).tolist()
 
 def load_and_preprocess_data(check_consistency=False):
     """
-    Load and preprocess EVA and landcover data.
-    Returns processed EVA and landcover datasets.
+    Load and preprocess EVA data and environmental covariate raster. Returns
+    `plot_gdf` (gdf of plots), `species_dict` (dictionary where each key
+    corresponds to plot_gdf.index and value associated species list), and
+    `climate_raster`.
     """
     logging.info("Loading EVA data...")
     plot_gdf, species_dict = EVADataset().load()
@@ -91,13 +95,20 @@ def run_SR_compilation(plot_gdf,
                        megaplots, # a list of geometries or an int
                        area_range = None, 
                        verbose=CONFIG["verbose"]):
+    
+    """
+    Calculate species richness, area and observed area for each megaplot,
+    defined as bags of EVA raw plots contained in `plot_gdf`. Returns a gpd
+    dataframe, together with a set of used plots. `megaplots` can be a list of
+    geometries corresponding to the megaplots, or an int, in which case random squares are generated.
+    """
     data = pd.DataFrame({
-                        "observed_area": pd.Series(int),
-                        "megaplot_area": pd.Series(int),
-                        "sr": pd.Series(int),
-                        "num_plots": pd.Series(int),
-                        "geometry": pd.Series(dtype="object"),
-                        })
+        "observed_area": pd.Series(dtype="float"),
+        "megaplot_area": pd.Series(dtype="float"),
+        "sr": pd.Series(dtype="int"),
+        "num_plots": pd.Series(dtype="int"),
+        "geometry": pd.Series(dtype="object"),
+    })
     if isinstance(megaplots, int):
         nb_megaplots = megaplots
     else:
@@ -134,8 +145,8 @@ def run_SR_compilation(plot_gdf,
 
 def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbose"]):
     """
-    Calculate area and convert landcover binary raster to multipoint for each SAR data row.
-    Returns processed SAR data.
+    Based on a gpd dataframe return by `run_SR_compilation`, calculate
+    environmental covariates for each megaplot.
     """
     nb_megaplots = len(megaplot_data)
     miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
@@ -161,17 +172,37 @@ def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbo
         megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
     return megaplot_data
 
-def run_compilation(plot_gdf, species_dict, climate_raster, megaplots, area_range):
-    megaplot_data, plot_gdf = run_SR_compilation(plot_gdf, species_dict, megaplots, area_range)
+def run_megaplot_compilation(plot_gdf, species_dict, climate_raster, megaplots, area_range):
+    """
+    Compiles species richness and environmental covariates for each megaplot.
+    """
+    megaplot_data, used_plots = run_SR_compilation(plot_gdf, species_dict, megaplots, area_range)
     assert (megaplot_data.sr > 0).all()
     megaplot_data = run_climate_compilation(megaplot_data, climate_raster)
-    return megaplot_data, plot_gdf
+    return megaplot_data, used_plots
 
-def generate_plot_data(plot_data, species_data, climate_raster):
+def run_plot_compilation(plot_data, species_dict, climate_raster):
     """
-    Calculate area and convert landcover binary raster to multipoint for each SAR data row.
-    Returns processed SAR data.
+    Compiles species richness and environmental covariates for each raw (EVA) plot.
     """
+    miniters = max(plot_data.shape[0] // 100, 1)  # Refresh every 1%
+    for i, row in tqdm(plot_data.iterrows(), 
+                       desc="Compiling species richness", 
+                       total=plot_data.shape[0],
+                       disable=not CONFIG["verbose"],
+                       miniters=miniters,
+                       maxinterval=float("inf")):
+        plot_id = row["plot_id"]
+        species = species_dict[plot_id]
+        sr = len(np.unique(species))
+        plot_data.loc[i, "sr"] = sr
+
+    plot_data = plot_data.rename({"area_m2": "observed_area", "level_1":"habitat_id"}, axis=1)
+    plot_data = plot_data.set_index("plot_id")
+    plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
+    plot_data["megaplot_area"] = plot_data["observed_area"]
+    plot_data["num_plots"] = 1
+    
     logging.info("Calculating climate vars...")
     y = plot_data.geometry.y
     x = plot_data.geometry.x
@@ -181,24 +212,9 @@ def generate_plot_data(plot_data, species_data, climate_raster):
         method="nearest",
     )
     env_vars = env_vars.to_numpy().transpose()
-    plot_data[CONFIG["env_vars"]] = env_vars
-    miniters = max(plot_data.shape[0] // 100, 1)  # Refresh every 1%
-    for i, row in tqdm(plot_data.iterrows(), 
-                       desc="Compiling species richness", 
-                       total=plot_data.shape[0],
-                       disable=not CONFIG["verbose"],
-                       miniters=miniters,
-                       maxinterval=float("inf")):
-        plot_id = row["plot_id"]
-        species = species_data[plot_id]
-        sr = len(np.unique(species))
-        plot_data.loc[i, "sr"] = sr
-
-    plot_data = plot_data.rename({"area_m2": "observed_area", "level_1":"habitat_id"}, axis=1)
-    plot_data = plot_data.set_index("plot_id")
-    plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data["megaplot_area"] = plot_data["observed_area"]
-    plot_data["num_plots"] = 1
+    std_env_vars = np.zeros_like(env_vars)
+    plot_data[CLIMATE_COL_NAMES] = np.concatenate([env_vars, std_env_vars], axis=1)
+    
     plot_data = plot_data[["sr", "observed_area", "megaplot_area", "geometry", "habitat_id", "num_plots"] + CLIMATE_COL_NAMES]
 
     return plot_data
@@ -214,8 +230,8 @@ if __name__ == "__main__":
     
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
     # Sample 1000 rows for debugging purposes
-    plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
-    plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
+    # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
+    plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
         
     nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
     EVA_raw_train_idx, EVA_raw_test_idx = train_test_split(plot_data_all.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
@@ -232,7 +248,7 @@ if __name__ == "__main__":
             EVA_raw_test_hab["habitat_id"] = "all"
             nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(EVA_raw_megaplot_train_test_hab)), CONFIG["num_polygon_max"])
             logging.info(f"Compiling megaplot test dataset...")
-            EVA_megaplot_test_hab, used_plots  = run_compilation(EVA_raw_megaplot_train_test_hab, 
+            EVA_megaplot_test_hab, used_plots  = run_megaplot_compilation(EVA_raw_megaplot_train_test_hab, 
                                                                                 species_dict, 
                                                                                 climate_raster, 
                                                                                 nb_megaplot_test,
@@ -242,7 +258,7 @@ if __name__ == "__main__":
             EVA_raw_megaplot_train_test_hab = EVA_raw_megaplot_train_test[EVA_raw_megaplot_train_test["habitat_id"] == hab].copy()
             EVA_raw_test_hab = EVA_raw_test[EVA_raw_test["habitat_id"] == hab].copy()
             logging.info(f"Compiling megaplot test dataset...")
-            EVA_megaplot_test_hab, _  = run_compilation(EVA_raw_megaplot_train_test_hab, 
+            EVA_megaplot_test_hab, _  = run_megaplot_compilation(EVA_raw_megaplot_train_test_hab, 
                                                                     species_dict, 
                                                                     climate_raster, 
                                                                     test_geometries,
@@ -251,7 +267,7 @@ if __name__ == "__main__":
         EVA_raw_megaplot_train_hab = EVA_raw_megaplot_train_test_hab[~EVA_raw_megaplot_train_test_hab.index.isin(used_plots)]
         logging.info(f"Compiling megaplot train dataset...")
         nb_megaplots_train = min(len(EVA_raw_megaplot_train_hab), CONFIG["num_polygon_max"])
-        EVA_megaplot_train_hab, _ = run_compilation(EVA_raw_megaplot_train_hab,
+        EVA_megaplot_train_hab, _ = run_megaplot_compilation(EVA_raw_megaplot_train_hab,
                                                     species_dict,
                                                     climate_raster,
                                                     nb_megaplots_train,
@@ -284,7 +300,7 @@ if __name__ == "__main__":
     logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
     
-    # exporting raw plot data tp gpkg
+    # exporting raw plot data to gpkg
     output_path = CONFIG["output_file_path"] / "eva_chelsa_plot_data.gpkg"
     logging.info(f"Exporting {output_path}")
     plot_data_all.to_file(output_path, driver="GPKG")
