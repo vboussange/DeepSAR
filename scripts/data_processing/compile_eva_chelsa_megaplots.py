@@ -122,14 +122,23 @@ def run_SR_compilation(plot_gdf,
                 total=nb_megaplots, 
                 miniters=miniters,
                 maxinterval=float("inf")):
+        
+        # generating random square
         if isinstance(megaplots, int):
             box = generate_random_square(plot_gdf, area_range)
         else:
             box = megaplots.iloc[i]
+            
+        # identifying plots within the square
         plots_within_box = plot_gdf.within(box)
         df_samp = plot_gdf[plots_within_box]
         if len(df_samp) == 0:
             continue
+        else:
+            x = random.randint(1, len(df_samp))
+            df_samp = df_samp.sample(n=x)
+
+        # calculating species richness and feature values
         species = np.concatenate([species_dict[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
         observed_area = np.sum(df_samp['observed_area'])
@@ -219,29 +228,40 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
 
     return plot_data
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    # Set up the output directory
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
-    CONFIG["output_file_path"]  = CONFIG["output_file_path"] / sha
-    CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
-    CONFIG["output_file_name"] = Path(f"eva_chelsa_augmented_data.pkl")
+    output_file_path  = CONFIG["output_file_path"] / sha
+    output_file_path.mkdir(parents=True, exist_ok=True)
+    output_file_name = Path("eva_chelsa_megaplot_data")
     
+    
+    # Loading data
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
-    # Sample 1000 rows for debugging purposes
-    # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
+    plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
     plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
         
+    # splitting the raw plot dataset into a dataset used for generating
+    # megaplots, and another one for testing model on raw plots
     nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
     EVA_raw_train_idx, EVA_raw_test_idx = train_test_split(plot_data_all.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
     EVA_raw_megaplot_train_test, EVA_raw_test = plot_data_all.loc[EVA_raw_train_idx], plot_data_all.loc[EVA_raw_test_idx]
+    EVA_raw_test["type"] = "EVA_raw_test"
+    EVA_raw_test.to_file(output_file_path / (output_file_name + "_raw_test.gpkg"), driver="GPKG")
     
+    # Generating training and test megaplots
     megaplot_ar = []
-    # compiling data for each separate habitat
-    # CONFIG["habitats"] must contain "all" at first position
-    for hab in CONFIG["habitats"]:
+    for hab in ["all"] + CONFIG["habitats"]:
         logging.info(f"Generating megaplot dataset for habitat: {hab}")
+        
+        # Generating test megaplots
+        # If habitat is "all", we consider all raw plots and generate
+        # `nb_megaplot_test` random squares for building test megaplots.
+        # Subsequently, we use the same random squares for test megaplots for all habitats, 
+        # to prevent data leakage when evaluating the "all" model on habitat specific megaplots.
         if hab == "all":
             EVA_raw_megaplot_train_test_hab, EVA_raw_test_hab = EVA_raw_megaplot_train_test.copy(), EVA_raw_test.copy()
             EVA_raw_megaplot_train_test_hab["habitat_id"] = "all"
@@ -263,7 +283,8 @@ if __name__ == "__main__":
                                                                     climate_raster, 
                                                                     test_geometries,
                                                                     CONFIG["area_range_test"])
-
+        # Generating training megaplots. We discard the test raw plots
+        # used for generating test megaplots, to prevent data leakage.
         EVA_raw_megaplot_train_hab = EVA_raw_megaplot_train_test_hab[~EVA_raw_megaplot_train_test_hab.index.isin(used_plots)]
         logging.info(f"Compiling megaplot train dataset...")
         nb_megaplots_train = min(len(EVA_raw_megaplot_train_hab), CONFIG["num_polygon_max"])
@@ -276,27 +297,26 @@ if __name__ == "__main__":
         EVA_megaplot_test_hab["type"] = "EVA_megaplot_test"
         EVA_megaplot_train_hab["type"] = "EVA_megaplot_train"
         
-        compiled_data = pd.concat([EVA_megaplot_test_hab, EVA_megaplot_train_hab], ignore_index=True, verify_integrity=True)
         # Save checkpoint
-        checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
-        save_to_pickle(checkpoint_path, megaplot_data=compiled_data)
+        compiled_data = pd.concat([EVA_megaplot_test_hab, EVA_megaplot_train_hab], ignore_index=True, verify_integrity=True)
+        checkpoint_path = output_file_path / (output_file_name + f"_checkpoint_{hab}.gpkg")
+        compiled_data.to_file(checkpoint_path)
         logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
         
         megaplot_ar.append(compiled_data)
 
     # aggregating results and final save
-    EVA_raw_test["type"] = "EVA_raw_test"
     megaplot_data = pd.concat(megaplot_ar + [EVA_raw_test], ignore_index=True, verify_integrity=True)
 
     # export the full compilation to pickle
-    output_path = CONFIG["output_file_path"] / CONFIG["output_file_name"]
+    output_path = output_file_path / (output_file_name + ".pkl")
     logging.info(f"Exporting {output_path}")
     save_to_pickle(output_path, 
                    megaplot_data=megaplot_data, 
                    config=CONFIG)
     
     # exporting megaplot_data to gpkg
-    output_path = CONFIG["output_file_path"] / "eva_chelsa_megaplot_data.gpkg"
+    output_path = output_file_path / (output_file_name + ".pkg")
     logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
     
