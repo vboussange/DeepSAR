@@ -49,7 +49,7 @@ CONFIG = {
     "raw_plot_test_size": 0.1, # in fraction of total EVA records
     "megaplot_test_size": 0.005, # in fraction of total EVA train records
     # "side_range": (1e2, 1e5), # in m
-    "num_polygon_max": np.inf, #todo to hange
+    "num_polygon_max": 2, #np.inf, #todo to hange
     "crs": "EPSG:3035",
     "habitats" : ["all", "T", "Q", "S", "R"],
     # "habitats" : ["all"], # TODO: to change for full habitats
@@ -104,7 +104,7 @@ def run_SR_compilation(plot_gdf,
         nb_megaplots = len(megaplots)
     miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
     used_plots = set()
-
+    row_idx = 0
     for i in tqdm(range(nb_megaplots),
                 desc="Compiling SR", 
                 disable=not verbose,
@@ -117,14 +117,16 @@ def run_SR_compilation(plot_gdf,
             box = megaplots.iloc[i]
         plots_within_box = plot_gdf.within(box)
         df_samp = plot_gdf[plots_within_box]
+        if len(df_samp) == 0:
+            continue
         species = np.concatenate([species_dict[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
         observed_area = np.sum(df_samp['observed_area'])
         megaplot_area = max(box.area, observed_area)
-        # geom = MultiPoint(df_samp.geometry.to_list())
         num_plots = len(df_samp)
-        data.loc[i, ["observed_area", "megaplot_area", "sr", "num_plots", "geometry"]] = [observed_area, megaplot_area, sr, num_plots, box]
+        data.loc[row_idx, ["observed_area", "megaplot_area", "sr", "num_plots", "geometry"]] = [observed_area, megaplot_area, sr, num_plots, box]
         used_plots.update(df_samp.index)
+        row_idx += 1
             
     data = gpd.GeoDataFrame(data, crs = plot_gdf.crs, geometry="geometry")
     data["habitat_id"] = plot_gdf["habitat_id"].iloc[0]
@@ -212,7 +214,7 @@ if __name__ == "__main__":
     
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
     # Sample 1000 rows for debugging purposes
-    # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
+    plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])
     plot_data_all = generate_plot_data(plot_gdf, species_dict, climate_raster)
         
     nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
