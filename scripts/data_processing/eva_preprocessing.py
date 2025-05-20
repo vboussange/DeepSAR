@@ -89,16 +89,6 @@ def find_best_match(row, reference_set: set) -> str:
     return "NA", False
 
 def clean_eva_plots(plot_gdf):
-    # calculate SR per plot
-    print("Discarding duplicates")
-    # identify unique locations and select latest plots
-    plot_idx = []
-    for _, _gdf in plot_gdf.groupby("geometry"):
-        if _gdf["recording_date"].notna().any():
-            plot_idx.append(_gdf["recording_date"].idxmax())
-        else:
-            plot_idx.append(_gdf.plot_id.iloc[np.random.randint(len(_gdf))])
-
     # filtering for inconsistent coordinates 
     print("Filtering by landcover and extent")
     countries_gdf = gpd.read_file(COUNTRY_DATA)
