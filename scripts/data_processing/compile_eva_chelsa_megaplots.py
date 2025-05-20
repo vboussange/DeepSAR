@@ -229,28 +229,28 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
     return plot_data
 
 if __name__ == "__main__":
-    # Set up the output directory
+    # Set up the random seed for reproducibility
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
+    
+    # Set up the output directory
     repo = git.Repo(search_parent_directories=True)
     sha = repo.git.rev_parse(repo.head, short=True)
     output_file_path  = CONFIG["output_file_path"] / sha
     output_file_path.mkdir(parents=True, exist_ok=True)
-    output_file_name = Path("eva_chelsa_megaplot_data")
-    
     
     # Loading data
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
-    plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
+    # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
     plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
         
-    # splitting the raw plot dataset into a dataset used for generating
+    # Splitting the raw plot dataset into a dataset used for generating
     # megaplots, and another one for testing model on raw plots
     nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
     EVA_raw_train_idx, EVA_raw_test_idx = train_test_split(plot_data_all.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
     EVA_raw_megaplot_train_test, EVA_raw_test = plot_data_all.loc[EVA_raw_train_idx], plot_data_all.loc[EVA_raw_test_idx]
     EVA_raw_test["type"] = "EVA_raw_test"
-    EVA_raw_test.to_file(output_file_path / (output_file_name + "_raw_test.gpkg"), driver="GPKG")
+    EVA_raw_test.to_file(output_file_path / ("eva_chelsa_megaplot_data_raw_test.gpkg"), driver="GPKG")
     
     # Generating training and test megaplots
     megaplot_ar = []
@@ -299,7 +299,7 @@ if __name__ == "__main__":
         
         # Save checkpoint
         compiled_data = pd.concat([EVA_megaplot_test_hab, EVA_megaplot_train_hab], ignore_index=True, verify_integrity=True)
-        checkpoint_path = output_file_path / (output_file_name + f"_checkpoint_{hab}.gpkg")
+        checkpoint_path = output_file_path / f"eva_chelsa_megaplot_data_checkpoint_{hab}.gpkg"
         compiled_data.to_file(checkpoint_path)
         logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
         
@@ -309,14 +309,14 @@ if __name__ == "__main__":
     megaplot_data = pd.concat(megaplot_ar + [EVA_raw_test], ignore_index=True, verify_integrity=True)
 
     # export the full compilation to pickle
-    output_path = output_file_path / (output_file_name + ".pkl")
+    output_path = output_file_path / "eva_chelsa_megaplot_data.pkl"
     logging.info(f"Exporting {output_path}")
     save_to_pickle(output_path, 
                    megaplot_data=megaplot_data, 
                    config=CONFIG)
     
     # exporting megaplot_data to gpkg
-    output_path = output_file_path / (output_file_name + ".pkg")
+    output_path = output_file_path / "eva_chelsa_megaplot_data.pkg"
     logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
     
