@@ -16,7 +16,7 @@ from src.dataset import AugmentedDataset
 
 if __name__ == "__main__":
     MODEL = "large"
-    HASH = "fb8bc71"
+    HASH = "627173c"
     path_eva_data = Path(__file__).parent / f"../../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
     path_gift_data = Path(__file__).parent / f"../../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
     
@@ -62,4 +62,7 @@ if __name__ == "__main__":
     fig.tight_layout()
     fig.savefig(Path(__file__).parent / f"data_sar.png", dpi=300, transparent=True)
 
+
+#######
+# quick test
 

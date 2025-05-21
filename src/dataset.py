@@ -9,7 +9,7 @@ import geopandas as gpd
 class AugmentedDataset:
     def __init__(self, path_eva_data, path_gift_data, seed):
 
-        self.eva_data = read_result(path_eva_data)
+        self.eva_data = gpd.read_file(path_eva_data)
         self.gift_data = gpd.read_file(path_gift_data)
         self.seed = seed
     
@@ -18,22 +18,15 @@ class AugmentedDataset:
         gift_data = self.gift_data
         seed = self.seed
         if hab == "all":
-            eva_plot_data = eva_data["plot_data_all"]
+            eva_data_hab = eva_data[(eva_data["habitat_id"] == "all") | (eva_data["type"] == "EVA_raw_test")]
         else:
-            eva_plot_data = eva_data["plot_data_all"][eva_data["plot_data_all"]["habitat_id"] == hab]
-        eva_megaplot_data = eva_data["megaplot_data"][eva_data["megaplot_data"]["habitat_id"] == hab]
-        gift_plot_data = gift_data[gift_data["habitat_id"] == hab]
-        
-        # tagging the data
-        eva_plot_data["type"] = "EVA_raw"
-        eva_megaplot_data["type"] = "EVA_megaplot"
-        gift_plot_data["type"] = "GIFT"
-        
-        
-        augmented_data = pd.concat([eva_plot_data, eva_megaplot_data, gift_plot_data], ignore_index=True)
+            eva_data_hab = eva_data[eva_data["habitat_id"] == hab]
+        gift_data_hab = gift_data[gift_data["habitat_id"] == hab]
+    
+        augmented_data = pd.concat([eva_data_hab, gift_data_hab], ignore_index=True)
         
         # stack with raw plot data
-        augmented_data.loc[:, "log_area"] = np.log(augmented_data["area"].astype(np.float32)) 
+        augmented_data.loc[:, "log_observed_area"] = np.log(augmented_data["log_observed_area"].astype(np.float32)) 
         augmented_data.loc[:, "log_megaplot_area"] = np.log(augmented_data["megaplot_area"].astype(np.float32))
         augmented_data.loc[:, "log_sr"] = np.log(augmented_data["sr"].astype(np.float32))
         augmented_data = augmented_data.dropna()

@@ -8,6 +8,7 @@ from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from src.mlp import MLP, CustomMSELoss
 from src.trainer import Trainer
 from dataclasses import dataclass, field
+import geopandas as gpd
 
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -147,11 +148,43 @@ if __name__ == "__main__":
     class Config:
         device: str = choose_device()
         climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-        path_eva_data: str = Path(__file__).parent / f"../../data/processed/EVA_CHELSA_compilation/fb8bc71/eva_chelsa_augmented_data.pkl"
+        path_eva_data: str = Path(__file__).parent / f"../../data/processed/EVA_CHELSA_compilation/627173c/eva_chelsa_megaplot_data.gpkg"
         path_gift_data: str = Path(__file__).parent / f"../../data/processed/GIFT_CHELSA_compilation/fb8bc71/megaplot_data.gpkg"
         seed: int = 2
 
     config = Config()
+            
+    # quick and dirty test
+    eva_augmented_data = gpd.read_file(config.path_eva_data)
+    
+    eva_augmented_data_train = eva_augmented_data[eva_augmented_data["type"] == "EVA_megaplot_train"]
+    eva_augmented_data_test = eva_augmented_data[eva_augmented_data["type"] == "EVA_megaplot_test"]
+    print(len(eva_augmented_data_train))
+    print(len(eva_augmented_data_test))
+    fig, ax = plt.subplots()
+    ax.scatter(eva_augmented_data_train["observed_area"].astype(np.float32), 
+              eva_augmented_data_train["megaplot_area"].astype(np.float32), 
+              alpha=0.1, 
+              c="tab:blue")
+    ax.scatter(eva_augmented_data_test["observed_area"].astype(np.float32), 
+              eva_augmented_data_test["megaplot_area"].astype(np.float32), 
+            #   alpha=0.1, 
+              c="tab:red")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    
+    # TODO: you may also want to plot the distribution of the ratio of observed area to megaplot area, or scatter megaplot area vs observed area
+    
+
+    # ax.hexbin(eva_augmented_data["observed_area"], 
+    #           eva_augmented_data["sr"], 
+    #         #   alpha=0.1, 
+    #           gridsize=30,
+    #           xscale="log",
+    #           yscale="log",
+    #           cmap="magma",)
+    
+    
     augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
                                          path_gift_data = config.path_gift_data,
                                          seed = config.seed)
@@ -258,3 +291,5 @@ if __name__ == "__main__":
     SR_rast_1e5 = create_raster(proj_features, SR)
     SR_rast_1e5 = SR_rast_1e5.rio.reproject_match(SR_rast_1e4)
     (SR_rast_1e5 - SR_rast_1e4).plot()
+    
+    
