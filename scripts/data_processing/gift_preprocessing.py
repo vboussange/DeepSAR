@@ -8,6 +8,26 @@ from pathlib import Path
 import geopandas as gpd
 from eva_preprocessing import clean_species_name
 from src.data_processing.utils_env_pred import EXTENT_DATASET
+from src.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
+
+
+def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
+    """
+    Calculates species richness and observed area for each plot.
+    """
+    
+    for i, row in plot_gdf.iterrows():
+        plot_id = row["entity_ID"]
+        clipped_habitat_map = habitat_map.rio.clip([row.geometry], drop=True, all_touched=True)
+        proportion_area = get_fraction_habitat_landcover(clipped_habitat_map)
+        species = species_dict[plot_id]
+        sr = len(np.unique(species))
+        plot_gdf.loc[i, "sr"] = sr
+
+    plot_gdf["observed_area"] = plot_gdf.geometry.area * proportion_area
+    plot_gdf["megaplot_area"] = plot_gdf.geometry.area
+
+    return plot_gdf
 
 # ---------------------- CONFIGURATION ---------------------- #
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"
@@ -19,6 +39,7 @@ eva_species_df = pd.read_parquet(PROCESSED_EVA_DATA / "species_data.parquet")
 gift_species_df = pd.read_csv(RAW_GIFT_DATA / "species_data.csv")
 gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
 eva_plot_df = gpd.read_file(PROCESSED_EVA_DATA / "plot_data.gpkg")
+eunis = EUNISDataset()
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 gift_species_df = gift_species_df[~gift_species_df.work_species.isna()]
@@ -53,6 +74,8 @@ for hab in ["Q", "R", "S", "T", "all"]:
     gift_pl_df = gift_plot_df[gift_plot_df["entity_ID"].isin(gift_old_plot_ids)]
     gift_pl_df["entity_ID"] = gift_pl_df["entity_ID"].map(gift_new_plot_ids)
     gift_pl_df["level_1"] = hab
+    habitat_map = eunis.get_habitat_map(hab).where(eunis.raster > -1, np.nan).rio.reproject("EPSG:3035")
+    gift_pl_df = clip_GIFT_SR(gift_pl_df, gift_sp_df, habitat_map)
     filtered_gift_plot_df.append(gift_pl_df)
     filtered_gift_species_df.append(gift_sp_df)
     plot_id = plot_id + len(gift_old_plot_ids)
