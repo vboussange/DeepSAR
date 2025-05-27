@@ -90,8 +90,8 @@ def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
         species = species_dict[plot_id]
         sr = len(np.unique(species))
         plot_gdf.loc[i, "sr"] = sr
+        plot_gdf.loc[i, "observed_area"] = row.geometry.area * proportion_area
 
-    plot_gdf["area"] = plot_gdf.geometry.area * proportion_area
     return plot_gdf
 
 def process_partition(partition, block_plot_gdf, species_dict, climate_raster, habitat_map):

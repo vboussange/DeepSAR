@@ -70,27 +70,6 @@ def create_features(climate_dataset, res):
     X_map = pd.concat([df_mean, df_std], axis=1)
     return X_map[climate_features]
         
-# we use batches, otherwise model and data may not fit in memory
-def get_SR(model, raster_features, feature_scaler, target_scaler, batch_size=4096):
-    SR_all = []
-    total_length = len(raster_features)
-
-    percent_step = max(1, total_length // batch_size // 100)
-    
-    for i in tqdm(range(0, total_length, batch_size), desc = "Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
-        with torch.no_grad():
-            current_batch_size = min(batch_size, total_length - i)
-            # features = get_true_sar.interpolate_features(X_map_dict, log_area_tensor, res_climate_pixel, predictors, batch_index=slice(i, i + current_batch_size))
-            X = raster_features.iloc[i:i+current_batch_size,:]
-            X = feature_scaler.transform(X.values)
-            X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-            y = model(X)
-            SR = np.exp(target_scaler.inverse_transform(y.cpu().numpy()))
-
-            SR_all.append(SR)
-        
-    SR_all = np.concatenate(SR_all, axis=0)
-    return SR_all
         
         
 def load_chelsa_and_reproject():

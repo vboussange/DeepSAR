@@ -11,21 +11,20 @@ from src.data_processing.utils_env_pred import EXTENT_DATASET
 from src.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
 
 
-def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
+def clip_GIFT_SR(plot_gdf, gift_species_df, habitat_map):
     """
     Calculates species richness and observed area for each plot.
     """
-    
+    plot_gdf["observed_area"] = 0.
+    plot_gdf["megaplot_area"] = plot_gdf.geometry.area
     for i, row in plot_gdf.iterrows():
         plot_id = row["entity_ID"]
         clipped_habitat_map = habitat_map.rio.clip([row.geometry], drop=True, all_touched=True)
         proportion_area = get_fraction_habitat_landcover(clipped_habitat_map)
-        species = species_dict[plot_id]
+        species = gift_species_df[gift_species_df["entity_ID"] == plot_id]["work_species_cleaned"].values
         sr = len(np.unique(species))
         plot_gdf.loc[i, "sr"] = sr
-
-    plot_gdf["observed_area"] = plot_gdf.geometry.area * proportion_area
-    plot_gdf["megaplot_area"] = plot_gdf.geometry.area
+        plot_gdf.loc[i, "observed_area"] = row["megaplot_area"] * proportion_area
 
     return plot_gdf
 
@@ -52,9 +51,14 @@ species_eva = set(eva_species_df.gift_matched_species_name.unique())
 species_gift =  set(gift_species_df['work_species_cleaned'].unique())
 assert species_eva.issubset(species_gift), "Not all EVA species are present in GIFT dataset"
 
-# # Crop plot_gdf to the extent of climate_raster
+# # Crop plot_gdf to the extent of climate_raster, and reproject to EPSG:3035
 print("Cropping plot_gdf to the extent of climate_raster...")
 gift_plot_df = gift_plot_df.cx[EXTENT_DATASET[0]:EXTENT_DATASET[2], EXTENT_DATASET[1]:EXTENT_DATASET[3]]
+gift_plot_df = gift_plot_df.to_crs("EPSG:3035")
+
+# compiling habitat agnostic data
+habitat_map = eunis.get_habitat_map("all").where(eunis.raster > -1, np.nan).rio.reproject("EPSG:3035")
+gift_plot_df = clip_GIFT_SR(gift_plot_df, gift_species_df, habitat_map)
 
 # saving habitat agnostic data
 output_path = OUTPUT_FOLDER / "unfiltered"
