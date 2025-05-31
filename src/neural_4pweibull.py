@@ -14,7 +14,7 @@ class FullyConnectedBatchNormBlock(nn.Module):
     def forward(self, x):
         x = self.linear(x)
         x = self.batch_norm(x)
-        x = F.relu(x)
+        x = F.leaky_relu(x)
         return x
     
 class Neural4PWeibull(nn.Module):
@@ -27,6 +27,10 @@ class Neural4PWeibull(nn.Module):
         
         # last layer corresponds to the parameters of the Weibull function
         self.last_fully_connected = nn.Linear(layer_sizes[-1], 4)
+        # p0 corresponds to [b, c, d, e]; need to transform it to [b, c, d_offset, e]
+        p0[2] = p0[2] - p0[1]  # d_offset = d - c
+        assert p0[3] > 0, "e must be positive"
+        
         self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
         nn.init.normal_(self.last_fully_connected.weight, mean=0, std=0.01)
         
@@ -49,15 +53,16 @@ class Neural4PWeibull(nn.Module):
         # Extract and constrain parameters
         b = x[:, 0]
         c = x[:, 1]
-        d = c + F.softplus(x[:, 2])  # Ensure d > c
+        d = c - F.softplus(x[:, 2])  # Ensure d < c
         e = F.softplus(x[:, 3])      # Ensure e > 0
         return b, c, d, e
 
     def forward(self, x):
         log_aplot, features = x[:, 0], x[:, 1:]
         b, c, d, e = self.predict_b_c_d_e(features)
-        log_sr = torch.log(self.weibull_4p(log_aplot, b, c, d, e))
-        return log_sr
+        sr = F.softplus(self.weibull_4p(log_aplot, b, c, d, e))
+        # log_sr = torch.log(sr)
+        return sr
 
 if __name__ == "__main__":
     import torch.optim as optim
@@ -69,16 +74,16 @@ if __name__ == "__main__":
     n_features = 5
     layer_sizes = [16, 8]
     # layer_sizes = []
-    p0 = [-0.1, 1.0, 6.0, 1.0]  # [b, c, d_offset, e_offset]
+    p0 = [1., 6.0, -1, 3.0]  # [b, c, d_offset, e_offset]
 
     batch_size = 128
     n_samples = 1000
 
     # True Weibull parameters
-    b_true = -0.5
-    c_true = 2.0
-    d_true = 8.0
-    e_true = 0.5 # inflection point in log space
+    b_true = 1.
+    c_true = 8.0
+    d_true = -1.
+    e_true = 3. # inflection point in log space
 
     # Generate random features and aplot
     np.random.seed(42)
@@ -91,16 +96,16 @@ if __name__ == "__main__":
                             p0=p0)
 
     # Generate targets using the 4-parameter Weibull function
-    log_sr = torch.log(model.weibull_4p(torch.tensor(log_aplot, dtype=torch.float32), 
+    y = model.weibull_4p(torch.tensor(log_aplot, dtype=torch.float32), 
                          torch.tensor(b_true, dtype=torch.float32), 
                          torch.tensor(c_true, dtype=torch.float32), 
                          torch.tensor(d_true, dtype=torch.float32), 
-                         torch.tensor(e_true, dtype=torch.float32)))
-    log_sr = log_sr.squeeze() #+ np.random.normal(0, 0.2, size=(n_samples,))  # add noise
+                         torch.tensor(e_true, dtype=torch.float32))
+    y = y.squeeze() + 0.2 * np.random.normal(0, 0.1, size=(n_samples,))
 
     # Plot the generated targets
     plt.figure(figsize=(10, 6))
-    plt.plot(log_aplot.squeeze(), log_sr, 'b.', alpha=0.6, label='Generated targets (with noise)')
+    plt.plot(log_aplot.squeeze(), y, 'b.', alpha=0.6, label='Generated targets (with noise)')
     plt.xlabel('aplot')
     plt.ylabel('y (Weibull output)')
     plt.title('Generated Weibull Data with Noise')
@@ -111,7 +116,7 @@ if __name__ == "__main__":
     # Prepare input tensor
     x = np.concatenate([log_aplot, features], axis=1)
     x_tensor = torch.tensor(x, dtype=torch.float32)
-    log_sr_tensor = torch.tensor(log_sr, dtype=torch.float32)
+    y_tensor = torch.tensor(y, dtype=torch.float32)
 
     # Model, loss, optimizer
     criterion = nn.MSELoss()
@@ -122,15 +127,15 @@ if __name__ == "__main__":
     for epoch in range(n_epochs):
         perm = torch.randperm(n_samples)
         x_shuffled = x_tensor[perm]
-        log_sr_shuffled = log_sr_tensor[perm]
+        y_shuffled = y_tensor[perm]
 
         for i in range(0, n_samples, batch_size):
             xb = x_shuffled[i:i+batch_size]
-            log_sr_b = log_sr_shuffled[i:i+batch_size]
+            y_b = y_shuffled[i:i+batch_size]
 
             optimizer.zero_grad()
-            log_sr_pred = model(xb)
-            loss = criterion(log_sr_pred.squeeze(), log_sr_b)
+            y_pred = model(xb)
+            loss = criterion(y_pred.squeeze(), y_b)
             loss.backward()
             optimizer.step()
 
@@ -151,12 +156,12 @@ if __name__ == "__main__":
         
     
     # Generate predictions for plotting
-    log_sr_pred = model(x_tensor).squeeze()
+    y_pred = model(x_tensor).squeeze()
 
     # Create comparison plot
     plt.figure(figsize=(10, 6))
-    plt.scatter(log_aplot.squeeze(), log_sr.squeeze(), alpha=0.6, label='True values', color='blue', s=20)
-    plt.scatter(log_aplot.squeeze(), log_sr_pred.detach().numpy(), alpha=0.6, label='Predictions', color='red', s=20)
+    plt.scatter(log_aplot.squeeze(), y.squeeze(), alpha=0.6, label='True values', color='blue', s=20)
+    plt.scatter(log_aplot.squeeze(), y_pred.detach().numpy(), alpha=0.6, label='Predictions', color='red', s=20)
     plt.xlabel('aplot')
     plt.ylabel('y')
     plt.title('True vs Predicted Values')

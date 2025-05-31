@@ -46,7 +46,7 @@ CONFIG = {
         "bio15",
     ],
     "crs": "EPSG:3035",
-    "gift_data_dir": Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered",
+    "gift_data_dir": Path(__file__).parent / "../../../data/processed/GIFT/preprocessing/unfiltered",
 }
 
 mean_labels = CONFIG["env_vars"]
@@ -122,7 +122,7 @@ def estimate_sr_weibull(x, y):
     try:
         popt, pcov = curve_fit(
             weibull4, x, y, 
-            p0=[1, min(y), max(y), np.median(x)], 
+            p0=[1, max(y), min(y), np.median(x)], 
             maxfev=10000
         )
         b, c, d, e = popt
@@ -133,7 +133,7 @@ def estimate_sr_weibull(x, y):
 
 eva_dataset, eva_species_dict, gift_dataset = load_and_preprocess_data()
 
-country = "Germany"
+country = "Czech Republic"
 test_idx = gift_dataset[gift_dataset.geo_entity == country].index[0]
 test_geom = gift_dataset.loc[test_idx].geometry
 plots_within = eva_dataset.within(test_geom)
@@ -212,8 +212,9 @@ for idx, row in tqdm(fit_df.iterrows(), total=fit_df.shape[0]):
         b, c, d, e = estimate_sr_weibull(np.log(x), y)
 
         # Predict species richness at GIFT polygon area
-        predicted_sr = weibull4(np.log(gift_polygon_area), b, c, d, e)
-    
+        predicted_sr = c
+        # predicted_sr = weibull4(np.log(gift_polygon_area), b, c, d, e)
+
         
         # Update values in the fit_df directly using loc
         fit_df.loc[idx, "predicted_sr"] = predicted_sr

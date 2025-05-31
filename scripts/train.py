@@ -17,7 +17,7 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.mlp import MLP, CustomMSELoss
+from src.neural_4pweibull import Neural4PWeibull
 from src.trainer import Trainer
 from src.ensemble_model import EnsembleModel
 from src.dataset import AugmentedDataset, create_dataloader
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 MODEL_ARCHITECTURE = {"small":[16, 16, 16],
                     "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                     "medium":[2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]}
-MODEL = "large"
-HASH = "fb8bc71"
+MODEL = "small"
+HASH = "fb8bc71" # TODO: to change
 @dataclass
 class Config:
     device: str
@@ -42,12 +42,10 @@ class Config:
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 20
     n_epochs: int = 100
-    dSRdA_weight: float = 1e0
     weight_decay: float = 1e-3
     seed: int = 1
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    habitats: list = field(default_factory=lambda: ["all", "T", "Q", "S", "R"])
     n_ensembles: int = 5  # Number of models in the ensemble
     run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
@@ -68,7 +66,7 @@ def train_and_evaluate_ensemble(config, df):
                                             test_size= config.test_size,
                                             random_state=config.seed)
     gdf_train_val = df.loc[train_val_idx]
-    _, feature_scaler, target_scaler = create_dataloader(gdf_train_val, predictors, config.batch_size, config.num_workers)
+    train_val_loader, feature_scaler, target_scaler = create_dataloader(gdf_train_val, predictors, config.batch_size, config.num_workers)
 
     models = []
 
@@ -89,7 +87,11 @@ def train_and_evaluate_ensemble(config, df):
         val_loader, _, _ = create_dataloader(gdf_val, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
         test_loader, _, _ = create_dataloader(gdf_test, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
 
-        model = MLP(len(predictors), config.layer_sizes)
+        e0 = train_val_loader.dataset[0,:].median()
+        c0 = train_val_loader.dataset[1,:].max()
+        d0 = train_val_loader.dataset[1,:].min()
+        p0 = [1, min(y), max(y), e0]
+        model = Neural4PWeibull(len(predictors), config.layer_sizes, p0)
 
         trainer = Trainer(config=config, 
                           model=model, 
@@ -98,7 +100,7 @@ def train_and_evaluate_ensemble(config, df):
                           train_loader=train_loader, 
                           val_loader=val_loader, 
                           test_loader=test_loader, 
-                          compute_loss=CustomMSELoss(config.dSRdA_weight),
+                          compute_loss=nn.MSEloss(),
                           device=config.device,
                         # compute_loss = nn.MSELoss()
                           )
@@ -114,7 +116,7 @@ def train_and_evaluate_ensemble(config, df):
                                 train_loader=train_loader, 
                                 val_loader=val_loader, 
                                 test_loader=test_loader, 
-                                compute_loss=CustomMSELoss(config.dSRdA_weight),
+                                compute_loss=nn.MSEloss(),
                                 device=config.device,
                                )
     targets, preds = ensemble_trainer.get_model_predictions(test_loader)
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     config = Config(device=device)
-    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
+    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
     
     augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
@@ -148,12 +150,10 @@ if __name__ == "__main__":
                                          seed = config.seed)
     
     
-    results_all = {}
-    for hab in config.habitats:
-        logger.info(f"Training ensemble model with habitat {hab}")
-        df = augmented_dataset.compile_training_data(hab)
-        results = train_and_evaluate_ensemble(config, df)
-        results_all[hab] = results
+    logger.info(f"Training ensemble model with habitat {hab}")
+    df = augmented_dataset.compile_training_data(hab)
+    results = train_and_evaluate_ensemble(config, df)
+    results_all[hab] = results
 
     results_all["config"] = config
     logger.info(f"Saving results in {config.run_folder}")

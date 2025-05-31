@@ -1,5 +1,5 @@
 """
-Compiles megaplots based on EVA and CHELSA data, for different habitat types.
+Compiles megaplots based on EVA and CHELSA data, for habitat "all".
 """
 
 import pandas as pd
@@ -46,13 +46,10 @@ CONFIG = {
     "block_length": 1e6, # in meters
     "area_range_train": (1e4, 1e12),  # in m2
     "area_range_test": (1e4, 1e10),  # in m2
-    "raw_plot_test_size": 0.1, # in fraction of total EVA records
-    "megaplot_test_size": 0.005, # in fraction of total EVA train records
-    # "side_range": (1e2, 1e5), # in m
+    "megaplot_test_size": 0.005, # in fraction of total EVA records
+    "megaplot_train_size": 3, # in fraction of total EVA train records
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
-    "habitats" : ["all", "T", "Q", "S", "R"],
-    # "habitats" : ["all"], # TODO: to change for full habitats
     "random_state": 2,
     "verbose": True,
 }
@@ -62,10 +59,7 @@ mean_labels = CONFIG["env_vars"]
 std_labels = [f"std_{var}" for var in CONFIG["env_vars"]]
 CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels)).tolist()
 
-# range to be investigated
-# poly_range = (100, 100, 200e3, 200e3) # in meters
-
-def load_and_preprocess_data(check_consistency=False):
+def load_and_preprocess_data():
     """
     Load and preprocess EVA data and environmental covariate raster. Returns
     `plot_gdf` (gdf of plots), `species_dict` (dictionary where each key
@@ -74,10 +68,9 @@ def load_and_preprocess_data(check_consistency=False):
     """
     logging.info("Loading EVA data...")
     plot_gdf, species_dict = EVADataset().load()
-    if check_consistency:
-        logging.info("Checking data consistency...")
-        assert all([len(np.unique(species_dict[k])) == r.SR for k, r in plot_gdf.iterrows()])
-
+    plot_gdf = plot_gdf.set_index("plot_id")
+    plot_gdf = plot_gdf.to_crs(CONFIG["crs"])
+    
     logging.info("Loading climate raster...")
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
 
@@ -135,7 +128,8 @@ def run_SR_compilation(plot_gdf,
         if len(df_samp) == 0:
             continue
         else:
-            x = random.randint(1, len(df_samp))
+            x = np.random.uniform(np.log10(1), np.log10(len(df_samp)))
+            x = int(10**x)
             df_samp = df_samp.sample(n=x)
 
         # calculating species richness and feature values
@@ -149,7 +143,6 @@ def run_SR_compilation(plot_gdf,
         row_idx += 1
             
     data = gpd.GeoDataFrame(data, crs = plot_gdf.crs, geometry="geometry")
-    data["habitat_id"] = plot_gdf["habitat_id"].iloc[0]
     return data, used_plots
 
 def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbose"]):
@@ -160,7 +153,7 @@ def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbo
     nb_megaplots = len(megaplot_data)
     miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
     
-    for i, row in tqdm(megaplot_data.iterrows(), 
+    for plot_id, row in tqdm(megaplot_data.iterrows(), 
                        total=nb_megaplots, 
                        desc="Compiling climate", 
                        disable=not verbose,
@@ -178,7 +171,7 @@ def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbo
             _m = np.nanmean(env_vars, axis=(1, 2))
             _std = np.nanstd(env_vars, axis=(1, 2))
         env_pred_stats = np.concatenate([_m, _std])
-        megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
+        megaplot_data.loc[plot_id, CLIMATE_COL_NAMES] = env_pred_stats
     return megaplot_data
 
 def run_megaplot_compilation(plot_gdf, species_dict, climate_raster, megaplots, area_range):
@@ -190,24 +183,24 @@ def run_megaplot_compilation(plot_gdf, species_dict, climate_raster, megaplots, 
     megaplot_data = run_climate_compilation(megaplot_data, climate_raster)
     return megaplot_data, used_plots
 
+
+# TODO: raw plots are not used anymore, we should simplify this
 def run_plot_compilation(plot_data, species_dict, climate_raster):
     """
     Compiles species richness and environmental covariates for each raw (EVA) plot.
     """
     miniters = max(plot_data.shape[0] // 100, 1)  # Refresh every 1%
-    for i, row in tqdm(plot_data.iterrows(), 
+    for plot_id, row in tqdm(plot_data.iterrows(), 
                        desc="Compiling species richness", 
                        total=plot_data.shape[0],
                        disable=not CONFIG["verbose"],
                        miniters=miniters,
                        maxinterval=float("inf")):
-        plot_id = row["plot_id"]
         species = species_dict[plot_id]
         sr = len(np.unique(species))
-        plot_data.loc[i, "sr"] = sr
+        plot_data.loc[plot_id, "sr"] = sr
 
     plot_data = plot_data.rename({"area_m2": "observed_area", "level_1":"habitat_id"}, axis=1)
-    plot_data = plot_data.set_index("plot_id")
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
     plot_data["megaplot_area"] = plot_data["observed_area"]
     plot_data["num_plots"] = 1
@@ -224,7 +217,7 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
     std_env_vars = np.zeros_like(env_vars)
     plot_data[CLIMATE_COL_NAMES] = np.concatenate([env_vars, std_env_vars], axis=1)
     
-    plot_data = plot_data[["sr", "observed_area", "megaplot_area", "geometry", "habitat_id", "num_plots"] + CLIMATE_COL_NAMES]
+    plot_data = plot_data[["sr", "observed_area", "megaplot_area", "geometry", "num_plots"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
@@ -243,71 +236,32 @@ if __name__ == "__main__":
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
     plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
-        
-    # Splitting the raw plot dataset into a dataset used for generating
-    # megaplots, and another one for testing model on raw plots
-    nb_raw_plots_test = int(CONFIG["raw_plot_test_size"] * len(plot_data_all))
-    EVA_raw_train_idx, EVA_raw_test_idx = train_test_split(plot_data_all.index, test_size=nb_raw_plots_test, random_state=CONFIG["random_state"])
-    EVA_raw_megaplot_train_test, EVA_raw_test = plot_data_all.loc[EVA_raw_train_idx], plot_data_all.loc[EVA_raw_test_idx]
-    EVA_raw_test["type"] = "EVA_raw_test"
-    EVA_raw_test.to_file(output_file_path / ("eva_chelsa_megaplot_data_raw_test.gpkg"), driver="GPKG")
     
-    # Generating training and test megaplots
-    megaplot_ar = []
-    for hab in ["all"] + CONFIG["habitats"]:
-        logging.info(f"Generating megaplot dataset for habitat: {hab}")
-        
-        # Generating test megaplots
-        # If habitat is "all", we consider all raw plots and generate
-        # `nb_megaplot_test` random squares for building test megaplots.
-        # Subsequently, we use the same random squares for test megaplots for all habitats, 
-        # to prevent data leakage when evaluating the "all" model on habitat specific megaplots.
-        if hab == "all":
-            EVA_raw_megaplot_train_test_hab, EVA_raw_test_hab = EVA_raw_megaplot_train_test.copy(), EVA_raw_test.copy()
-            EVA_raw_megaplot_train_test_hab["habitat_id"] = "all"
-            EVA_raw_test_hab["habitat_id"] = "all"
-            nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(EVA_raw_megaplot_train_test_hab)), CONFIG["num_polygon_max"])
-            logging.info(f"Compiling megaplot test dataset...")
-            EVA_megaplot_test_hab, used_plots  = run_megaplot_compilation(EVA_raw_megaplot_train_test_hab, 
-                                                                                species_dict, 
-                                                                                climate_raster, 
-                                                                                nb_megaplot_test,
-                                                                                CONFIG["area_range_test"])
-            test_geometries = EVA_megaplot_test_hab.geometry
-        else:
-            EVA_raw_megaplot_train_test_hab = EVA_raw_megaplot_train_test[EVA_raw_megaplot_train_test["habitat_id"] == hab].copy()
-            EVA_raw_test_hab = EVA_raw_test[EVA_raw_test["habitat_id"] == hab].copy()
-            logging.info(f"Compiling megaplot test dataset...")
-            EVA_megaplot_test_hab, _  = run_megaplot_compilation(EVA_raw_megaplot_train_test_hab, 
-                                                                    species_dict, 
-                                                                    climate_raster, 
-                                                                    test_geometries,
-                                                                    CONFIG["area_range_test"])
-        # Generating training megaplots. We discard the test raw plots
-        # used for generating test megaplots, to prevent data leakage.
-        EVA_raw_megaplot_train_hab = EVA_raw_megaplot_train_test_hab[~EVA_raw_megaplot_train_test_hab.index.isin(used_plots)]
-        logging.info(f"Compiling megaplot train dataset...")
-        nb_megaplots_train = min(len(EVA_raw_megaplot_train_hab), CONFIG["num_polygon_max"])
-        EVA_megaplot_train_hab, _ = run_megaplot_compilation(EVA_raw_megaplot_train_hab,
+    # Generating test megaplots
+    nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(plot_data_all)), CONFIG["num_polygon_max"])
+    logging.info("Compiling megaplot test dataset...")
+    EVA_megaplot_test, used_plots = run_megaplot_compilation(plot_data_all, 
+                                                             species_dict, 
+                                                             climate_raster, 
+                                                             nb_megaplot_test,
+                                                             CONFIG["area_range_test"])
+    
+    # Generating training megaplots
+    EVA_raw_megaplot_train = plot_data_all[~plot_data_all.index.isin(used_plots)]
+    logging.info("Compiling megaplot train dataset...")
+    nb_megaplots_train = min(CONFIG["megaplot_train_size"] * len(EVA_raw_megaplot_train), CONFIG["num_polygon_max"])
+    EVA_megaplot_train, _ = run_megaplot_compilation(EVA_raw_megaplot_train,
                                                     species_dict,
                                                     climate_raster,
                                                     nb_megaplots_train,
                                                     CONFIG["area_range_train"])
-        
-        EVA_megaplot_test_hab["type"] = "EVA_megaplot_test"
-        EVA_megaplot_train_hab["type"] = "EVA_megaplot_train"
-        
-        # Save checkpoint
-        compiled_data = pd.concat([EVA_megaplot_test_hab, EVA_megaplot_train_hab], ignore_index=True, verify_integrity=True)
-        checkpoint_path = output_file_path / f"eva_chelsa_megaplot_data_checkpoint_{hab}.gpkg"
-        compiled_data.to_file(checkpoint_path)
-        logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
-        
-        megaplot_ar.append(compiled_data)
-
-    # aggregating results and final save
-    megaplot_data = pd.concat(megaplot_ar + [EVA_raw_test], ignore_index=True, verify_integrity=True)
-
+    
+    EVA_megaplot_test["test"] = True
+    EVA_megaplot_train["test"] = False
+    
+    # Save checkpoint
+    megaplot_data = pd.concat([EVA_megaplot_test, EVA_megaplot_train], ignore_index=True, verify_integrity=True)
+    
     # export the full compilation to pickle
     output_path = output_file_path / "eva_chelsa_megaplot_data.pkl"
     logging.info(f"Exporting {output_path}")
@@ -316,13 +270,8 @@ if __name__ == "__main__":
                    config=CONFIG)
     
     # exporting megaplot_data to gpkg
-    output_path = output_file_path / "eva_chelsa_megaplot_data.pkg"
+    output_path = output_file_path / "eva_chelsa_megaplot_data.gpkg"
     logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
-    
-    # exporting raw plot data to gpkg
-    output_path = CONFIG["output_file_path"] / "eva_chelsa_plot_data.gpkg"
-    logging.info(f"Exporting {output_path}")
-    plot_data_all.to_file(output_path, driver="GPKG")
     
     logging.info(f'Full compilation saved at {CONFIG["output_file_path"]}.')
