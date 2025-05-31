@@ -176,10 +176,10 @@ if len(df_test) > 0:
     ax.legend()
 
     # Add text with fit information
-    # ax.text(0.05, 0.8, f"Logistic parameters: a={a:.1f}, b={b:.3f}, c={c:.1f}\n"
-    #                     f"Predicted SR: {predicted_sr:.1f}\n"
-    #                     f"GIFT observed SR: {gift_observed_sr}",
-    #         transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.8))
+    ax.text(0.05, 0.8, f"Weibull parameters: b={b:.3f}, c={c:.1f}, d={d:.1f}, e={e:.1f}\n"
+                        f"Predicted SR: {predicted_sr:.1f}\n"
+                        f"GIFT observed SR: {gift_observed_sr}",
+            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.8))
 
     plt.tight_layout()
     plt.show()

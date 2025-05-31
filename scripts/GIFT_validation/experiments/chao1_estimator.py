@@ -45,7 +45,7 @@ CONFIG = {
         "bio15",
     ],
     "crs": "EPSG:3035",
-    "gift_data_dir": Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered", # TODO: work in progress
+    "gift_data_dir": Path(__file__).parent / "../../../data/processed/GIFT/preprocessing/unfiltered", # TODO: work in progress
 }
 
 # Define covariate feature names based on environmental covariates
