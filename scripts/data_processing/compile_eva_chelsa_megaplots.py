@@ -274,4 +274,4 @@ if __name__ == "__main__":
     logging.info(f"Exporting {output_path}")
     megaplot_data.to_file(output_path, driver="GPKG")
     
-    logging.info(f'Full compilation saved at {CONFIG["output_file_path"]}.')
+    logging.info(f'Full compilation saved at {output_file_path}.')

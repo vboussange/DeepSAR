@@ -110,7 +110,7 @@ class Trainer:
 
         for epoch in range(n_epochs):
             train_loss, val_loss = self.train_step()
-            print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}") #todo: change for print
+            print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
             metric_log = {}
             # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
             loader, name = self.test_loader, "test"
@@ -120,7 +120,7 @@ class Trainer:
             for m in metrics:
                 metric_value = eval(m)(target_trs, pred_trs)
                 metric_log[name + "_" + m] = metric_value
-                print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}") #todo: change for print
+                print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}")
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -133,7 +133,6 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    # TODO: it feels like there is a problem : The training loss and validation loss do not return the same number, although they should after the model has converged
     from sklearn.preprocessing import StandardScaler
     from sklearn.metrics import mean_squared_error, r2_score
     from torch.utils.data import DataLoader, TensorDataset

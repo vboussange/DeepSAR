@@ -36,7 +36,6 @@ class Config:
     device: str
     batch_size: int = 1024
     num_workers: int = 10
-    test_size: float = 0.1
     val_size: float = 0.1
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
@@ -50,9 +49,7 @@ class Config:
     run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL]) # [16, 16, 16] # [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7] # [2**8, 2**8, 2**8, 2**8, 2**8, 2**8, 2**6, 2**4]
-    # test_partitions: list = field(default_factory=lambda: [684, 546, 100, 880, 1256, 296]) # ["T1", "T3", "R1", "R2", "Q5", "Q2", "S2", "S3", "all"]
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
-    path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
 
 
 def train_and_evaluate_ensemble(config, df):
@@ -62,10 +59,7 @@ def train_and_evaluate_ensemble(config, df):
     climate_features = climate_vars + std_climate_vars
     predictors = ["log_area", "log_megaplot_area"] + climate_features
             
-    train_val_idx, test_idx = train_test_split(df.index,
-                                            test_size= config.test_size,
-                                            random_state=config.seed)
-    gdf_train_val = df.loc[train_val_idx]
+    gdf_train_val = df[df["test"] == False]
     train_val_loader, feature_scaler, target_scaler = create_dataloader(gdf_train_val, predictors, config.batch_size, config.num_workers)
 
     models = []
@@ -73,24 +67,25 @@ def train_and_evaluate_ensemble(config, df):
     for ensemble_idx in range(config.n_ensembles):
         logger.info(f"Training model {ensemble_idx + 1}/{config.n_ensembles}")
 
-        # Set random seeds for reproducibility
+        # train val test split
         torch.manual_seed(config.seed + ensemble_idx)
         np.random.seed(config.seed + ensemble_idx)
         random.seed(config.seed + ensemble_idx)
 
-        train_idx, val_idx = train_test_split(train_val_idx,
+        train_idx, val_idx = train_test_split(gdf_train_val.index,
                                             test_size=config.val_size,
                                             random_state=config.seed + ensemble_idx,)
-        gdf_train, gdf_val, gdf_test = df.loc[train_idx], df.loc[val_idx], df.loc[test_idx]
+        gdf_train, gdf_val, gdf_test = gdf_train_val.loc[train_idx], gdf_train_val.loc[val_idx], df[df["test"] == True]
 
         train_loader, _, _ = create_dataloader(gdf_train, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
         val_loader, _, _ = create_dataloader(gdf_val, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
         test_loader, _, _ = create_dataloader(gdf_test, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler)
 
-        e0 = train_val_loader.dataset[0,:].median()
-        c0 = train_val_loader.dataset[1,:].max()
-        d0 = train_val_loader.dataset[1,:].min()
-        p0 = [1, min(y), max(y), e0]
+        # Model initialization 
+        e0 = train_val_loader.features[0,:].median()
+        c0 = train_val_loader.targets.max()
+        d0 = train_val_loader.targets.min()
+        p0 = [1e-1, c0, d0, e0]
         model = Neural4PWeibull(len(predictors), config.layer_sizes, p0)
 
         trainer = Trainer(config=config, 
@@ -145,16 +140,10 @@ if __name__ == "__main__":
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
     
-    augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
-                                         path_gift_data = config.path_gift_data,
-                                         seed = config.seed)
+    eva_dataset = gpd.read_file(config.path_eva_data)
     
-    
-    logger.info(f"Training ensemble model with habitat {hab}")
-    df = augmented_dataset.compile_training_data(hab)
-    results = train_and_evaluate_ensemble(config, df)
-    results_all[hab] = results
+    results = train_and_evaluate_ensemble(config, eva_dataset)
 
-    results_all["config"] = config
+    results["config"] = config
     logger.info(f"Saving results in {config.run_folder}")
-    torch.save(results_all, config.run_folder / f"{config.run_name}.pth")
+    torch.save(results, config.run_folder / f"{config.run_name}.pth")

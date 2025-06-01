@@ -51,7 +51,6 @@ HASH = "fb8bc71"
 class Config:
     batch_size: int = 1024
     num_workers: int = 0
-    k_folds: int = 10 #todo: to change
     n_epochs: int = 100 #todo: to change
     lr: float = 5e-3
     lr_scheduler_factor: float = 0.5
