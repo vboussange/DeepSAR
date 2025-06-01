@@ -48,7 +48,7 @@ class CustomDataLoader(Dataset):
 
 def scale_features_targets(gdf, predictors, feature_scaler=None, target_scaler=None):
     features = gdf[predictors].values.astype(np.float32)
-    target = gdf["log_sr"].values.astype(np.float32)
+    target = gdf["sr"].values.astype(np.float32)
 
     if feature_scaler is None:
         feature_scaler, target_scaler = MinMaxScaler(), MinMaxScaler()

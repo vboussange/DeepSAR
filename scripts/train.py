@@ -1,5 +1,5 @@
 """
-Training ensemble model for the different datasets.
+Training ensemble models.
 """
 
 
@@ -46,7 +46,7 @@ class Config:
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     n_ensembles: int = 5  # Number of models in the ensemble
-    run_name: str = f"checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}"
+    run_name: str = f"checkpoint_{MODEL}_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet"
