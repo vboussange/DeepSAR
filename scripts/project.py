@@ -62,6 +62,12 @@ def create_features(predictor_labels, climate_dataset, res):
         
 # we use batches, otherwise model and data may not fit in memory
 def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=4096):
+    """
+    Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
+    dataset at a specified resolution. dSR is obtained as a gradient of SR with
+    respect to log_megaplot_area. Does not account for changes in climate
+    features with area.
+    """
     mean_log_SR_list = []
     std_log_SR_list = []
     dlogSR_dlogA_list = []
@@ -77,7 +83,7 @@ def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, t
             X = features.iloc[i:i+current_batch_size,:]
             X = feature_scaler.transform(X.values)
             X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-            ys = [m(X) for m in model.models]
+            ys = [m.predict_sr(X) for m in model.models]
             log_SRs = [np.exp(target_scaler.inverse_transform(y.cpu().numpy())) for y in ys]
             mean_log_SR = np.mean(log_SRs, axis=0)
             std_log_SR = np.std(log_SRs, axis=0)
@@ -87,7 +93,7 @@ def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, t
         # grad: dSR/dA, getting predictions without statistics
         X = X.requires_grad_(True)
         log_SR = model(X)
-        dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,:2].sum(axis=1)
+        dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,0].sum(axis=1)
         dlogSR_dlogA_list.append(dlogSR_dlogA)
         
     mean_log_SR = np.concatenate(mean_log_SR_list, axis=0)

@@ -51,18 +51,43 @@ class Neural4PWeibull(nn.Module):
         x = self.last_fully_connected(x)
         
         # Extract and constrain parameters
-        b = x[:, 0]
-        c = x[:, 1]
-        d = c - F.softplus(x[:, 2])  # Ensure d < c
-        e = F.softplus(x[:, 3])      # Ensure e > 0
+        b = x[:, 0:1]
+        c = x[:, 1:2]
+        d = c - F.softplus(x[:, 2:3])  # Ensure d < c
+        e = F.softplus(x[:, 3:4])      # Ensure e > 0
         return b, c, d, e
 
     def forward(self, x):
-        log_aplot, features = x[:, 0], x[:, 1:]
+        log_aplot, features = x[:, :1], x[:, 1:]
         b, c, d, e = self.predict_b_c_d_e(features)
         sr = F.softplus(self.weibull_4p(log_aplot, b, c, d, e))
         # log_sr = torch.log(sr)
         return sr
+    
+    def predict_sr(self, x):
+        """
+        Predicts asymptotic SR from features. `log_aplot` should not appear in `x`.
+        """
+        b, c, d, e = self.predict_b_c_d_e(x)
+        sr = F.softplus(e)
+        return sr
+    
+class MSELogLoss(nn.Module):
+    def __init__(self, reduction='mean'):
+        super(MSELogLoss, self).__init__()
+        self.reduction = reduction
+        
+    def forward(self, input, target):
+        log_input = torch.log(torch.clamp(input, min=1e-8))
+        log_target = torch.log(torch.clamp(target, min=1e-8))
+        loss = (log_input - log_target) ** 2
+        
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
 
 if __name__ == "__main__":
     import torch.optim as optim
@@ -119,7 +144,7 @@ if __name__ == "__main__":
     y_tensor = torch.tensor(y, dtype=torch.float32)
 
     # Model, loss, optimizer
-    criterion = nn.MSELoss()
+    criterion = MSELogLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     # Training loop

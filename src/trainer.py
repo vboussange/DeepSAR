@@ -72,13 +72,8 @@ class Trainer:
         for X, y in self.train_loader:
             X, y = X.to(self.device), y.to(self.device)
             self.optimizer.zero_grad()
-            if isinstance(self.compute_loss, torch.nn.MSELoss):
-                outputs = self.model(X)
-                batch_loss = self.compute_loss(outputs, y)
-            else:
-                X = X.requires_grad_(True)
-                outputs = self.model(X)
-                batch_loss = self.compute_loss(self.model, outputs, X, y)
+            outputs = self.model(X)
+            batch_loss = self.compute_loss(outputs, y)
 
             batch_loss.backward()
             self.optimizer.step()
@@ -89,13 +84,8 @@ class Trainer:
         val_loss = 0.0
         for X, y in self.val_loader:
             X, y = X.to(self.device), y.to(self.device)
-            if isinstance(self.compute_loss, torch.nn.MSELoss):
-                    outputs = self.model(X)
-                    batch_loss = self.compute_loss(outputs, y)
-            else:
-                X = X.requires_grad_(True)
-                outputs = self.model(X)
-                batch_loss = self.compute_loss(self.model, outputs, X, y)
+            outputs = self.model(X)
+            batch_loss = self.compute_loss(outputs, y)
             val_loss +=  batch_loss.item() * X.size(0)
         avg_val_loss = val_loss / len(self.val_loader.dataset)
         
@@ -112,7 +102,7 @@ class Trainer:
             train_loss, val_loss = self.train_step()
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
             metric_log = {}
-            # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]):
+            # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]): # TODO: to modify
             loader, name = self.test_loader, "test"
             targets, preds = self.get_model_predictions(loader)
             pred_trs = self.target_scaler.inverse_transform(preds)

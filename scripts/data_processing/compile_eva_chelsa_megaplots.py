@@ -270,8 +270,8 @@ if __name__ == "__main__":
                    config=CONFIG)
     
     # exporting megaplot_data to gpkg
-    output_path = output_file_path / "eva_chelsa_megaplot_data.gpkg"
+    output_path = output_file_path / "eva_chelsa_megaplot_data.parquet"
     logging.info(f"Exporting {output_path}")
-    megaplot_data.to_file(output_path, driver="GPKG")
+    megaplot_data.to_parquet(output_path)
     
     logging.info(f'Full compilation saved at {output_file_path}.')
