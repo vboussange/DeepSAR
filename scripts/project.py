@@ -2,17 +2,12 @@
 Projecting spatially MLP and saving to geotiff files.
 """
 import torch
-import pickle
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 from train import Config
-from src.ensemble_model import initialize_ensemble_model
-import get_true_sar
 from pathlib import Path
-from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from src.data_processing.utils_env_pred import CHELSADataset
-from src.dataset import AugmentedDataset, create_dataloader
+from src.neural_4pweibull import initialize_ensemble_model
 import pandas as pd
 from tqdm import tqdm
 
@@ -57,20 +52,19 @@ def create_features(predictor_labels, climate_dataset, res):
     df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
     X_map = pd.concat([df_mean, df_std], axis=1)
     
-    X_map = X_map.assign(log_area=np.log(res**2), log_megaplot_area=np.log(res**2))
+    X_map = X_map.assign(log_observed_area=np.log(res**2), log_megaplot_area=np.log(res**2))
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=4096):
+def get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler, batch_size=4096):
     """
     Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
     dataset at a specified resolution. dSR is obtained as a gradient of SR with
     respect to log_megaplot_area. Does not account for changes in climate
     features with area.
     """
-    mean_log_SR_list = []
-    std_log_SR_list = []
-    dlogSR_dlogA_list = []
+    mean_SR_list = []
+    std_SR_list = []
     features = create_features(predictors, climate_dataset, res)
     total_length = len(features)
 
@@ -83,23 +77,16 @@ def get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, t
             X = features.iloc[i:i+current_batch_size,:]
             X = feature_scaler.transform(X.values)
             X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-            ys = [m.predict_sr(X) for m in model.models]
-            log_SRs = [np.exp(target_scaler.inverse_transform(y.cpu().numpy())) for y in ys]
-            mean_log_SR = np.mean(log_SRs, axis=0)
-            std_log_SR = np.std(log_SRs, axis=0)
-            mean_log_SR_list.append(mean_log_SR)
-            std_log_SR_list.append(std_log_SR)
+            ys = [m.predict_sr(X[:, 1:]) for m in model.models] # predicting asymptote, no need to feed log_observed_area
+            SRs = [target_scaler.inverse_transform(y.cpu().numpy()) for y in ys]
+            mean_SR = np.mean(SRs, axis=0)
+            std_SR = np.std(SRs, axis=0)
+            mean_SR_list.append(mean_SR)
+            std_SR_list.append(std_SR)
         
-        # grad: dSR/dA, getting predictions without statistics
-        X = X.requires_grad_(True)
-        log_SR = model(X)
-        dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,0].sum(axis=1)
-        dlogSR_dlogA_list.append(dlogSR_dlogA)
-        
-    mean_log_SR = np.concatenate(mean_log_SR_list, axis=0)
-    std_log_SR = np.concatenate(std_log_SR_list, axis=0)
-    dlogSR_dlogA = np.concatenate(dlogSR_dlogA_list, axis=0)    
-    return features, mean_log_SR, std_log_SR, dlogSR_dlogA
+    mean_SR = np.concatenate(mean_SR_list, axis=0)
+    std_SR = np.concatenate(std_SR_list, axis=0)
+    return features, mean_SR, std_SR
         
         
 def load_chelsa_and_reproject(predictors):
@@ -110,41 +97,27 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     seed = 1
-    MODEL = "large"
+    MODEL_NAME = "MSEfit_large_0b85791"
     HASH = "fb8bc71"
     
-    projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{HASH}")
+    projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{MODEL_NAME}")
     projection_path.mkdir(parents=True, exist_ok=True)
     
-    path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")
-    results_fit_split_all = torch.load(path_results, map_location="cpu")
-    config = results_fit_split_all["config"]
-    results_fit_split = results_fit_split_all["all"]
-    augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
-                                         path_gift_data = config.path_gift_data,
-                                         seed = config.seed)
-    df = augmented_dataset.compile_training_data("all")
-    # proportion_area = df[df["type"]=="GIFT"]["area"].mean() / df[df["type"]=="GIFT"]["megaplot_area"].mean() #TODO: this is to be modified
-
-    # TODO: this should be in `results_fit_split`, next commit should fix this
-    climate_vars = config.climate_variables
-    std_climate_vars = ["std_" + env for env in climate_vars]
-    climate_features = climate_vars + std_climate_vars
-    results_fit_split["predictors"] = ["log_area", "log_megaplot_area"] + climate_features
-    
-    model = initialize_ensemble_model(results_fit_split, config, "cuda")
-    
+    path_results = Path(__file__).parent / Path(f"results/train_seed_1/checkpoint_{MODEL_NAME}.pth")
+    results_fit_split = torch.load(path_results, map_location="cpu")
+    config = results_fit_split["config"]    
 
     predictors = results_fit_split["predictors"]
     feature_scaler = results_fit_split["feature_scaler"]
     target_scaler = results_fit_split["target_scaler"]
     
+    model = initialize_ensemble_model(results_fit_split["ensemble_model_state_dict"], predictors, config)
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 
     for res in [100000, 10000, 1000, 100, ]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
-        features, SR, std_SR, dlogSR_dlogA = get_SR_std_SR_dSR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
+        features, SR, std_SR = get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
         SR_rast = create_raster(features, SR)
         SR_rast.rio.to_raster(projection_path / f"SR_raster_{res:.0f}m.tif")
@@ -152,6 +125,4 @@ if __name__ == "__main__":
         std_SR_rast = create_raster(features, std_SR)
         std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{res:.0f}m.tif")
         
-        dlogSR_dlogA_rast = create_raster(features, dlogSR_dlogA)
-        dlogSR_dlogA_rast.rio.to_raster(projection_path / f"dlogSR_dlogA_raster_{res:.0f}m.tif")
         print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {projection_path}")

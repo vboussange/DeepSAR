@@ -11,7 +11,7 @@ import json
 
 from src.data_processing.utils_landcover import EUNISDataset
 
-GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/anonymised"
+GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered"
 
 class GIFTDataset:
     def __init__(self, data_dir=GIFT_DATA_DIR):
@@ -30,7 +30,7 @@ class GIFTDataset:
             species_gdf = species_df.groupby("entity_ID")
             species_dict = {}
             for k, v in tqdm(species_gdf, desc="Processing species data"):
-                species_dict[k] = list(v["anonymised_species_name"].unique())
+                species_dict[k] = list(v["gift_matched_species_name"].unique())
             json.dump(species_dict, open(species_dict_path, "w"))
             return species_dict
         else:

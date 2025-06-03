@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from src.ensemble_model import EnsembleModel
 # TODO: work in progress
 
 
@@ -58,7 +59,7 @@ class Neural4PWeibull(nn.Module):
     def forward(self, x):
         log_aplot, features = x[:, :1], x[:, 1:]
         b, c, d, e = self.predict_b_c_d_e(features)
-        sr = self.weibull_4p(log_aplot, b, c, d, e).squeeze()
+        sr = self.weibull_4p(log_aplot, b, c, d, e)
         # log_sr = torch.log(sr)
         return sr
     
@@ -85,6 +86,16 @@ class MSELogLoss(nn.Module):
             return loss.sum()
         else:
             return loss
+        
+def initialize_ensemble_model(model_state, predictors, config, device="cuda"):
+    """Load the model and scalers from the saved checkpoint."""
+    models = [Neural4PWeibull(len(predictors)-1, config.layer_sizes, np.ones(4)) for _ in range(config.n_ensembles)]
+    model = EnsembleModel(models)
+    
+    model.load_state_dict(model_state)
+    model = model.to(device)
+    model.eval()
+    return model
 
 if __name__ == "__main__":
     import torch.optim as optim
