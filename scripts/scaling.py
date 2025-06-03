@@ -62,15 +62,14 @@ class Config:
             "bio15",
         ]
     )
-    run_name: str = ""
+    run_name: str = "benchmark_" + HASH
     run_folder: Path = None
     path_eva_data: Path = None
     path_gift_data: Path = None
 
     def __post_init__(self):
         root = Path(__file__).parent
-        self.run_name = f"{root.name}_{self.hash_data}"
-        self.run_folder = root / "results" / self.run_name
+        self.run_folder = Path(root, 'results', f"{Path(__file__).stem}")
         self.run_folder.mkdir(parents=True, exist_ok=True)
         self.path_eva_data = (
             root
@@ -275,7 +274,6 @@ if __name__ == "__main__":
                 {
                     "model": name,
                     "run": run_id,
-                    "layers": arch,
                     "train_frac": frac,
                     "num_params": out["num_params"],
                     "r2_eva": out["r2_eva"][run_id],

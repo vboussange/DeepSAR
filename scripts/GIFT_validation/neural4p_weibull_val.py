@@ -30,7 +30,9 @@ def load_and_preprocess_data():
     
     print("Loading GIFT data...")
     gift_dataset = gpd.read_parquet(gift_data_dir/ "megaplot_data.parquet")
-    
+    # gift_dataset = gift_dataset[gift_dataset.geometry.is_valid] #TODO: to place in the preprocessing script
+    # # Filter GIFT dataset to only include geometries that intersect with EVA dataset
+    # gift_dataset = gift_dataset[gift_dataset.geometry.intersects(eva_dataset.unary_union)]
     
     return (eva_dataset, eva_species_dict), gift_dataset, result_modelling
 
@@ -61,8 +63,8 @@ gift_dataset["predicted_sr"] = y_pred.squeeze()
 
 fig, ax = plt.subplots()
 mask0 = gift_dataset[["sr", "predicted_sr"]].dropna()
-x = np.log(mask0["sr"])
-y = np.log(mask0["predicted_sr"])
+x = mask0["sr"]
+y = mask0["predicted_sr"]
 
 ax.scatter(x, y, alpha=0.7)
 max_val = np.nanmax([x.max(), y.max()])

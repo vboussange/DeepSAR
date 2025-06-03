@@ -175,7 +175,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     config = Config(device=device)
-    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_seed_{config.seed}")
+    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
     eva_dataset = gpd.read_parquet(config.path_eva_data)
@@ -190,30 +190,6 @@ if __name__ == "__main__":
 
     ensemble_trainer = EnsembleTrainer(config, eva_dataset, devices=devices)
     results = ensemble_trainer.run(predictors)
-
-    results["config"] = config
-    logger.info(f"Saving results in {config.run_folder}")
-    torch.save(results, config.run_folder / f"{config.run_name}.pth")
-        
-if __name__ == "__main__":
-    if torch.cuda.is_available():
-        device = "cuda:0"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
-
-    config = Config(device=device)
-    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_seed_{config.seed}")
-    config.run_folder.mkdir(exist_ok=True, parents=True)
-    
-    eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset = eva_dataset.dropna() #TODO: to improve
-    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
-    # eva_dataset["log_sr"] = np.log(eva_dataset["sr"])
-
-    results = train_and_evaluate_ensemble(config, eva_dataset)
 
     results["config"] = config
     logger.info(f"Saving results in {config.run_folder}")
