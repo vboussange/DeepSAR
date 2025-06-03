@@ -12,17 +12,19 @@ import sys
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.model_selection import GroupShuffleSplit, GroupKFold
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error, d2_absolute_error_score
+
 import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
 from joblib import Parallel, delayed
 import geopandas as gpd
 
-from src.neural_4pweibull import MLP, MSELogLoss
-from src.dataset import create_dataloader, AugmentedDataset
-from src.plotting import read_result
+from src.dataset import create_dataloader
 from src.trainer import Trainer
+from src.neural_4pweibull import Neural4PWeibull
+
 # TODO: can we use logging.info instead of logger.info?
 def setup_logger():
     logger = logging.getLogger()
@@ -44,212 +46,247 @@ MODEL_ARCHITECTURE = {
                       "large": [2**11, 2**11, 2**11, 2**11, 2**11, 2**11, 2**9, 2**7],
                         }
 MODEL = "large"
-HASH = "fb8bc71" 
+HASH = "0b85791" 
 @dataclass
 class Config:
+    device: str
     batch_size: int = 1024
-    num_workers: int = 0
-    n_epochs: int = 100 #todo: to change
-    lr: float = 5e-3
-    lr_scheduler_factor: float = 0.5
-    lr_scheduler_patience: int = 20
-    weight_decay: float = 1e-3
+    num_workers: int = 10
+    n_epochs: int = 1 #todo: to change
     val_size: float = 0.2
-    seed: int = 2
+    lr: float = 1e-4
+    lr_scheduler_factor: float = 0.5
+    lr_scheduler_patience: int = 5
+    weight_decay: float = 1e-4
+    seed: int = 1
+    hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    run_name: str = f"checkpoint_{MODEL}_model_cross_validation_{HASH}"
+    run_name: str = f"checkpoint_{MODEL}_ablation_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: MODEL_ARCHITECTURE[MODEL])
-    path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_augmented_data.pkl"
-    path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/{HASH}/megaplot_data.gpkg"
+    path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet"
+    path_gift_data: str = Path(__file__).parent / f"../data/processed/GIFT_CHELSA_compilation/6c2d61d/megaplot_data.parquet"
 
 
-class ParallelCrossValidator:
+class Benchmark:
     def __init__(self, config: Config):
         self.config = config
-        self.augmented_dataset = AugmentedDataset(path_eva_data = config.path_eva_data,
-                                                path_gift_data = config.path_gift_data,
-                                                seed = config.seed)
+        eva_data = pd.read_parquet(config.path_eva_data)
+        eva_data["log_megaplot_area"] = np.log(eva_data["megaplot_area"])
+        eva_data["log_observed_area"] = np.log(eva_data["megaplot_area"])
+        eva_data = eva_data.replace([np.inf, -np.inf], np.nan).dropna()
+        self.eva_data = eva_data
+        gift_data = gpd.read_parquet(config.path_gift_data)
+        gift_data["log_megaplot_area"] = np.log(gift_data["megaplot_area"])
+        gift_data["log_observed_area"] = np.log(gift_data["megaplot_area"])
+        gift_data = gift_data.replace([np.inf, -np.inf], np.nan).dropna()
+        self.gift_data = gift_data
         self.devices = ["cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5"]
+        self.nruns = 5  # Number of runs for each fold
 
-    def run_CV_for_habitat(self, hab):
-        climate_vars = self.config.climate_variables
-        std_climate_vars = ["std_" + env for env in climate_vars]
-        climate_features = climate_vars + std_climate_vars
-        num_climate_features = len(climate_features)
-
-        model_list = {
-            "area": (MLP(2, config.layer_sizes), ["log_area", "log_megaplot_area"], MSELogLoss()),
-            "climate": (MLP(num_climate_features, config.layer_sizes), climate_features, MSELogLoss()),
-            "area+climate": (MLP(num_climate_features + 2, config.layer_sizes), ["log_area", "log_megaplot_area"] + climate_features, MSELogLoss()),
-        }
-
-        gdf = self.augmented_dataset.compile_training_data(hab)
-
-        cv_results = {}
-        for predictors_name, (model, predictors, compute_loss, agnostic) in model_list.items():
-            gdf_train_val, gdf_test = (self.augmented_dataset.compile_training_data("all"), gdf) if agnostic else (gdf, gdf)
-
-            logger.info(f"Training model with predictors: {predictors_name}")
-
-            res = self.train_and_evaluate(
-                model,
-                predictors,
-                compute_loss,
-                gdf_train_val,
-                gdf_test,
-            )
-            cv_results[predictors_name] = res
-        return cv_results
-        
-    
-    def train_and_evaluate(self, model, predictors, compute_loss, gdf_train_val, gdf_test):
-        kfold = GroupKFold(n_splits=self.config.k_folds)
+    def run(self, predictors, layer_sizes, compute_loss, train_size):
 
         results = Parallel(n_jobs=len(self.devices))(
             delayed(self.train_and_evaluate_fold)(
-                train_idx,
-                test_idx,
-                gdf_train_val,
-                gdf_test,
-                model,
-                predictors,
-                compute_loss,
-                self.devices[fold % len(self.devices)], 
-            )
-            for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
-        )
-        
-        # results = [
-        #     self.train_and_evaluate_fold(
-        #     train_idx,
-        #     test_idx,
-        #     gdf_train_val,
-        #     gdf_test,
-        #     model,
-        #     predictors,
-        #     compute_loss,
-        #     optimizer_cls,
-        #     scheduler_cls,
-        #     self.devices[fold % len(self.devices)], 
-        #     fold
-        #     )
-        #     for fold, (train_idx, test_idx) in enumerate(kfold.split(gdf_train_val, groups=gdf_train_val.partition))
-        # ]
+                predictors = predictors,
+                compute_loss = compute_loss,
+                layer_sizes = layer_sizes,
+                train_size = train_size,
+                seed = i,
+                device = self.devices[i % len(self.devices)], 
+            ) for i in range(self.nruns))
 
-        aggregated_results = {key: [result[key] for result in results] for key in results[0]}
-        aggregated_results["predictors"] = predictors
+
+        # compute number of parameters
+        model = Neural4PWeibull(len(predictors) - 1, layer_sizes, np.ones(4))
+        num_params = sum(p.numel() for p in model.parameters())
+        del model  # Free memory
+        
+        aggregated_results = {
+            "logs": [result["log"] for result in results],
+            "r2_test_eva": [result["r2_test_eva"] for result in results],
+            "d2_test_eva": [result["d2_test_eva"] for result in results],
+            "rmse_test_eva": [result["rmse_test_eva"] for result in results],
+            "r2_test_gift": [result["r2_test_gift"] for result in results],
+            "d2_test_gift": [result["d2_test_gift"] for result in results],
+            "rmse_test_gift": [result["rmse_test_gift"] for result in results],
+            "num_params": num_params,
+        }
 
         return aggregated_results
     
-    def train_and_evaluate_fold(self, train_idx, test_idx, gdf_train_val, gdf_test, model, predictors, compute_loss, device):
-        torch.cuda.set_device(device)
-        model = copy.deepcopy(model)
-
-        gdf_train_val_fold = gdf_train_val.iloc[train_idx]
-        ttrain_idx, val_idx = next(GroupShuffleSplit(test_size=self.config.val_size, random_state=self.config.seed).split(gdf_train_val_fold, groups=gdf_train_val_fold.partition))
-        gdf_train_fold = gdf_train_val_fold.iloc[ttrain_idx]
-        gdf_val_fold = gdf_train_val_fold.iloc[val_idx]
+    def train_and_evaluate_fold(self, 
+                                predictors, 
+                                layer_sizes,
+                                compute_loss,
+                                train_size,
+                                seed,
+                                device):
         
-        val_partitions = gdf_val_fold.partition.unique()
-        # NOTE: we gather partitions that must be used for test set, and define the test 
-        # dataset with gdf_test. This is essential to cover the agnostic model case (no use otherwise)
-        test_partitions = gdf_train_val.iloc[test_idx].partition.unique()
-        test_idx_fold = gdf_test.partition.isin(test_partitions)
-        gdf_test_fold = gdf_test[test_idx_fold]
+        eva_gdf_test, eva_gdf_train_val = self.eva_data[self.eva_data["test"] == True].copy(), self.eva_data[self.eva_data["test"] == False].copy()
+        eva_gdf_train_val = eva_gdf_train_val.sample(frac=train_size, random_state=seed)
+        train_idx, val_idx = train_test_split(eva_gdf_train_val.index,
+                                    test_size=self.config.val_size,
+                                    random_state=seed)
+        gdf_train, gdf_val = eva_gdf_train_val.loc[train_idx], eva_gdf_train_val.loc[val_idx]
+        train_loader, feature_scaler, target_scaler = create_dataloader(gdf_train, predictors, self.config.batch_size, self.config.num_workers)
+        val_loader, _, _ = create_dataloader(gdf_val, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
 
-        train_loader, feature_scaler, target_scaler = create_dataloader(gdf_train_fold, predictors, self.config.batch_size, self.config.num_workers)
-        val_loader, _, _ = create_dataloader(gdf_val_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
-        test_loader, _, _ = create_dataloader(gdf_test_fold, predictors, self.config.batch_size, self.config.num_workers, feature_scaler, target_scaler)
+        # Model initialization 
+        e0 = train_loader.dataset.features[:,0].median()
+        c0 = train_loader.dataset.targets.max()
+        d0 = train_loader.dataset.targets.min()
+        p0 = [1e-1, c0, d0, e0]
+        model = Neural4PWeibull(len(predictors)-1, layer_sizes, p0)
 
-        trainer = Trainer(config=config, 
+        trainer = Trainer(config=self.config, 
                           model=model, 
                           feature_scaler=feature_scaler, 
                           target_scaler=target_scaler, 
                           train_loader=train_loader, 
                           val_loader=val_loader, 
-                          test_loader=test_loader, 
                           compute_loss=compute_loss,
                           device=device)
         
-        best_model, best_metrics = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
+        best_model, log = trainer.train(n_epochs=self.config.n_epochs)
+        best_model.eval()
 
-        results = {
-            # "train_loss": best_metrics['train_mean_squared_error'],
-            # "val_MSE": best_metrics['val_mean_squared_error'],
-            "test_MSE": best_metrics['test_mean_squared_error'],
-            "test_R2": best_metrics['test_r2_score'],
-            "test_partition": test_partitions.tolist(),
-            "val_partition": val_partitions.tolist(),
-            "model_state_dict": best_model.state_dict(),
-            "feature_scaler": feature_scaler,
-            "target_scaler": target_scaler
+        
+        # evaluating model predictions against EVA test set
+        X = eva_gdf_test[predictors].copy()
+        X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
+        with torch.no_grad():
+            y_pred = best_model(X).numpy()
+            y_pred = target_scaler.inverse_transform(y_pred).squeeze()
+        y_true = eva_gdf_test["sr"].values
+        
+        r2_test_eva = r2_score(y_true, y_pred)
+        d2_test_eva = d2_absolute_error_score(y_true, y_pred)
+        rmse_test_eva = np.sqrt(mean_squared_error(y_true, y_pred))
+
+        # evaluating model predictions against GIFT test set
+        X = self.gift_data[predictors].copy()
+        X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
+        X = X[:,1:] # removing the log_observed_area feature
+        with torch.no_grad():
+            y_pred = best_model.predict_sr(X).numpy()
+            y_pred = target_scaler.inverse_transform(y_pred).squeeze()
+        y_true = self.gift_data["sr"].values
+        
+        r2_test_gift = r2_score(y_true, y_pred)
+        d2_test_gift = d2_absolute_error_score(y_true, y_pred)
+        rmse_test_gift = np.sqrt(mean_squared_error(y_true, y_pred))
+
+        return {
+            "log": log,
+            "r2_test_eva": r2_test_eva,
+            "d2_test_eva": d2_test_eva,
+            "rmse_test_eva": rmse_test_eva,
+            "r2_test_gift": r2_test_gift,
+            "d2_test_gift": d2_test_gift,
+            "rmse_test_gift": rmse_test_gift
         }
 
-        # calculating the test loss for the best model
-        best_model.eval()
-        best_model.to(device)
-        for loss_name, compute_loss in zip(["test_physics_informed_loss", "test_standard_loss"], [CustomMSELoss(self.config.dSRdA_weight), torch.nn.MSELoss()]):
-            val_loss = 0.0
-            for X, y in test_loader:
-                X, y = X.to(device), y.to(device)
-                if isinstance(compute_loss, torch.nn.MSELoss):
-                        outputs = best_model(X)
-                        batch_loss = compute_loss(outputs, y)
-                else:
-                    X = X.requires_grad_(True)
-                    outputs = best_model(X)
-                    batch_loss = compute_loss(best_model, outputs, X, y)
-                    
-                val_loss +=  batch_loss.item() * X.size(0)
-            avg_val_loss = val_loss / len(test_loader.dataset)
-            results[loss_name] = avg_val_loss
-
-
-        return results
-
         
+def generate_symmetric_architecture(n, base_size=32, growth_factor=2):
+    """
+    Generates symmetric hidden layer sizes where capacity increases with n.
+    
+    Args:
+        n: Complexity parameter (higher = more capacity)
+        base_size: Starting number of neurons
+        growth_factor: Multiplier for neuron count scaling
         
+    Returns:
+        List of layer sizes (symmetric and increasing/decreasing)
+    """
+    # Build the first half of layers by geometric growth
+    half = (n + 1) // 2
+    layers = [base_size * (growth_factor ** i) for i in range(half)]
+    # Mirror for symmetry; exclude the middle layer when n is odd
+    mirror_section = layers[:-1] if n % 2 else layers
+    return layers + mirror_section[::-1]
 
 if __name__ == "__main__":
-    config = Config()
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    config = Config(device=device)
     
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     random.seed(config.seed)
     
-    config.run_folder = Path(Path(__file__).parent,'results', f"{Path(__file__).stem}_dSRdA_weight_{config.dSRdA_weight:.0e}_seed_{config.seed}")
+    config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}_seed_{config.seed}")
     config.run_folder.mkdir(exist_ok=True)
     
-    validator = ParallelCrossValidator(config)
+    benchmark = Benchmark(config)
     
-    results_all = {}
-    for hab in config.habitats:
-        logger.info(f"Training models for habitat: {hab}")
-        cv_results = validator.run_CV_for_habitat(hab)
-        results_all[hab] = cv_results
+    climate_vars = config.climate_variables
+    std_climate_vars = ["std_" + env for env in climate_vars]
+    climate_features = climate_vars + std_climate_vars
+    
+    
+    base_architecture = generate_symmetric_architecture(8, base_size=32, growth_factor=4)
+    model_list = {
+            "area": (["log_observed_area", "log_megaplot_area"], 
+                     nn.MSELoss(), 
+                     base_architecture, 
+                     1),
+            "climate": (["log_observed_area"] + climate_features, 
+                        nn.MSELoss(), 
+                        base_architecture, 
+                        1),
+        }
+    for frac in np.logspace(np.log(0.1), np.log(1.0), 5):        
+        model_list["area+climate"] = (["log_observed_area", "log_megaplot_area"] + climate_features, 
+                                                  nn.MSELoss(), 
+                                                  base_architecture,
+                                                  frac)
         
-        # checkpointing
-        save_path = config.run_folder / f"{config.run_name}_{hab}.pth"
-        torch.save(cv_results, save_path)
-        
-    results_all["config"] = config
-    logger.info(f"Saving results in {config.run_folder}")
-    torch.save(results_all, config.run_folder / f"{config.run_name}.pth")
-
-
-
-    # # testing
-    # compiled_data = trainer.compile_training_data("all", config)
-    # import matplotlib.pyplot as plt
-    # plt.figure(figsize=(10, 6))
-    # data = compiled_data["log_megaplot_area"]
-    # # data = np.log(trainer.gift_data["area"])
-    # plt.hist(data, bins=50, log=True, alpha=0.7, color='blue', edgecolor='black')
-    # plt.xlabel("Area")
-    # plt.ylabel("Frequency (log scale)")
-    # plt.title("Distribution of Area")
-    # plt.grid(axis='y', linestyle='--', alpha=0.7)
-    # plt.show()
+    for n in [0, 2, 4, 6]:
+        model_list["area+climate"] = (["log_observed_area", "log_megaplot_area"] + climate_features, 
+                                        nn.MSELoss(), 
+                                        generate_symmetric_architecture(n, base_size=32, growth_factor=4),
+                                        1)
     
     
+    
+results_data = []
+
+for model_name, (predictors, compute_loss, layer_sizes, train_size) in model_list.items():
+    logger.info(f"Running benchmark for {model_name}")
+    
+    results = benchmark.run(
+        predictors=predictors,
+        layer_sizes=layer_sizes,
+        compute_loss=compute_loss,
+        train_size=train_size
+    )
+    
+    # Add results to the list with model information
+    for i in range(benchmark.nruns):
+        results_data.append({
+            'model_name': model_name,
+            'run_id': i,
+            'layer_sizes': str(layer_sizes),
+            'train_size': train_size,
+            'num_params': results['num_params'],
+            'r2_test_eva': results['r2_test_eva'][i],
+            'd2_test_eva': results['d2_test_eva'][i],
+            'rmse_test_eva': results['rmse_test_eva'][i],
+            'r2_test_gift': results['r2_test_gift'][i],
+            'd2_test_gift': results['d2_test_gift'][i],
+            'rmse_test_gift': results['rmse_test_gift'][i]
+        })
+    
+    logger.info(f"Completed {model_name}")
+
+# Create DataFrame and save to CSV
+df_results = pd.DataFrame(results_data)
+csv_path = config.run_folder / "benchmark_results.csv"
+df_results.to_csv(csv_path, index=False)
+logger.info(f"Results saved to {csv_path}")

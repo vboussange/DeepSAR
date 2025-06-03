@@ -36,11 +36,11 @@ class Config:
     device: str
     batch_size: int = 1024
     num_workers: int = 10
+    n_epochs: int = 100
     val_size: float = 0.1
     lr: float = 1e-4
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 5
-    n_epochs: int = 100
     weight_decay: float = 1e-4
     seed: int = 1
     hash_data: str = HASH

@@ -26,9 +26,9 @@ class Trainer:
                  target_scaler,
                  train_loader,
                  val_loader,
-                 test_loader,
                  compute_loss,
-                 device):
+                 test_loader = None,
+                 device = "cpu"):
         
         self.model = model.to(device)
         self.feature_scaler = feature_scaler
