@@ -5,15 +5,12 @@ import torch.nn.functional as F
 # TODO: work in progress
 
 
-class FullyConnectedBatchNormBlock(nn.Module):
+class FullyConnectedBlock(nn.Module):
     def __init__(self, in_features, out_features, **kwargs):
-        super(FullyConnectedBatchNormBlock, self).__init__()
+        super(FullyConnectedBlock, self).__init__()
         self.linear = nn.Linear(in_features, out_features, **kwargs)
-        self.batch_norm = nn.BatchNorm1d(out_features)
-
     def forward(self, x):
         x = self.linear(x)
-        x = self.batch_norm(x)
         x = F.leaky_relu(x)
         return x
     
@@ -23,26 +20,27 @@ class Neural4PWeibull(nn.Module):
         layer_sizes = [n_features] + layer_sizes
         
         self.fully_connected_layers = nn.ModuleList(
-            [FullyConnectedBatchNormBlock(in_f, out_f) for in_f, out_f in zip(layer_sizes[:-1], layer_sizes[1:])])
+            [FullyConnectedBlock(in_f, out_f) for in_f, out_f in zip(layer_sizes[:-1], layer_sizes[1:])])
         
         # last layer corresponds to the parameters of the Weibull function
         self.last_fully_connected = nn.Linear(layer_sizes[-1], 4)
         # p0 corresponds to [b, c, d, e]; need to transform it to [b, c, d_offset, e]
-        p0[2] = p0[2] - p0[1]  # d_offset = d - c
+        p0[2] = p0[1] - p0[2]   # d_offset = c - d
         assert p0[3] > 0, "e must be positive"
         
-        self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
-        nn.init.normal_(self.last_fully_connected.weight, mean=0, std=0.01)
+        # self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
+        # nn.init.xavier_normal_(self.last_fully_connected.weight, gain=0.2)
         
     def weibull_4p(self, x, b, c, d, e):
         """
         4-parameter Weibull function: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - ln(e))))
         """
-    
-        # More stable computation
         log_x = torch.log(torch.clamp(x, min=1e-8))
         log_e = torch.log(torch.clamp(e, min=1e-8))
-        return c + (d - c) * torch.exp(-torch.exp(b * (log_x - log_e)))
+        # Clamp the inner exponential to prevent overflow
+        inner_exp = torch.clamp(b * (log_x - log_e), min=-50, max=50)
+        outer_exp = torch.clamp(-torch.exp(inner_exp), min=-50, max=0)
+        return c + (d - c) * torch.exp(outer_exp)
 
 
     def predict_b_c_d_e(self, x):
@@ -60,7 +58,7 @@ class Neural4PWeibull(nn.Module):
     def forward(self, x):
         log_aplot, features = x[:, :1], x[:, 1:]
         b, c, d, e = self.predict_b_c_d_e(features)
-        sr = F.softplus(self.weibull_4p(log_aplot, b, c, d, e))
+        sr = self.weibull_4p(log_aplot, b, c, d, e).squeeze()
         # log_sr = torch.log(sr)
         return sr
     
@@ -68,9 +66,8 @@ class Neural4PWeibull(nn.Module):
         """
         Predicts asymptotic SR from features. `log_aplot` should not appear in `x`.
         """
-        b, c, d, e = self.predict_b_c_d_e(x)
-        sr = F.softplus(e)
-        return sr
+        _, c, _, _ = self.predict_b_c_d_e(x)
+        return c
     
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
@@ -128,23 +125,14 @@ if __name__ == "__main__":
                          torch.tensor(e_true, dtype=torch.float32))
     y = y.squeeze() + 0.2 * np.random.normal(0, 0.1, size=(n_samples,))
 
-    # Plot the generated targets
-    plt.figure(figsize=(10, 6))
-    plt.plot(log_aplot.squeeze(), y, 'b.', alpha=0.6, label='Generated targets (with noise)')
-    plt.xlabel('aplot')
-    plt.ylabel('y (Weibull output)')
-    plt.title('Generated Weibull Data with Noise')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
-
     # Prepare input tensor
     x = np.concatenate([log_aplot, features], axis=1)
     x_tensor = torch.tensor(x, dtype=torch.float32)
     y_tensor = torch.tensor(y, dtype=torch.float32)
 
     # Model, loss, optimizer
-    criterion = MSELogLoss()
+    criterion = nn.MSELoss()
+    # criterion = MSELogLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     # Training loop

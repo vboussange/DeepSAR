@@ -38,6 +38,7 @@ numba_logger.setLevel(
 )  # see https://stackoverflow.com/questions/65398774/numba-printing-information-regarding-nvidia-driver-to-python-console-when-using
 
 CONFIG = {
+    "gift_data_dir": Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered",
     "output_file_path": Path(
         Path(__file__).parent,
         f"../../data/processed/GIFT_CHELSA_compilation/",
@@ -71,7 +72,7 @@ def load_and_preprocess_data():
     Returns processed GIFT and climate datasets.
     """
     logging.info("Loading EVA data...")
-    plot_gdf, species_dict = GIFTDataset().load()
+    plot_gdf = gpd.read_file(CONFIG["gift_data_dir"] / "plot_data.gpkg")
     logging.info("Loading climate raster...")
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
 
@@ -80,57 +81,26 @@ def load_and_preprocess_data():
     climate_dataset = climate_dataset.rio.reproject(CONFIG["crs"]).sortby("y")
     climate_raster = climate_dataset.to_array()
     climate_raster = climate_raster.sel(variable=CONFIG["env_vars"])
-    return plot_gdf, species_dict, climate_raster
+    return plot_gdf, climate_raster
 
-def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
-    for i, row in plot_gdf.iterrows():
-        plot_id = row["entity_ID"]
-        clipped_habitat_map = habitat_map.rio.clip([row.geometry], drop=True, all_touched=True)
-        proportion_area = get_fraction_habitat_landcover(clipped_habitat_map)
-        species = species_dict[plot_id]
-        sr = len(np.unique(species))
-        plot_gdf.loc[i, "sr"] = sr
-        plot_gdf.loc[i, "observed_area"] = row.geometry.area * proportion_area
+# def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
+#     for i, row in plot_gdf.iterrows():
+#         plot_id = row["entity_ID"]
+#         clipped_habitat_map = habitat_map.rio.clip([row.geometry], drop=True, all_touched=True)
+#         proportion_area = get_fraction_habitat_landcover(clipped_habitat_map)
+#         species = species_dict[plot_id]
+#         sr = len(np.unique(species))
+#         plot_gdf.loc[i, "sr"] = sr
+#         plot_gdf.loc[i, "observed_area"] = row.geometry.area * proportion_area
 
-    return plot_gdf
+#     return plot_gdf
 
-def process_partition(partition, block_plot_gdf, species_dict, climate_raster, habitat_map):
-    megaplot_data_partition = clip_GIFT_SR(block_plot_gdf, species_dict, habitat_map)
-    # megaplot_data_partition["num_plots"] = megaplot_data_partition['geometry'].apply(lambda geom: len(geom.geoms) if geom.geom_type == 'MultiPoint' else 1)
-    megaplot_data_partition["megaplot_area"] = block_plot_gdf.geometry.area
-    megaplot_data_partition["geometry"] = block_plot_gdf.geometry
-    megaplot_data_partition["partition"] = partition
-    megaplot_data_partition = gpd.GeoDataFrame(megaplot_data_partition, crs = block_plot_gdf.crs, geometry="geometry")
-    # print(f"Partition {partition}: Processing climate variables...")
-    megaplot_data_partition = compile_climate_data_megaplot(megaplot_data_partition, climate_raster, habitat_map)
-    return megaplot_data_partition
-
-def generate_megaplots(plot_gdf, species_dict, climate_raster, habitat_map):
-    """
-    Process EVA data and generate synthetic megaplots data based on landcover.
-    Returns GeoDataFrame of SAR data.
-    """
-    total = len(plot_gdf["partition"].unique())
-    miniters = max(total // 100, 1)  # Refresh every 1%
-    megaplot_data_hab_ar = []
-    for partition, block_plot_gdf in tqdm(plot_gdf.groupby("partition"), desc="Processing partitions", total=total, miniters=miniters):
-        megaplot_data_hab_ar.append(process_partition(partition, block_plot_gdf, species_dict, climate_raster, habitat_map))
-                
-    megaplot_data_hab = pd.concat(megaplot_data_hab_ar, ignore_index=True)
-
-    logging.info(f"Nb. megaplots: {len(megaplot_data_hab)}")
-
-    return megaplot_data_hab[["sr", "area", "megaplot_area", "geometry", "partition"] + CLIMATE_COL_NAMES]
-
-
-def compile_climate_data_megaplot(megaplot_data, climate_raster, habitat_map, verbose=False):
+def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
     # only retain pixels which correspond to habitat map
-    habitat_map = habitat_map.where(habitat_map > 0, np.nan)
-    climate_raster = climate_raster * habitat_map
     for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
         # Use the geometry directly to clip the climate raster
@@ -153,44 +123,13 @@ if __name__ == "__main__":
     CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
     CONFIG["output_file_name"] = Path(f"augmented_data.pkl")
     
-    plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
-    eunis = EUNISDataset()
-    assert set(plot_gdf.entity_ID).issubset(set(species_dict.keys())), " plot_gdf.entity_ID is not a subset of species_dict.entity_ID"
-    
-    logging.info("Partitioning...")
-    plot_gdf["polygon"] = plot_gdf.geometry
-    plot_gdf.set_geometry(plot_gdf.geometry.centroid, inplace=True)
-    plot_gdf = partition_polygon_gdf(plot_gdf, CONFIG["block_length"])
-    plot_gdf.set_geometry(plot_gdf["polygon"], inplace=True, drop=True)
-    logging.info(f"Nb. partitions: {len(plot_gdf['partition'].unique())}")
-    # save raw plot SR and climate data
-    
-    megaplot_ar = []
-    
-    for hab in CONFIG["habitats"]:
-        logging.info(f"Generating megaplot dataset for habitat: {hab}")
-        # TODO: need to filter out species not in habitat, by creating specific plot ID
-        gdf_hab = plot_gdf[plot_gdf["level_1"] == hab]
-        habitat_map = eunis.get_habitat_map(hab).where(eunis.raster > -1, np.nan).rio.reproject_match(climate_raster)
-        megaplot_data_hab = generate_megaplots(gdf_hab, species_dict, climate_raster, habitat_map)
-        megaplot_data_hab["habitat_id"] = hab
-        
-        assert (megaplot_data_hab.sr > 0).all()
+    plot_gdf, climate_raster = load_and_preprocess_data()
+    plot_gdf = compile_climate_data_megaplot(plot_gdf, climate_raster, verbose=True)
 
-        megaplot_ar.append(megaplot_data_hab)
-        
-        # Save checkpoint
-        checkpoint_path = CONFIG["output_file_path"] / (CONFIG["output_file_name"].stem + f"_checkpoint_{hab}.pkl")
-        save_to_pickle(checkpoint_path, megaplot_data=megaplot_data_hab)
-        logging.info(f"Checkpoint saved for habitat `{hab}` at {checkpoint_path}")
-
-    # aggregating results and final save
-    megaplot_data = pd.concat(megaplot_ar, ignore_index=True)
-       
     # exporting megaplot_data to gpkg
-    output_path = CONFIG["output_file_path"] / "megaplot_data.gpkg"
+    output_path = CONFIG["output_file_path"] / "megaplot_data.parquet"
     print(f"Exporting {output_path}")
-    megaplot_data.to_file(output_path, driver="GPKG")
+    plot_gdf.to_parquet(output_path)
     
     
     logging.info(f'Full compilation saved at {CONFIG["output_file_path"]}.')
