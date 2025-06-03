@@ -23,3 +23,9 @@ def choose_device():
         device = "cpu"
     
     return device
+
+def symmetric_arch(n, base=32, factor=2):
+    half = (n + 1) // 2
+    front = [base * factor**i for i in range(half)]
+    mirror = front[:-1] if n % 2 else front
+    return front + mirror[::-1]

@@ -17,6 +17,7 @@ from sklearn.model_selection import train_test_split
 from src.dataset import create_dataloader
 from src.neural_4pweibull import Neural4PWeibull
 from src.trainer import Trainer
+from src.utils import symmetric_arch
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -45,8 +46,8 @@ class Config:
     batch_size: int = 1024
     num_workers: int = 0
     n_epochs: int = 100
-    val_size: float = 0.2
-    lr: float = 1e-4
+    val_size: float = 0.1
+    lr: float = 3e-4
     weight_decay: float = 1e-4
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 5
@@ -221,13 +222,6 @@ class Benchmark:
             "d2_gift": d2_g,
             "rmse_gift": rmse_g,
         }
-
-
-def symmetric_arch(n, base=32, factor=2):
-    half = (n + 1) // 2
-    front = [base * factor**i for i in range(half)]
-    mirror = front[:-1] if n % 2 else front
-    return front + mirror[::-1]
 
 
 if __name__ == "__main__":

@@ -101,16 +101,17 @@ class Trainer:
         for epoch in range(n_epochs):
             train_loss, val_loss = self.train_step()
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
-            metric_log = {}
             # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]): # TODO: to modify
-            loader, name = self.test_loader, "test"
-            targets, preds = self.get_model_predictions(loader)
-            pred_trs = self.target_scaler.inverse_transform(preds)
-            target_trs = self.target_scaler.inverse_transform(targets)
-            for m in metrics:
-                metric_value = eval(m)(target_trs, pred_trs)
-                metric_log[name + "_" + m] = metric_value
-                print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}")
+            metric_log = {}
+            if self.test_loader:
+                loader, name = self.test_loader, "test"
+                targets, preds = self.get_model_predictions(loader)
+                pred_trs = self.target_scaler.inverse_transform(preds)
+                target_trs = self.target_scaler.inverse_transform(targets)
+                for m in metrics:
+                    metric_value = eval(m)(target_trs, pred_trs)
+                    metric_log[name + "_" + m] = metric_value
+                    print(f"Epoch {epoch + 1}/{n_epochs} | {m} {name}: {metric_log[name + '_' + m]:.4f}")
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
