@@ -33,7 +33,7 @@ if __name__ == "__main__":
     df_chao2 = pd.read_csv(path_chao2_results)
     
     # Create combined figure
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 4))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
     # First two plots: boxplots for EVA and GIFT datasets
     df_plot = pd.concat([df_nw[(df_nw.train_frac == 1.) & (df_nw.num_params > 4e5)], # TODO: to fix
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     metric = "rmse"
 
     datasets = ['eva', 'gift']
-    colors = ['tab:blue', 'tab:orange']
+    colors = ['tab:blue', 'tab:purple']
     axes = [ax1, ax2]
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
@@ -81,11 +81,12 @@ if __name__ == "__main__":
 
         # Set labels and formatting
         ax.set_xticks(range(1, len(models) + 1))
-        ax.set_xticklabels(models, rotation=45, ha='right')
+        ax.set_xticklabels(models, rotation=45, ha='right', fontsize=10)
         ax.set_ylabel(f'{metric.upper()}') if j == 0 else None
         ax.set_title(f'{dataset.upper()} test dataset')
 
     # Third plot: errorbar plot for training fractions
+    ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
     metric = "rmse_gift"
     
     df_plot_train = df_nw[(df_nw['model'] == 'area+climate') & (df_nw['num_params'] > 4e5)]
@@ -109,13 +110,13 @@ if __name__ == "__main__":
     # Add individual data points
     for i, data in enumerate(all_data):
         x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
-        ax3.scatter(x, data, alpha=0.6, s=10, color='tab:purple', zorder=3)
+        ax3.scatter(x, data, alpha=0.6, s=10, color='tab:blue', zorder=3)
 
     # Set labels and formatting
     ax3.set_xticks(x_pos)
-    ax3.set_xticklabels([f'{frac:.0e}' for frac in train_fracs])
-    ax3.set_xlabel('Relative nb. of\ntraining samples')
-    ax3.set_ylabel('RMSE')
+    ax3.set_xticklabels([f'$10^{{{int(np.log10(frac))}}}$' if i % 2 == 0 else '' for i, frac in enumerate(train_fracs)])
+    ax3.set_xlabel('Nb. of\ntraining samples', fontsize=8)
+    # ax3.set_ylabel('RMSE')
 
     # Fourth plot: model predictions vs GIFT observations
     # Load model and data for prediction comparison
@@ -151,14 +152,14 @@ if __name__ == "__main__":
     gift_dataset["predicted_sr"] = y_pred.squeeze()
     
     # Create inset axes in ax2
-    ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right')
+    ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)
     
     # Plot predictions vs observations
     mask = gift_dataset[["sr", "predicted_sr"]].dropna()
     x = mask["sr"]
     y = mask["predicted_sr"]
     
-    ax4.scatter(x, y, alpha=0.6, s=10, color='tab:green')
+    ax4.scatter(x, y, alpha=0.6, s=10, color='tab:purple')
     
     # Add 1:1 line
     max_val = np.nanmax([x.max(), y.max()])
@@ -176,6 +177,8 @@ if __name__ == "__main__":
     
     ax4.set_xlabel('GIFT observed SR', fontsize=8)
     ax4.set_ylabel('Predicted SR', fontsize=8)
+    ax4.set_yscale('log')
+    ax4.set_xscale('log')
     # ax4.set_title('Model vs GIFT\nobservations')
     
     plt.tight_layout()
