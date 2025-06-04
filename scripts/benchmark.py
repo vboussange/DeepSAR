@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from torch import multiprocessing as mp
 from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
-                             r2_score)
+                             r2_score, mean_absolute_percentage_error)
 from sklearn.model_selection import train_test_split
 
 from src.dataset import create_dataloader
@@ -62,7 +62,7 @@ class Config:
             "bio15",
         ]
     )
-    run_name: str = "benchmark_" + HASH
+    run_name: str = "benchmark_nosmallmegaplots_" + HASH
     run_folder: Path = None
     path_eva_data: Path = None
     path_gift_data: Path = None
@@ -101,6 +101,7 @@ class Benchmark:
         for col in ("megaplot_area","observed_area"):
             eva[f"log_{col}"] = np.log(eva[col])
         eva = eva.replace([np.inf, -np.inf], np.nan).dropna()
+        eva = eva[eva["num_plots"] > 50]  # TODO: to change
         self.eva = eva
 
         # load GIFT
@@ -130,9 +131,11 @@ class Benchmark:
             "r2_eva": [r["r2_eva"] for r in results],
             "d2_eva": [r["d2_eva"] for r in results],
             "rmse_eva": [r["rmse_eva"] for r in results],
+            "mape_eva": [r["mape_eva"] for r in results],
             "r2_gift": [r["r2_gift"] for r in results],
             "d2_gift": [r["d2_gift"] for r in results],
             "rmse_gift": [r["rmse_gift"] for r in results],
+            "mape_gift": [r["mape_gift"] for r in results],
             "num_params": num_params,
         }        
 
@@ -198,6 +201,7 @@ class Benchmark:
         r2_eva = r2_score(y_true, y_pred)
         d2_eva = d2_absolute_error_score(y_true, y_pred)
         rmse_eva = root_mean_squared_error(y_true, y_pred)
+        mape_eva = mean_absolute_percentage_error(y_true, y_pred)
 
         # GIFT test (drop one feature if needed)
         Xg = torch.tensor(
@@ -211,15 +215,18 @@ class Benchmark:
         r2_g = r2_score(yg_true, y_pred_g)
         d2_g = d2_absolute_error_score(yg_true, y_pred_g)
         rmse_g = root_mean_squared_error(yg_true, y_pred_g)
+        mape_g = mean_absolute_percentage_error(yg_true, y_pred_g)
 
         return {
             "log": log,
             "r2_eva": r2_eva,
             "d2_eva": d2_eva,
             "rmse_eva": rmse_eva,
+            "mape_eva": mape_eva,
             "r2_gift": r2_g,
             "d2_gift": d2_g,
             "rmse_gift": rmse_g,
+            "mape_gift": mape_g,
         }
 
 
@@ -250,7 +257,7 @@ if __name__ == "__main__":
         ("climate", ["log_observed_area"] + feats, nn.MSELoss(), 1.0, base_arch)
     )
     # area+climate with varying data fractions
-    for frac in np.logspace(np.log10(0.1), np.log10(1.0), 5):
+    for frac in np.logspace(np.log10(1e-4), np.log10(1.0), 5):
         exps.append(
             ("area+climate", ["log_observed_area", "log_megaplot_area"] + feats, nn.MSELoss(), frac, base_arch)
         )
@@ -287,6 +294,6 @@ if __name__ == "__main__":
         logger.info(f"Finished {name}")
 
     df = pd.DataFrame(rows)
-    out_csv = config.run_folder / "results.csv"
+    out_csv = config.run_folder / f"{config.run_name}.csv"
     df.to_csv(out_csv, index=False)
     logger.info(f"Saved to {out_csv}")

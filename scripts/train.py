@@ -45,7 +45,7 @@ class Config:
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     n_ensembles: int = 5  # Number of models in the ensemble
-    run_name: str = f"checkpoint_MSEfit_lowlr_{HASH}"
+    run_name: str = f"checkpoint_MSEfit_lowlr_nosmallmegaplots_{HASH}"
     run_folder: str = ""
     layer_sizes: list = field(default_factory=lambda: symmetric_arch(8, base=32, factor=4))
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet"
@@ -182,6 +182,7 @@ if __name__ == "__main__":
     eva_dataset = eva_dataset.dropna()
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset = eva_dataset[eva_dataset["num_plots"] > 50]  # TODO: to change
 
     climate_vars = config.climate_variables
     std_climate_vars = ["std_" + env for env in climate_vars]
