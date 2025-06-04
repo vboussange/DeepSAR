@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 HASH = "0b85791"
 @dataclass
 class Config:
-    device: str
+    devices: list
     batch_size: int = 1024
     num_workers: int = 0
     n_epochs: int = 100
     val_size: float = 0.1
-    lr: float = 3e-4
+    lr: float = 1e-3
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 5
     weight_decay: float = 1e-4
@@ -45,16 +45,16 @@ class Config:
     hash_data: str = HASH
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     n_ensembles: int = 5  # Number of models in the ensemble
-    run_name: str = f"checkpoint_MSEfit_lowlr_nosmallmegaplots_{HASH}"
+    run_name: str = f"checkpoint_MSEfit_lowlr_nosmallmegaplots2_basearch6_{HASH}"
     run_folder: str = ""
-    layer_sizes: list = field(default_factory=lambda: symmetric_arch(8, base=32, factor=4))
+    layer_sizes: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet"
 
 class EnsembleTrainer:
-    def __init__(self, config, df, devices=None):
+    def __init__(self, config, df):
         self.config = config
         self.df = df
-        self.devices = devices or [config.device]
+        self.devices = config.devices
         self.n_ensembles = config.n_ensembles
 
     def run(self, predictors):
@@ -83,7 +83,7 @@ class EnsembleTrainer:
             val_loader=None,
             test_loader=test_loader,
             compute_loss=nn.MSELoss(),
-            device=self.config.device,
+            device=self.devices[0]
         )
         targets, preds = ensemble_trainer.get_model_predictions(test_loader)
         pred_trs = target_scaler.inverse_transform(preds)
@@ -166,15 +166,12 @@ class EnsembleTrainer:
 if __name__ == "__main__":
     if torch.cuda.is_available():
         devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        device = devices[0]
     elif torch.backends.mps.is_available():
         devices = ["mps"]
-        device = "mps"
     else:
         devices = ["cpu"]
-        device = "cpu"
 
-    config = Config(device=device)
+    config = Config(devices=devices)
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
@@ -182,14 +179,14 @@ if __name__ == "__main__":
     eva_dataset = eva_dataset.dropna()
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
-    eva_dataset = eva_dataset[eva_dataset["num_plots"] > 50]  # TODO: to change
+    eva_dataset = eva_dataset[eva_dataset["num_plots"] > 2]  # TODO: to change
 
     climate_vars = config.climate_variables
     std_climate_vars = ["std_" + env for env in climate_vars]
     climate_features = climate_vars + std_climate_vars
     predictors = ["log_observed_area", "log_megaplot_area"] + climate_features
 
-    ensemble_trainer = EnsembleTrainer(config, eva_dataset, devices=devices)
+    ensemble_trainer = EnsembleTrainer(config, eva_dataset)
     results = ensemble_trainer.run(predictors)
 
     results["config"] = config

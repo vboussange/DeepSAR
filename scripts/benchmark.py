@@ -40,8 +40,9 @@ logger = setup_logger()
 
 @dataclass
 class Config:
-    device: str
+    devices: list
     seed: int = 1
+    nruns: int = 5
     hash_data: str = HASH
     batch_size: int = 1024
     num_workers: int = 0
@@ -62,7 +63,7 @@ class Config:
             "bio15",
         ]
     )
-    run_name: str = "benchmark_nosmallmegaplots_" + HASH
+    run_name: str = "neural4p_weibull_nosmallmegaplots2_basearch6_" + HASH + "_benchmark"
     run_folder: Path = None
     path_eva_data: Path = None
     path_gift_data: Path = None
@@ -101,7 +102,7 @@ class Benchmark:
         for col in ("megaplot_area","observed_area"):
             eva[f"log_{col}"] = np.log(eva[col])
         eva = eva.replace([np.inf, -np.inf], np.nan).dropna()
-        eva = eva[eva["num_plots"] > 50]  # TODO: to change
+        eva = eva[eva["num_plots"] > 2]  # TODO: to change
         self.eva = eva
 
         # load GIFT
@@ -111,13 +112,13 @@ class Benchmark:
         gift = gift.replace([np.inf, -np.inf], np.nan).dropna()
         self.gift = gift
 
-        self.devices = ["cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4"]
-        self.nruns = len(self.devices)
+        self.devices = config.devices
+        self.nruns = config.nruns
 
     def run(self, predictors, loss_fn, layer_sizes, train_frac):
         # run in parallel on different GPUs
         ctx = mp.get_context('spawn')
-        with ctx.Pool(processes=self.nruns) as pool:
+        with ctx.Pool(processes=len(self.devices)) as pool:
             args = [(predictors, loss_fn, layer_sizes, train_frac, i) 
                    for i in range(self.nruns)]
             results = pool.starmap(self._single_run, args)
@@ -139,16 +140,16 @@ class Benchmark:
             "num_params": num_params,
         }        
 
-    def _single_run(self, predictors, loss_fn, layer_sizes, train_frac, seed):
+    def _single_run(self, predictors, loss_fn, layer_sizes, train_frac, run_id):
         # assign a GPU
-        device = self.devices[seed % len(self.devices)]
+        device = self.devices[run_id % len(self.devices)]
         # split EVA into train/val/test
         eva_trainval = self.eva[self.eva["test"] == False].sample(
-            frac=train_frac, random_state=seed
+            frac=train_frac, random_state=run_id
         )
         eva_test = self.eva[self.eva["test"] == True]
         train_idx, val_idx = train_test_split(
-            eva_trainval.index, test_size=self.config.val_size, random_state=seed
+            eva_trainval.index, test_size=self.config.val_size, random_state=run_id
         )
         df_tr = eva_trainval.loc[train_idx]
         df_val = eva_trainval.loc[val_idx]
@@ -232,12 +233,12 @@ class Benchmark:
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
-        device = "cuda:0"
+        devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
     elif torch.backends.mps.is_available():
-        device = "mps"
+        devices = ["mps"]
     else:
-        device = "cpu"
-    config = Config(device=device)
+        devices = ["cpu"]
+    config = Config(devices=devices)
 
     benchmark = Benchmark(config)
 
@@ -245,7 +246,7 @@ if __name__ == "__main__":
     climate = config.climate_variables
     std_climate = ["std_" + v for v in climate]
     feats = climate + std_climate
-    base_arch = symmetric_arch(8, base=32, factor=4)
+    base_arch = symmetric_arch(6, base=32, factor=4)
 
     exps = []
     # area only
@@ -286,9 +287,11 @@ if __name__ == "__main__":
                     "r2_eva": out["r2_eva"][run_id],
                     "d2_eva": out["d2_eva"][run_id],
                     "rmse_eva": out["rmse_eva"][run_id],
+                    "mape_eva": out["mape_eva"][run_id],
                     "r2_gift": out["r2_gift"][run_id],
                     "d2_gift": out["d2_gift"][run_id],
                     "rmse_gift": out["rmse_gift"][run_id],
+                    "mape_gift": out["mape_gift"][run_id],
                 }
             )
         logger.info(f"Finished {name}")

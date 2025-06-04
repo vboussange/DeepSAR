@@ -9,191 +9,106 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.metrics import mean_squared_error
 from src.plotting import boxplot_bypreds
+import pandas as pd
+from matplotlib.patches import Patch
 
 import scipy.stats as stats
 
-import sys
-sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from cross_validate_parallel import Config, Trainer
-from src.mlp import load_model_checkpoint
-from src.dataset import scale_features_targets, AugmentedDataset
-from src.plotting import read_result
-
-
-def evaluate_residuals(gdf, checkpoint, fold, config, scenario):
-    predictors = checkpoint["predictors"]
-    partition_idx = checkpoint["test_partition"][fold]
-    gdf_test = gdf[gdf.partition.isin(partition_idx)].sample(n=1000, random_state=42)
-    feature_scaler = checkpoint["feature_scaler"][fold]
-    target_scaler = checkpoint["target_scaler"][fold]
-    X_test, y_test, _, _ = scale_features_targets(gdf_test, predictors, feature_scaler=feature_scaler,  target_scaler=target_scaler)
-    log_area =  gdf_test["log_area"].values
-    
-    model_state = checkpoint["model_state_dict"][fold]
-    layer_sizes = [] if scenario == "linear_model" else config.layer_sizes
-    model = load_model_checkpoint(model_state, predictors, layer_sizes=layer_sizes)
-    with torch.no_grad():
-        y = target_scaler.inverse_transform(model(X_test))
-        y_test = target_scaler.inverse_transform(y_test)
-        res = y - y_test
-        print(f"MSE: {mean_squared_error(y, y_test):.4f}")
-    return log_area, res.flatten()
-
-def evaluate_model_all_residuals(gdf, result_modelling, hab, config):
-    fold = 1
-    result_all = {}
-    for scenario in ["linear_model", "climate", "area+climate"]:
-        checkpoint = result_modelling[hab][scenario]
-        log_area, residuals = evaluate_residuals(gdf, checkpoint, fold, config, scenario)
-        result_all[scenario] = {}
-        result_all[scenario]["residuals"] = residuals
-        result_all[scenario]["log_area"] = log_area
-    return result_all
-
 
 if __name__ == "__main__":
-    habitats = ["all", "T", "R", "Q", "S"]
-    habitat_labels = ["all", "Forests", "Grasslands", "Wetlands", "Shrublands"]
-    # habitats = ["all", "T1"]
-    seed = 2
-    MODEL = "large"
-    HASH = "fb8bc71"
-    path_results = Path(f"../../scripts/results/cross_validate_parallel_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_cross_validation_{HASH}.pth")    
+
+    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/neural4p_weibull_nosmallmegaplots2_basearch6_0b85791_benchmark.csv")    
+    path_chao2_results = Path(f"../../scripts/results/benchmark/chao2_estimator_benchmark.csv")    
+
     
-    result_modelling = torch.load(path_results, map_location="cpu")
-    config = result_modelling["config"]
-    metric = "test_R2"
+    # Read the data
+    df_nw = pd.read_csv(path_neural_weibull_results)
+    df_chao2 = pd.read_csv(path_chao2_results)
     
-    for hab in habitats:
-        val = result_modelling[hab]
-        mse_arr = []
-        # removing nan values
-        if "power_law" in val.keys():
-            val["linear_model"] = val.pop("power_law")
-                
-        for k in val.keys():
-            val2 = val[k]
+    # Create combined figure
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 3))
 
-            mse = val2[metric]
-            if len(mse) > 0:
-                mse_arr.append(mse)
-        mse = np.stack(mse_arr)
-        non_nan_columns = ~np.isnan(mse).any(axis=0)
-        matrix_no_nan_columns = mse[:, non_nan_columns]
-        for i, val2 in enumerate(val.values()):
-            if len(val2[metric]) > 0:
-                val2[metric] = mse[i,:]
-            else:
-                val2[metric] = np.array([])
-                
-    # Calculating residuals
-    config = result_modelling["config"]
+    # First two plots: boxplots for EVA and GIFT datasets
+    df_plot = pd.concat([df_nw[(df_nw.train_frac == 1.) & (df_nw.num_params > 4e5)], # TODO: to fix
+                         df_chao2], 
+                        ignore_index=True)
+    metric = "rmse"
 
-    gdf = AugmentedDataset(path_eva_data = config.path_eva_data,
-                            path_gift_data = config.path_gift_data,
-                            seed = config.seed).compile_training_data("all")
-    results_residuals = evaluate_model_all_residuals(gdf, result_modelling, "all", config)
+    datasets = ['eva', 'gift']
+    colors = ['tab:blue', 'tab:orange']
+    axes = [ax1, ax2]
+
+    for j, (dataset, ax) in enumerate(zip(datasets, axes)):
+        # Define models based on dataset
+        if dataset == 'eva':
+            models = ["area", "climate", "area+climate"]  # Exclude chao2_estimator for eva
+        else:
+            models = ["chao2_estimator", "area", "climate", "area+climate"]
+        
+        box_data = []
+        
+        for i, model in enumerate(models):
+            model_data = df_plot[df_plot['model'] == model]
+            metric_col = f"{metric}_{dataset}"
+            data = model_data[metric_col].values
+            box_data.append(data)
+
+        # Create box plots
+        bplot = ax.boxplot(box_data, patch_artist=True, widths=0.6, showfliers=False)
+        
+        # Add individual data points
+        color = colors[j]
+        for i, data in enumerate(box_data):
+            x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
+            ax.scatter(x, data, alpha=0.6, s=10, color=color, zorder=3)
+
+        # Color the boxes
+        for patch in bplot['boxes']:
+            patch.set_facecolor('none')
+            patch.set_edgecolor("none")
+        for item in ['caps', 'whiskers']:
+            for element in bplot[item]:
+                element.set_color("none")
+        for element in bplot["medians"]:
+            element.set_color("black")
+
+        # Set labels and formatting
+        ax.set_xticks(range(1, len(models) + 1))
+        ax.set_xticklabels(models, rotation=45, ha='right')
+        ax.set_ylabel(f'{metric.upper()}') if j == 0 else None
+        ax.set_title(f'{dataset.upper()} Dataset')
+
+    # Third plot: errorbar plot for training fractions
+    metric = "rmse_gift"
     
-    # Replace habitat keys with habitat_labels in result_modelling
-    result_modelling = {habitat_labels[i]: result_modelling[hab] for i, hab in enumerate(habitats)}
-    result_modelling["all"]['area+climate, habitat agnostic'] = {metric:[]}
-    PREDICTORS = ["linear_model", 
-                  "area", 
-                  "climate", 
-                "area+climate", 
-                  'area+climate, habitat agnostic', 
-                #   "area+climate, no physics"
-                  ]
-
-    # plotting results for test data
-    fig = plt.figure(figsize=(8, 6))
-    nclasses = len(list(result_modelling.keys()))
-    gs = gridspec.GridSpec(2, 3, height_ratios=[1.4,1], hspace=0.4)
+    df_plot_train = df_nw[(df_nw['model'] == 'area+climate') & (df_nw['num_params'] > 4e5)]
+    train_fracs = sorted(df_plot_train['train_frac'].unique())
     
-    # first axis
-    ax1 = fig.add_subplot(gs[0, :])
-    # ax1.set_ylim(0.1, 0.8)
-    boxplot_bypreds(
-        result_modelling,
-        ax=ax1,
-        spread=0.6,
-        colormap="Set2",
-        legend=True,
-        xlab="",
-        ylab="R2",
-        yscale="linear",
-        yname=metric,
-        habitats=habitat_labels,
-        predictors=PREDICTORS,
-        widths=0.1,
-    )
-    # label_l1 = ["Forests", "Grasslands", "Wetlands", "Shrublands"]
-    # for i,x in enumerate(np.arange(1, len(habitats), step=2)):
-    #     ax1.text(x+0.5, -0.03, label_l1[i], ha='center', va='bottom', fontsize=10, color='black')
-    fig.savefig(Path(__file__).stem + "_model_score.pdf", transparent=True, dpi=300)
-    fig
-    # second axis
-    color_palette = sns.color_palette("Set2", 5)
-    qr_range = [0.05, 0.95]
-    ax2 = fig.add_subplot(gs[1, 0], )
-    x = results_residuals["linear_model"]["log_area"]
-    residuals = results_residuals["linear_model"]["residuals"]
-    q1_ax2, q3_ax2 = np.quantile(residuals, qr_range)
-    ax2.axhspan(q1_ax2, q3_ax2, color=color_palette[0], alpha=0.1)
-    ax2.scatter(x, residuals, s=3.0, label="area", color = color_palette[0], alpha=1)
-    ax2.set_ylabel("Residuals\n$\\hat{\log \\text{SR}} - \log \\text{SR}$")
-    ax2.set_ylim(-2.5,2.5)
-    ax2.set_title("Linear model")
+    means = []
+    stds = []
+    all_data = []
 
-    ax3 = fig.add_subplot(gs[1, 1],sharey=ax2, sharex=ax2)
-    x = results_residuals["climate"]["log_area"]
-    residuals = results_residuals["climate"]["residuals"]
-    q1_ax3, q3_ax3 = np.quantile(residuals, qr_range)
-    ax3.axhspan(q1_ax3, q3_ax3, color=color_palette[2], alpha=0.1)
-    ax3.scatter(x, residuals, s=3.0, label="climate", color = color_palette[2], alpha=0.8)
-    ax3.set_title("Climate only")
+    for train_frac in train_fracs:
+        data = df_plot_train[df_plot_train['train_frac'] == train_frac][metric].values
+        means.append(np.mean(data))
+        stds.append(np.std(data))
+        all_data.append(data)
 
-    ax4 = fig.add_subplot(gs[1, 2], sharey=ax2, sharex=ax2)
-    x = results_residuals["area+climate"]["log_area"]
-    residuals = results_residuals["area+climate"]["residuals"]
-    q1_ax4, q3_ax4 = np.quantile(residuals, qr_range)
-    ax4.axhspan(q1_ax4, q3_ax4, color=color_palette[3], alpha=0.1)
-    ax4.scatter(x, residuals, s=3.0, label="area + climate", color = color_palette[3], alpha=0.8)
-    ax4.set_title("Area and climate")
+    # Create errorbar plot
+    x_pos = range(1, len(train_fracs) + 1)
+    ax3.errorbar(x_pos, means, yerr=stds, fmt='-', capsize=0, capthick=1, 
+                 color='black', markersize=6, linewidth=1, zorder=2)
 
-    plt.setp(ax3.get_yticklabels(), visible=False)
-    plt.setp(ax4.get_yticklabels(), visible=False)
+    # Add individual data points
+    for i, data in enumerate(all_data):
+        x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
+        ax3.scatter(x, data, alpha=0.6, s=10, color='tab:purple', zorder=3)
 
-    for ax in [ax2,ax3,ax4]:
-        ax.plot([min(x), max(x)], [0, 0], c="grey", linestyle="--")
-        ax.set_xlabel("log(A)")
+    # Set labels and formatting
+    ax3.set_xticks(x_pos)
+    ax3.set_xticklabels([f'{frac:.0e}' for frac in train_fracs])
+    ax3.set_xlabel('Relative nb. of\ntraining samples')
+    # ax3.set_ylabel('RMSE')
 
-    _let = ["a", "b", "c", "d"]
-    for i,ax in enumerate([ax1, ax2,ax3,ax4]):
-        _x = -0.1
-        ax.text(_x, 1.05, _let[i],
-            fontsize=12,
-            fontweight="bold",
-            va="bottom",
-            ha="left",
-            transform=ax.transAxes,
-        )
-    fig
-
-    # fig.tight_layout()
-    fig.savefig("figure_2.pdf", dpi=300, transparent=True)
-    
-    with open("paired_t_test_EVA_EUNIS.txt", "w") as file:
-        for j, c in enumerate(habitat_labels[:-1]):
-            print(c, file=file)
-            performance_baseline = result_modelling[c]["area"][
-                metric
-            ]
-            performance_new_features = result_modelling[c]["area+climate"][
-                metric
-            ]
-            t_statistic, p_value = stats.ttest_rel(
-                performance_baseline, performance_new_features
-            )
-            print("T-statistic:", t_statistic, file=file)
-            print("P-value:", p_value, file=file)
+    plt.tight_layout()
+    plt.show()

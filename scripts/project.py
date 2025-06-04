@@ -97,13 +97,13 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     seed = 1
-    MODEL_NAME = "MSEfit_large_0b85791"
-    HASH = "fb8bc71"
+    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    plotting = True
     
     projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{MODEL_NAME}")
     projection_path.mkdir(parents=True, exist_ok=True)
     
-    path_results = Path(__file__).parent / Path(f"results/train_seed_1/checkpoint_{MODEL_NAME}.pth")
+    path_results = Path(__file__).parent / Path(f"results/train/checkpoint_{MODEL_NAME}.pth")
     results_fit_split = torch.load(path_results, map_location="cpu")
     config = results_fit_split["config"]    
 
@@ -115,13 +115,27 @@ if __name__ == "__main__":
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 
-    for res in [100000, 10000, 1000, 100, ]:
+    for res in [10000, 1000]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
         features, SR, std_SR = get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
         SR_rast = create_raster(features, SR)
-        SR_rast.rio.to_raster(projection_path / f"SR_raster_{res:.0f}m.tif")
+        SR_rast.rio.to_raster(projection_path / f"SR_raster_{MODEL_NAME}_{res:.0f}m.tif")
+        if plotting:
+            import matplotlib.pyplot as plt
+            from matplotlib import cm
+            from matplotlib.colors import LinearSegmentedColormap
 
+            fig, ax = plt.subplots(figsize=(8, 6))
+            # colors = ["#dad7cd","#a3b18a","#588157","#3a5a40","#344e41"]
+            colors = ["#f72585","#b5179e","#7209b7","#560bad","#480ca8","#3a0ca3","#3f37c9","#4361ee","#4895ef","#4cc9f0"]
+            # check https://coolors.co/palettes/popular/gradient
+            custom_cmap = LinearSegmentedColormap.from_list("species_richness", colors[::-1])
+            SR_rast = SR_rast.rename("SR")
+            SR_rast.plot(ax=ax, cmap=custom_cmap, vmin=SR_rast.quantile(0.01), vmax=SR_rast.quantile(0.99))
+            ax.set_title(f"Res: {res}m")
+            fig.savefig(projection_path / f"SR_raster_{MODEL_NAME}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
+        
         std_SR_rast = create_raster(features, std_SR)
         std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{res:.0f}m.tif")
         
