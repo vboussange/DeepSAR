@@ -3,6 +3,7 @@ Total species richness estimation using rarefaction curve fitted with `a*(1. -
 np.exp(-b * (sum(area plot))))`. Gift dataset is assumed ground truth.
 """
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
@@ -133,209 +134,115 @@ def estimate_sr_weibull(x, y):
 
 eva_dataset, eva_species_dict, gift_dataset = load_and_preprocess_data()
 
-country = "Czech Republic"
-test_idx = gift_dataset[gift_dataset.geo_entity == country].index[0]
-test_geom = gift_dataset.loc[test_idx].geometry
-plots_within = eva_dataset.within(test_geom)
-df_test = eva_dataset[plots_within]
-gift_observed_sr = gift_dataset.loc[test_idx].sr
-gift_polygon_area = gift_dataset.loc[test_idx]["megaplot_area"]
 
-if len(df_test) > 0:
+def calculate_rarefaction_data(country, eva_dataset, eva_species_dict, gift_dataset):
+    """Calculate rarefaction curve data for a specific country."""
+    # Get country data
+    country_indices = gift_dataset[gift_dataset.geo_entity == country].index
+    if len(country_indices) == 0:
+        print(f"No data found for {country}")
+        return None
+    
+    test_idx = country_indices[0]
+    test_geom = gift_dataset.loc[test_idx].geometry
+    plots_within = eva_dataset.within(test_geom)
+    df_test = eva_dataset[plots_within]
+    gift_observed_sr = gift_dataset.loc[test_idx].sr
+    gift_polygon_area = gift_dataset.loc[test_idx]["megaplot_area"]
+    
+    if len(df_test) == 0:
+        print(f"No EVA plots within GIFT plot for {country}")
+        return None
+    
+    # Generate rarefaction curve
     x, y = rarefaction_curve(df_test, eva_species_dict)
-
+    x_mean = x.mean(axis=1)
+    y_mean = y.mean(axis=1)
+    
     # Fit Weibull model
-    b, c, d, e = estimate_sr_weibull(np.log(x), y)
-
-    # Predict species richness at GIFT polygon area
+    b, c, d, e = estimate_sr_weibull(np.log(x_mean), y_mean)
+    
+    # Determine interpolation vs extrapolation ranges
+    max_observed_area = max(x.flatten())
+    
+    # Calculate interpolation range
+    x_interp = None
+    y_interp = None
+    if max_observed_area > min(x.flatten()):
+        x_interp = np.logspace(np.log10(min(x.flatten())), np.log10(max_observed_area), 50)
+        y_interp = weibull4(np.log(x_interp), b, c, d, e)
+    
+    # Calculate extrapolation range
+    x_extrap = None
+    y_extrap = None
+    if gift_polygon_area > max_observed_area:
+        x_extrap = np.logspace(np.log10(max_observed_area), np.log10(gift_polygon_area), 50)
+        y_extrap = weibull4(np.log(x_extrap), b, c, d, e)
+    
+    # Calculate predicted species richness
     predicted_sr = weibull4(np.log(gift_polygon_area), b, c, d, e)
     
-    # Plot results
-    fig, ax = plt.subplots()
+    return {
+        'country': country,
+        'x': x,
+        'y': y,
+        'x_interp': x_interp,
+        'y_interp': y_interp,
+        'x_extrap': x_extrap,
+        'y_extrap': y_extrap,
+        'gift_polygon_area': gift_polygon_area,
+        'gift_observed_sr': gift_observed_sr,
+        'predicted_sr': predicted_sr,
+        'parameters': (b, c, d, e)
+    }
+
+def plot_rarefaction_curves(data_list, colors):
+    """Plot rarefaction curves from pre-calculated data."""
+
+# Generate data for both countries
+countries = ["Czech Republic", "Sachsen, Germany"]
+colors = ["#f72585","#4cc9f0"]
+
+data_list = []
+for country in countries:
+    data = calculate_rarefaction_data(country, eva_dataset, eva_species_dict, gift_dataset)
+    if data:
+        data_list.append(data)
+
+
+# plotting
+fig, ax = plt.subplots(figsize=(4, 4))
+
+for data, color in zip(data_list, colors):
+    country = data['country']
     
-    # Plot original rarefaction curve
-    ax.scatter(x, y, label="EVA rarefaction data")
+    # Plot training points
+    ax.scatter(data['x'], data['y'], alpha=0.3, color=color, s=20,)
     
-    # Plot the fit line on original scale
-    x_fit = np.logspace(np.log10(min(x)), np.log10(max(x) * 2), 100)
-    y_fit = weibull4(np.log(x_fit), b, c, d, e)
-    ax.plot(x_fit, y_fit, 'r-')
-
-    # Plot the GIFT prediction point
-    ax.scatter(gift_polygon_area, predicted_sr, marker='*', s=200, color='green', 
-                label=f"Predicted SR: {predicted_sr:.1f}")
-    ax.scatter(gift_polygon_area, gift_observed_sr, marker='*', s=200, color='blue',
-                label=f"GIFT observed SR: {gift_observed_sr}")
-
-    # Format plot
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_ylabel('Species Richness')
-    ax.set_xlabel('Observed area (m²)')
-    ax.set_title(f'Rarefaction curve with logistic fit, {country}')
-    ax.legend()
-
-    # Add text with fit information
-    ax.text(0.05, 0.8, f"Weibull parameters: b={b:.3f}, c={c:.1f}, d={d:.1f}, e={e:.1f}\n"
-                        f"Predicted SR: {predicted_sr:.1f}\n"
-                        f"GIFT observed SR: {gift_observed_sr}",
-            transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.8))
-
-    plt.tight_layout()
-    plt.show()
-
-    print(f"Predicted species richness for GIFT plot: {predicted_sr:.1f}")
-    print(f"Actual GIFT observed species richness: {gift_observed_sr}")
-else:
-    print(f"No EVA plots within GIFT plot {test_idx}")
+    # Plot interpolation range (solid line)
+    if data['x_interp'] is not None:
+        ax.plot(data['x_interp'], data['y_interp'], color=color, linewidth=2, 
+                )
     
+    # Plot extrapolation range (dashed line)
+    if data['x_extrap'] is not None:
+        ax.plot(data['x_extrap'], data['y_extrap'], color=color, linewidth=2, 
+                linestyle='--')
+    
+# Format plot
+ax.set_xscale('log')
+ax.set_yscale('log')
+ax.set_ylabel('Species richness')
+ax.set_xlabel('Area (m²)')
+ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+ax.grid(True, alpha=0.3)
 
-# Estimating SR for each GIFT plot using Weibull model
-fit_df = gift_dataset.copy()
-# fit_df["a"] = 0.0
-# fit_df["b"] = 0.0
-# fit_df["c"] = 0.0
-fit_df["eva_observed_sr"] = 0
-fit_df["eva_observed_area"] = 0
-fit_df["predicted_sr"] = 0.0
+# Add legend entries for line types
+interp_line = mlines.Line2D([], [], color='grey', linewidth=2, label='Interpolation')
+extrap_line = mlines.Line2D([], [], color='grey', linewidth=2, linestyle='--', label='Extrapolation')
 
-for idx, row in tqdm(fit_df.iterrows(), total=fit_df.shape[0]):
-    geom = fit_df.loc[idx].geometry
-    plots_within = eva_dataset.within(geom)
-    df_samp = eva_dataset[plots_within]
-    gift_observed_sr = fit_df.loc[test_idx].sr
-    gift_polygon_area = fit_df.loc[test_idx]["megaplot_area"]
-    if len(df_samp) > 0:
-        x, y = rarefaction_curve(df_samp, eva_species_dict)
+training_dot = mlines.Line2D([], [], color='grey', marker='o', linestyle='None', markersize=5, label='Training data')
+ax.legend(handles=[training_dot, interp_line, extrap_line], bbox_to_anchor=(0.6, 0.2), loc='upper left')
 
-        # Fit Weibull model
-        b, c, d, e = estimate_sr_weibull(np.log(x), y)
-
-        # Predict species richness at GIFT polygon area
-        predicted_sr = c
-        # predicted_sr = weibull4(np.log(gift_polygon_area), b, c, d, e)
-
-        
-        # Update values in the fit_df directly using loc
-        fit_df.loc[idx, "predicted_sr"] = predicted_sr
-        # fit_df.loc[idx, "a"] = a
-        # fit_df.loc[idx, "b"] = b
-        # fit_df.loc[idx, "c"] = c
-        fit_df.loc[idx, "eva_observed_sr"] = len(np.unique(np.concatenate([eva_species_dict[i] for i in df_test.index])))
-        fit_df.loc[idx, "eva_observed_area"] = df_samp.area_m2.sum()
-# output_path = Path(__file__).parent / f"{Path(__file__).stem}.parquet"
-# fit_df.to_parquet(output_path)
-# logging.info(f"Results saved to {output_path}")
-fit_df["coverage"] = np.log(fit_df["eva_observed_area"] / fit_df["megaplot_area"])
-
-# -----------------------------------------------
-# Plotting full predictions
-
-fit_df = fit_df[fit_df["predicted_sr"] > 0]
-fit_df = fit_df[fit_df["predicted_sr"] < 1e4]
-fit_df["log_predicted_sr"] = np.log(fit_df["predicted_sr"])
-fit_df["log_sr"] = np.log(fit_df["sr"])
-
-fig, ax = plt.subplots()
-mask0 = fit_df[["sr", "predicted_sr"]].dropna()
-x = mask0["sr"]
-y = mask0["predicted_sr"]
-
-# Scatter plot: GIFT observed SR vs Chao1
-ax.scatter(x, y,c=fit_df["coverage"], 
-                         alpha=0.7, cmap='magma_r')
-max_val = np.nanmax([x.max(), y.max()])
-ax.plot([0, max_val], [0, max_val], 'r--', label='1:1 line')
-ax.set_xlabel("GIFT observed SR")
-ax.set_ylabel("Predicted SR")
-ax.set_xlim(x.min(), x.max())
-ax.set_ylim(x.min(), x.max())
-
-# Compute R2, D2, and MSE for Chao1
-r2_0 = r2_score(x, y)
-d2_0 = d2_absolute_error_score(x, y)
-mse_0 = np.sqrt(mean_squared_error(x, y))
-corr_0 = np.corrcoef(x, y)[0, 1]
-ax.text(
-    0.05, 0.95, f"R2={r2_0:.2f}\nD2={d2_0:.2f}\nRMSE={mse_0:.2f}\nCorr={corr_0:.2f}",
-    transform=ax.transAxes,
-    verticalalignment='top', bbox=dict(boxstyle="round", fc="w", alpha=0.7)
-)
-ax.legend()
-ax.set_title("GIFT vs predicted species richness from logistic fit")
-
-
-
-
-# -----------------------------------------------
-# Plotting residuals vs coverage
-fit_df["log_coverage"] = np.log(fit_df["eva_observed_area"]) / np.log(fit_df["megaplot_area"])
-
-# Calculate residuals (difference between predicted and actual)
-fit_df["log_megaplot_area"] = np.log(fit_df["megaplot_area"])
-fit_df['residual'] = fit_df['log_predicted_sr'] - fit_df['log_sr']
-xaxis = "log_megaplot_area"
-fig_res, ax_res = plt.subplots()
-
-scatter = ax_res.scatter(fit_df[xaxis], fit_df['residual'], 
-                         c=fit_df['log_sr'], cmap='viridis', alpha=0.7)
-
-# Add a horizontal line at y=0 (perfect prediction)
-ax_res.axhline(y=0, color='r', linestyle='--', label='No error')
-
-# Add a trend line to see if there's a pattern
-# Filter out NaN values for regression
-valid_mask = ~np.isnan(fit_df[xaxis]) & ~np.isnan(fit_df['residual'])
-slope, intercept, r_value, p_value, std_err = linregress(
-    fit_df.loc[valid_mask, xaxis], 
-    fit_df.loc[valid_mask, 'residual']
-)
-x_vals = np.array([fit_df[xaxis].min(), fit_df[xaxis].max()])
-ax_res.plot(x_vals, intercept + slope * x_vals, 'b-', 
-            label=f'Trend: y={slope:.3f}x+{intercept:.3f}, r²={r_value**2:.3f}')
-
-# Add labels and title
-ax_res.set_xlabel(xaxis)
-ax_res.set_ylabel('Residuals (log predicted SR - log observed SR)')
-
-# Add colorbar
-cbar = plt.colorbar(scatter)
-cbar.set_label('Log observed species richness')
-
-# Add legend
-ax_res.legend()
-
-plt.tight_layout()
-plt.show()
-
-# Spatial plot of residuals
-fig_map, ax_map = plt.subplots(1, 1, figsize=(10, 8))
-
-# Create a copy of the geodataframe with residuals
-plot_df = fit_df.copy()
-
-# Remove rows with NaN residuals
-plot_df = plot_df[~plot_df['residual'].isna()]
-
-# Create a colormap with a distinct center (white for zero residual)
-cmap = mpl.cm.RdBu_r
-norm = mpl.colors.TwoSlopeNorm(vmin=plot_df['residual'].min(), vcenter=0, vmax=plot_df['residual'].max())
-
-# Plot polygons with color based on residuals
-plot = plot_df.plot(column='residual', ax=ax_map, cmap=cmap, norm=norm, 
-                    edgecolor='black', linewidth=0.5)
-
-# Add a smaller colorbar
-divider = make_axes_locatable(ax_map)
-cax = divider.append_axes("bottom", size="3%", pad=0.5)
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-sm.set_array([])
-cbar = plt.colorbar(sm, cax=cax, orientation="horizontal")
-cbar.set_label('Residual (log predicted - log observed)')
-
-# Add title and configure map
-ax_map.set_title('Spatial Distribution of Species Richness Prediction Residuals')
-ax_map.set_axis_off()
-
-plt.tight_layout()
-plt.show()
+fig.tight_layout()
+fig.savefig(Path(__file__).parent / "rarefaction_curves.png", dpi=300, bbox_inches='tight')
