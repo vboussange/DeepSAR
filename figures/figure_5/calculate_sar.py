@@ -12,9 +12,8 @@ from src.utils import save_to_pickle
 from src.data_processing.utils_env_pred import CHELSADataset
 import matplotlib.pyplot as plt
 import xarray as xr
-from src.ensemble_model import initialize_ensemble_model
+from src.neural_4pweibull import initialize_ensemble_model
 
-from src.mlp import scale_feature_tensor, inverse_transform_scale_feature_tensor, get_gradient
 from scripts.train import Config
 
 from pathlib import Path
@@ -32,25 +31,30 @@ def load_chelsa_and_reproject(predictors):
 if __name__ == "__main__":
     # creating X_maps for different resolutions
     seed = 1
-    MODEL = "large"
-    HASH = "a53390d"
-    path_results = Path(__file__).parent / Path(f"results/train_dSRdA_weight_1e+00_seed_{seed}/checkpoint_{MODEL}_model_full_physics_informed_constraint_{HASH}.pth")    
-    results_fit_split_all = torch.load(path_results, map_location="cpu")
-    config = results_fit_split_all["config"]
-    results_fit_split = results_fit_split_all["all"]
-    model = initialize_ensemble_model(results_fit_split, config, "cuda")
-    
-    predictors  = results_fit_split["predictors"]
+    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    output_dir = Path("SARs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
+    path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
+    results_fit_split = torch.load(path_results, map_location="cpu")
+    config = results_fit_split["config"]    
+
+    predictors = results_fit_split["predictors"]
     feature_scaler = results_fit_split["feature_scaler"]
     target_scaler = results_fit_split["target_scaler"]
+    
+    model = initialize_ensemble_model(results_fit_split["ensemble_model_state_dict"], predictors, config)
+    
     climate_dataset, res_climate_pixel = load_chelsa_and_reproject(predictors)
+
     
     dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long
-                       "log_SR": [],},
+                       "SRs": [],},
               "loc2": {"coords": (53, 8.4),
-                       "log_SR": [],},
+                       "SRs": [],},
             "loc3": {"coords": (42.1, -5),
-                       "log_SR": [],}
+                       "SRs": [],}
             }
     
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3035")
@@ -73,22 +77,25 @@ if __name__ == "__main__":
                                                     )
             df_mean = pd.DataFrame({var: [reduced_climate_dataset[var].mean().item()] for var in reduced_climate_dataset.data_vars})
             df_std = pd.DataFrame({f"std_{var}": [reduced_climate_dataset[var].std().item()] for var in reduced_climate_dataset.data_vars})
-            X_map = pd.concat([df_mean, df_std], axis=1)
-            X_map = X_map.assign(log_area=np.log(window_size**2), log_megaplot_area=np.log(window_size**2))
-            X_map = X_map[predictors]
+            features = pd.concat([df_mean, df_std], axis=1)
+            features = features.assign(log_observed_area=np.log(window_size**2), log_megaplot_area=np.log(window_size**2))
+            features = features[predictors]
             
             # predictions
-            X = torch.tensor(X_map.values, dtype=torch.float32)
-            X = scale_feature_tensor(X, feature_scaler).to(next(model.parameters()).device)
-            X = X.requires_grad_(True)
-            log_SR = model(X)
-            log_SR = inverse_transform_scale_feature_tensor(log_SR, target_scaler).detach().cpu().numpy()
-            # dlogSR_dlogA = get_gradient(log_SR, X).detach().cpu().numpy()[:,:2].sum(axis=1)
-            dict_SAR[loc]["log_SR"].append(log_SR)
-        dict_SAR[loc]["log_SR"] = np.concatenate(dict_SAR[loc]["log_SR"], axis=0)
+            X = features.values
+            X = feature_scaler.transform(X)
+            with torch.no_grad():
+                X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
+                ys = np.concatenate([m.predict_sr(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
+                SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
+                
+            dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
 
         minx, miny, maxx, maxy = x, y - window_size, x + window_size, y
         dict_SAR[loc]["coords_epsg_3035"] = (minx, miny, maxx, maxy)
+        
+        # Convert to numpy array with shape (len(window_sizes), len(model.models))
+        dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"])
             
     dict_SAR["log_area"] = np.log(window_sizes**2)
     
@@ -97,15 +104,13 @@ if __name__ == "__main__":
     for loc in dict_plot:
         d = dict_SAR[loc]
         arg_plot = dict_plot[loc]
-        ax.plot(np.exp(dict_SAR["log_area"]), np.exp(d["log_SR"]), c=arg_plot["c"])
+        ax.plot(np.exp(dict_SAR["log_area"]), d["SRs"], c=arg_plot["c"])
         # ax.fill_between(np.exp(dict_SAR["log_area"]), 
-        #         np.exp(d["log_SR_first_quantile"]), np.exp(d["log_SR_third_quantile"]), 
-        #         # label="Neural network",
-        #         linestyle="-", 
-        #         color = arg_plot["c"],
-        #         alpha = 0.4,)
+        #     np.array(d["SR"]) - np.array(d["std_SR"]), 
+        #     np.array(d["SR"]) + np.array(d["std_SR"]), 
+        #     color=arg_plot["c"],
+        #     alpha=0.4)
     ax.set_xscale("log")
     ax.set_yscale("log")
-    fig.savefig(Path(f"results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pdf"), dpi=300, bbox_inches="tight")
-    save_to_pickle(Path(f"results/true_SAR/true_SAR_ensemble_seed_{seed}_model_{MODEL}_hash_{HASH}.pkl"), dict_SAR=dict_SAR)
-
+    fig.savefig(output_dir / "SARs.pdf", dpi=300, bbox_inches="tight")
+    save_to_pickle(output_dir / "SARs.pkl", dict_SAR=dict_SAR)

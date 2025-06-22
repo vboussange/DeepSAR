@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from src.utils import save_to_pickle
 from scripts.train import Config
 from src.ensemble_model import initialize_ensemble_model
-import scripts.get_true_sar as get_true_sar
+import figures.figure_5.calculate_sar as calculate_sar
 from pathlib import Path
 from src.dataset import scale_features_targets
 from src.mlp import load_model_checkpoint
