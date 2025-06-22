@@ -1,3 +1,4 @@
+# TODO: to fix bounding boxes which are shifted, possibly due to rolling window in rasters
 import matplotlib.pyplot as plt
 import pickle
 import xarray as xr
@@ -10,6 +11,7 @@ from scipy import stats
 from src.plotting import CMAP_BR, CMAP_DSR
 from matplotlib import colors
 import seaborn as sns
+from matplotlib.gridspec import GridSpec
 
 rcparams = {
             "font.size": 9,
@@ -105,12 +107,30 @@ if __name__ == '__main__':
 
     # Load required rasters
     kwargs = {'x': 2, 'y': 2, 'center': False, 'min_periods': 2}
-    rasters = {
-        'sr_1000': rast_dict["SR_raster_1000m"].rolling(**kwargs).mean().rio.clip(europe_geom, drop=True),
-        'sr_50000': rast_dict["SR_raster_50000m"].rolling(**kwargs).mean().rio.clip(europe_geom, drop=True), 
-        'dsr_1000': rast_dict["dSR_dlogA_raster_1000m"].rolling(**kwargs).mean().rio.clip(europe_geom, drop=True),
-        'dsr_50000': rast_dict["dSR_dlogA_raster_50000m"].rolling(**kwargs).mean().rio.clip(europe_geom, drop=True)
-    }
+    # Define raster processing parameters
+    rolling_kwargs = {'x': 2, 'y': 2, 'center': False, 'min_periods': 2}
+    
+    # Load and process rasters
+    raster_configs = [
+        ('sr_1000', "SR_raster_1000m"),
+        ('sr_50000', "SR_raster_50000m"),
+        ('dsr_1000', "dSR_dlogA_raster_1000m"),
+        ('dsr_50000', "dSR_dlogA_raster_50000m")
+    ]
+    
+    rasters = {}
+    for key, filename in raster_configs:
+        if filename not in rast_dict:
+            print(f"Warning: {filename} not found in raster data")
+            continue
+            
+        raster = (rast_dict[filename]
+                 .rolling(**rolling_kwargs)
+                 .mean()
+                 .rio.clip(europe_geom, drop=True)
+                 .rio.write_crs("EPSG:3035")
+                 )
+        rasters[key] = raster
     
     # Coarsen rasters for faster plotting
     for key in rasters:
@@ -122,98 +142,14 @@ if __name__ == '__main__':
     cbar_kwargs = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
                    'label': 'Species richness', 'pad': 0.05, 'location': 'left'}
     
-    fig, ax = plt.subplots()
-    
-    name = "sr_1000"
-    rast = rasters[name]
-    # reducing the size of the raster for faster plotting
+    fig = plt.figure(figsize=(8, 10))
+    gs = GridSpec(3, 6, figure=fig, height_ratios=[0.4, 1, 1])
 
-    # rast = preprocess_raster(rast)
-    # norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
-    plot_raster(ax, 
-                rast, 
-                cmap=CMAP_BR, 
-                cbar_kwargs=cbar_kwargs, 
-                # norm=norm, 
-                vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                title='Area = $10^6$m$^2$')
-    fig.tight_layout()
-    plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=20000)
-    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
+    # Top row: SAR curves (3 panels, each spanning 2 columns)
+    ax1 = fig.add_subplot(gs[0, 0:2])
+    ax2 = fig.add_subplot(gs[0, 2:4])
+    ax3 = fig.add_subplot(gs[0, 4:6])
 
-    # Plot species richness at resolution 50km
-    fig, ax = plt.subplots()
-
-    name = "sr_50000"
-    rast = rasters[name]
-
-    # rast = preprocess_raster(rast)
-    # norm = colors.LogNorm(vmin=rast.min().item(), vmax=rast.max().item())
-    plot_raster(ax, 
-                rast, 
-                cmap=CMAP_BR, 
-                cbar_kwargs=cbar_kwargs, 
-                # norm=norm, 
-                vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                title='Area = $25\cdot 10^8$m$^2$')
-    fig.tight_layout()
-    plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=50000)
-    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
-
-    # Plot dlogSR/dlogA at resolution 1000m
-    fig, ax = plt.subplots()
-    cbar_kwargs['label'] = 'dlogSR/dlogA'
-    cbar_kwargs['location'] = 'left'
-    name = "dsr_1000"
-    rast = np.maximum(0.,rasters[name])
-    rast = rast.where(rasters[name[1:]] > 0)
-
-    # rast = preprocess_raster(rast)
-    plot_raster(ax, 
-                rast, 
-                cmap=CMAP_DSR, 
-                cbar_kwargs=cbar_kwargs, 
-                vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                )
-    plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=20000)
-    fig.tight_layout()
-    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
-
-    # Plot dlogSR/dlogA at resolution 50km
-    fig, ax = plt.subplots()
-    cbar_kwargs['label'] = 'dlogSR/dlogA'
-    cbar_kwargs['location'] = 'left'
-    name = "dsr_50000"
-    rast = np.maximum(0.,rasters[name])
-    rast = rast.where(rasters[name[1:]] > 0)
-
-    # rast = preprocess_raster(rast)
-    plot_raster(ax, 
-                rast, 
-                cmap=CMAP_DSR, 
-                cbar_kwargs=cbar_kwargs, 
-                vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                )
-    plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=50000)
-    fig.tight_layout()
-    fig.savefig(f"panels/{name}.pdf", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.png", dpi=300, transparent=True)
-    fig.savefig(f"panels/{name}.svg", dpi=300, transparent=True)
-    
-    
-    
-    # Plot SAR curves on three different axes
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 3), sharey=True, sharex=True)
     area = np.exp(dict_sar["log_area"])
 
     # Plot each location on a separate axis
@@ -239,10 +175,7 @@ if __name__ == '__main__':
         
         ax.plot(area_smooth, median_sr_smooth,
                 color=color, 
-                linewidth=2, 
-                # marker='o', 
-                # markersize=3
-                )
+                linewidth=2)
         ax.fill_between(area_smooth,
                         q05_sr_smooth,
                         q95_sr_smooth,
@@ -253,7 +186,6 @@ if __name__ == '__main__':
         ax.axvline(x=25e8, color='gray', linestyle='--', alpha=0.7)
         
         ax.set_xscale('log')
-        # ax.set_yscale('log')
         
         if i == 0:
             ax.set_ylabel("SR")
@@ -263,98 +195,71 @@ if __name__ == '__main__':
         ax.set_ylim(500, 2000)
         ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
 
+    # Second row: Species richness maps (2 panels, each spanning 3 columns)
+    ax_sr1 = fig.add_subplot(gs[1, 0:3])
+    ax_sr2 = fig.add_subplot(gs[1, 3:6])
+
+    # SR at 1000m resolution
+    cbar_kwargs = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
+                   'label': 'Species richness', 'pad': 0.05, 'location': 'left'}
+
+    name = "sr_1000"
+    rast = rasters[name]
+    plot_raster(ax_sr1, 
+                rast, 
+                cmap=CMAP_BR, 
+                cbar_kwargs=cbar_kwargs, 
+                vmin=rast.quantile(0.01), 
+                vmax=rast.quantile(0.99),
+                title='Area = $10^6$m$^2$')
+    plot_bounding_boxes(ax_sr1, dict_sar, dict_plot, buffer_size_meters=20000)
+    ax_sr1.set_aspect('equal')
+
+    # SR at 50000m resolution
+    name = "sr_50000"
+    rast = rasters[name]
+    plot_raster(ax_sr2, 
+                rast, 
+                cmap=CMAP_BR, 
+                cbar_kwargs=cbar_kwargs, 
+                vmin=rast.quantile(0.01), 
+                vmax=rast.quantile(0.99),
+                title='Area = $25\cdot 10^8$m$^2$')
+    plot_bounding_boxes(ax_sr2, dict_sar, dict_plot, buffer_size_meters=50000)
+    ax_sr2.set_aspect('equal')
+
+    # Third row: dSR maps (2 panels, each spanning 3 columns)
+    ax_dsr1 = fig.add_subplot(gs[2, 0:3])
+    ax_dsr2 = fig.add_subplot(gs[2, 3:6])
+
+    cbar_kwargs['label'] = 'dlogSR/dlogA'
+    cbar_kwargs['location'] = 'left'
+
+    # dSR at 1000m resolution
+    name = "dsr_1000"
+    rast = np.maximum(0., rasters[name])
+    rast = rast.where(rasters[name[1:]] > 0)
+    plot_raster(ax_dsr1, 
+                rast, 
+                cmap=CMAP_DSR, 
+                cbar_kwargs=cbar_kwargs, 
+                vmin=rast.quantile(0.01), 
+                vmax=rast.quantile(0.99))
+    ax_dsr1.set_aspect('equal')
+
+    # dSR at 50000m resolution
+    name = "dsr_50000"
+    rast = np.maximum(0., rasters[name])
+    rast = rast.where(rasters[name[1:]] > 0)
+    plot_raster(ax_dsr2, 
+                rast, 
+                cmap=CMAP_DSR, 
+                cbar_kwargs=cbar_kwargs, 
+                vmin=rast.quantile(0.01), 
+                vmax=rast.quantile(0.99))
+    ax_dsr2.set_aspect('equal')
+
     fig.tight_layout()
-    fig.savefig("panels/sar_curves.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/sar_curves.png", dpi=300, transparent=True)
-    fig.savefig("panels/sar_curves.svg", dpi=300, transparent=True)
-
-
-
-    # Create figure with gridspec for custom layout
-    fig = plt.figure(figsize=(15, 12))
-    gs = fig.add_gridspec(3, 6, hspace=0.3, wspace=0.3)
-        
-    area = np.exp(dict_sar["log_area"])
-    
-    # Row 1: Three panels for correlations and SAR (2 grid cells each)
-    ax1 = fig.add_subplot(gs[0, 0:2])  # Left correlation
-    ax2 = fig.add_subplot(gs[0, 2:4])  # Middle SAR
-    ax3 = fig.add_subplot(gs[0, 4:6])  # Right correlation
-    
-    # Left: Correlation dSR vs SR (1000m)
-    valid_mask = (rasters['sr_1000'] > 0) & (rasters['dsr_1000'] > 0)
-    sr_flat = rasters['sr_1000'].where(valid_mask).values.flatten()
-    dsr_flat = rasters['dsr_1000'].where(valid_mask).values.flatten()
-    valid_idx = ~(np.isnan(sr_flat) | np.isnan(dsr_flat))
-    
-    ax1.scatter(sr_flat[valid_idx], dsr_flat[valid_idx], alpha=0.5, s=1)
-    
-    # Calculate and plot linear trend
-    # Calculate correlation coefficient
-    correlation = np.corrcoef(np.log10(sr_flat[valid_idx]), np.log10(dsr_flat[valid_idx]))[0, 1]
-    slope, intercept, r_value, p_value, std_err = stats.linregress(np.log10(sr_flat[valid_idx]), np.log10(dsr_flat[valid_idx]))
-    x_trend = np.logspace(np.log10(sr_flat[valid_idx].min()), np.log10(sr_flat[valid_idx].max()), 100)
-    y_trend = 10**(slope * np.log10(x_trend) + intercept)
-    ax1.plot(x_trend, y_trend, 'r-', linewidth=2, label=f'Linear fit (r={r_value:.3f})')
-    
-    
-    ax1.set_xlabel('Species Richness (1km)')
-    ax1.set_ylabel('dlogSR/dlogA')
-    ax1.set_yscale('log')
-    ax1.set_xscale('log')
-    ax1.set_title('Correlation: 1km resolution')
-    ax1.legend()
-    
-    # Middle: SAR curves
-    plot_sar(ax2, dict_sar, dict_plot, area)
-    ax2.set_title('Species-Area Relationships')
-    
-    # Right: Correlation dSR vs SR (50000m)
-    valid_mask = (rasters['sr_50000'] > 0) & (rasters['dsr_50000'] > 0)
-    sr_flat = rasters['sr_50000'].where(valid_mask).values.flatten()
-    dsr_flat = rasters['dsr_50000'].where(valid_mask).values.flatten()
-    valid_idx = ~(np.isnan(sr_flat) | np.isnan(dsr_flat))
-    correlation = np.corrcoef(np.log10(sr_flat[valid_idx]), np.log10(dsr_flat[valid_idx]))[0, 1]
-
-    ax3.scatter(sr_flat[valid_idx], dsr_flat[valid_idx], alpha=0.5, s=1)
-    ax3.set_xlabel('Species Richness (50km)')
-    ax3.set_ylabel('dlogSR/dlogA')
-    ax3.set_title('Correlation: 50km resolution')
-    
-    # Row 2: Species richness rasters (3 grid cells each)
-    ax4 = fig.add_subplot(gs[1, 0:3])  # SR 1km
-    ax5 = fig.add_subplot(gs[1, 3:6])  # SR 50km
-    
-    cbar_kwargs_sr = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
-                      'label': 'Species richness', 'pad': 0.05}
-    
-    plot_raster(ax4, rasters['sr_1000'], cmap="viridis", 
-                cbar_kwargs=cbar_kwargs_sr, title='SR: 1km²')
-    plot_bounding_boxes(ax4, dict_sar, dict_plot, buffer_size_meters=50000)
-    
-    plot_raster(ax5, rasters['sr_50000'], cmap="viridis", 
-                cbar_kwargs=cbar_kwargs_sr, title='SR: 50km²')
-    plot_bounding_boxes(ax5, dict_sar, dict_plot, buffer_size_meters=200000)
-    
-    # Row 3: dlogSR/dlogA rasters (3 grid cells each)
-    ax6 = fig.add_subplot(gs[2, 0:3])  # dSR 1km
-    ax7 = fig.add_subplot(gs[2, 3:6])  # dSR 50km
-    
-    cbar_kwargs_dsr = {'orientation': 'vertical', 'shrink': 0.6, 'aspect': 40,
-                       'label': 'dlogSR/dlogA', 'pad': 0.05}
-    
-    dsr_1000_filtered = np.maximum(0., rasters['dsr_1000']).where(rasters['sr_1000'] > 0)
-    plot_raster(ax6, dsr_1000_filtered, cmap="plasma", 
-                cbar_kwargs=cbar_kwargs_dsr, vmax=dsr_1000_filtered.quantile(0.9),
-                title='dlogSR/dlogA: 1km²')
-    plot_bounding_boxes(ax6, dict_sar, dict_plot, buffer_size_meters=50000)
-    
-    dsr_50000_filtered = np.maximum(0., rasters['dsr_50000']).where(rasters['sr_50000'] > 0)
-    plot_raster(ax7, dsr_50000_filtered, cmap="plasma", 
-                cbar_kwargs=cbar_kwargs_dsr, vmax=dsr_50000_filtered.quantile(0.9),
-                title='dlogSR/dlogA: 50km²')
-    plot_bounding_boxes(ax7, dict_sar, dict_plot, buffer_size_meters=200000)
-    
-    fig.savefig("panels/figure_5_complete.pdf", dpi=300, bbox_inches='tight', transparent=True)
-    fig.savefig("panels/figure_5_complete.png", dpi=300, bbox_inches='tight', transparent=True)
-    fig.savefig("panels/figure_5_complete.svg", dpi=300, bbox_inches='tight', transparent=True)
+    fig.savefig("panels/figure_5_combined.pdf", dpi=300, transparent=True)
+    fig.savefig("panels/figure_5_combined.png", dpi=300, transparent=True)
+    fig.savefig("panels/figure_5_combined.svg", dpi=300, transparent=True)
