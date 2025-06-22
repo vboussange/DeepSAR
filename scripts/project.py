@@ -8,6 +8,7 @@ from train import Config
 from pathlib import Path
 from src.data_processing.utils_env_pred import CHELSADataset
 from src.neural_4pweibull import initialize_ensemble_model
+from src.plotting import CMAP_BR
 import pandas as pd
 from tqdm import tqdm
 
@@ -124,15 +125,11 @@ if __name__ == "__main__":
         if plotting:
             import matplotlib.pyplot as plt
             from matplotlib import cm
-            from matplotlib.colors import LinearSegmentedColormap
 
             fig, ax = plt.subplots(figsize=(8, 6))
             # colors = ["#dad7cd","#a3b18a","#588157","#3a5a40","#344e41"]
-            colors = ["#f72585","#b5179e","#7209b7","#560bad","#480ca8","#3a0ca3","#3f37c9","#4361ee","#4895ef","#4cc9f0"]
-            # check https://coolors.co/palettes/popular/gradient
-            custom_cmap = LinearSegmentedColormap.from_list("species_richness", colors[::-1])
             SR_rast = SR_rast.rename("SR")
-            SR_rast.plot(ax=ax, cmap=custom_cmap, vmin=SR_rast.quantile(0.01), vmax=SR_rast.quantile(0.99))
+            SR_rast.plot(ax=ax, cmap=CMAP_BR, vmin=SR_rast.quantile(0.01), vmax=SR_rast.quantile(0.99))
             ax.set_title(f"Res: {res}m")
             fig.savefig(projection_path / f"SR_raster_{MODEL_NAME}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
         

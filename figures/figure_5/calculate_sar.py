@@ -58,7 +58,7 @@ if __name__ == "__main__":
             }
     
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3035")
-    window_sizes = np.logspace(np.log10(1e2), np.log10(1e5), 100)
+    window_sizes = np.logspace(np.log10(1e2), np.log10(1e6), 100)
     for loc in dict_SAR:
         print(loc)
         y, x = transformer.transform(*dict_SAR[loc]["coords"])

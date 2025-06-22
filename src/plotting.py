@@ -7,6 +7,7 @@ import scipy.stats as stats
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.multicomp import MultiComparison
 from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from matplotlib.colors import LinearSegmentedColormap
 
 RCPARAMS_DICT = {
     "font.size": 9,
@@ -29,6 +30,13 @@ COLOR_PALETTE = [(0.09019607843137255, 0.41568627450980394, 0.050980392156862744
                         (0.5450980392156862, 0.03529411764705882, 0.03529411764705882, 1.0),
                         (0.5529411764705883, 0.6274509803921569, 0.796078431372549)]
 
+COLORS_BR = ["#f72585","#b5179e","#7209b7","#560bad","#480ca8","#3a0ca3","#3f37c9","#4361ee","#4895ef","#4cc9f0"]
+# check https://coolors.co/palettes/popular/gradient
+CMAP_BR = LinearSegmentedColormap.from_list("species_richness", COLORS_BR[::-1])
+
+
+COLORS_DSR = ["#00296b","#003f88","#00509d","#fdc500","#ffd500"]
+CMAP_DSR = LinearSegmentedColormap.from_list("dsr", COLORS_DSR)
 
 class ResultData:
     def __init__(self, gdf, config, aggregate_labels, test_partition_idx):
