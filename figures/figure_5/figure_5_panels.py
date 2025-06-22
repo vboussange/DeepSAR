@@ -261,6 +261,7 @@ if __name__ == '__main__':
             ax.set_xlabel("Area")
         ax.set_xlim(1e5, 1e10)
         ax.set_ylim(500, 2000)
+        ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
 
     fig.tight_layout()
     fig.savefig("panels/sar_curves.pdf", dpi=300, transparent=True)
