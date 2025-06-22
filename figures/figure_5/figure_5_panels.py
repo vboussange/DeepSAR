@@ -1,4 +1,4 @@
-# TODO: to fix bounding boxes which are shifted, possibly due to rolling window in rasters
+# TODO: to fix bounding boxes which are shifted, this problem did not appear in 7ec7ab7 version
 import matplotlib.pyplot as plt
 import pickle
 import xarray as xr
