@@ -260,6 +260,6 @@ if __name__ == '__main__':
     ax_dsr2.set_aspect('equal')
 
     fig.tight_layout()
-    fig.savefig("panels/figure_5_combined.pdf", dpi=300, transparent=True)
-    fig.savefig("panels/figure_5_combined.png", dpi=300, transparent=True)
-    fig.savefig("panels/figure_5_combined.svg", dpi=300, transparent=True)
+    fig.savefig("figure_5_combined.pdf", dpi=300, transparent=True)
+    fig.savefig("figure_5_combined.png", dpi=300, transparent=True)
+    fig.savefig("figure_5_combined.svg", dpi=300, transparent=True)
