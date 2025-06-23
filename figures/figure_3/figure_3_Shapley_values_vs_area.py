@@ -1,5 +1,7 @@
 """
 This script generates plots of Shapley values vs area and residuals vs area for different habitats.
+
+# TODO: change color maps for plotting.CMAP_BR blue and reds
 """
 import torch
 import numpy as np

@@ -232,8 +232,8 @@ for data, color in zip(data_list, colors):
 # Format plot
 ax.set_xscale('log')
 ax.set_yscale('log')
-ax.set_ylabel('Species richness')
-ax.set_xlabel('Area (m²)')
+ax.set_ylabel('Species richness', labelpad=10)
+ax.set_xlabel('Sampling effort (m²)')
 ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 ax.grid(True, alpha=0.3)
 
@@ -245,4 +245,4 @@ training_dot = mlines.Line2D([], [], color='grey', marker='o', linestyle='None',
 ax.legend(handles=[training_dot, interp_line, extrap_line], bbox_to_anchor=(0.6, 0.2), loc='upper left')
 
 fig.tight_layout()
-fig.savefig(Path(__file__).parent / "rarefaction_curves.png", dpi=300, bbox_inches='tight')
+fig.savefig(Path(__file__).parent / "rarefaction_curves.svg", bbox_inches='tight')

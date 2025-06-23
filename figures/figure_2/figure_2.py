@@ -1,5 +1,6 @@
 """
 Plotting figure 2 'prediction power of climate, area, and both on SR'
+TODO: change color scheme for plotting.CMAP_BR blue and reds
 """
 import torch
 import numpy as np
