@@ -61,10 +61,10 @@ def load_data(rast_path=RAST_PATH, sar_path=SAR_PATH):
 #                             ).mean()
 #     return rast
 
-def plot_raster(ax, rast, cmap, cbar_kwargs, norm=None, title='', **kwargs):
+def plot_raster(ax, rast, cmap, cbar_kwargs, norm=None, **kwargs):
     """Plot raster data on a given axis."""
     rast.plot(ax=ax, cmap=cmap, cbar_kwargs=cbar_kwargs, norm=norm, **kwargs).set_rasterized(True)
-    ax.set_title(title)
+    ax.set_title('')
     ax.set_axis_off()
 
 def plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=100000):
@@ -90,8 +90,6 @@ def plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=100000):
         col = []
         col.append(ax.plot(x, y, color='white', linewidth=4, alpha=0.8)[0])  # Wider white border
         col.append(ax.plot(x, y, color=color, linewidth=2)[0])    # Colored line on top
-        for c in col:
-            c.set_rasterized(True)
     
 
 if __name__ == '__main__':
@@ -158,6 +156,7 @@ if __name__ == '__main__':
         
     # Add labels under the vertical lines
     labels = ['A', 'B', 'C']
+    
     for i, (loc, ax) in enumerate(zip(locations, axes)):
         loc_info = dict_plot[loc]
         sar_data = dict_sar[loc]
@@ -173,7 +172,7 @@ if __name__ == '__main__':
         median_sr_smooth = np.convolve(median_sr, np.ones(window_size)/window_size, mode='valid')
         q05_sr_smooth = np.convolve(q05_sr, np.ones(window_size)/window_size, mode='valid')
         q95_sr_smooth = np.convolve(q95_sr, np.ones(window_size)/window_size, mode='valid')
-        area_smooth = area[window_size-1:] / 1e6  # Convert area to km^2
+        area_smooth = area[window_size-1:] / 1e6  # Convert area to km² for plotting
         
         ax.plot(area_smooth, median_sr_smooth,
                 color=color, 
@@ -184,11 +183,11 @@ if __name__ == '__main__':
                         color=color, alpha=0.2)
         
         # Add vertical lines
-        ax.axvline(x=1e6, color='gray', linestyle='--', alpha=0.7)
-        ax.axvline(x=25e8, color='gray', linestyle='--', alpha=0.7)
+        ax.axvline(x=1, color='gray', linestyle='--', alpha=0.7)
+        ax.axvline(x=2.5e3, color='gray', linestyle='--', alpha=0.7)
 
-        ax.text(1e6, ax.get_ylim()[0] - 50, f'{labels[i]}1', ha='center', va='top', fontsize=8)
-        ax.text(25e8, ax.get_ylim()[0] - 50, f'{labels[i]}2', ha='center', va='top', fontsize=8)
+        ax.text(1, 2200, f'{labels[i]}1', ha='center', va='top', fontsize=10, weight='bold')
+        ax.text(2.5e3, 2200, f'{labels[i]}2', ha='center', va='top', fontsize=10, weight='bold')
         
         ax.set_xscale('log')
         
@@ -196,9 +195,19 @@ if __name__ == '__main__':
             ax.set_ylabel("Species richness")
         if i == 1:
             ax.set_xlabel("Area (km$^2$)")
-        ax.set_xlim(1e5, 1e10)
+        ax.set_xlim(1e-1, 1e4)
         ax.set_ylim(500, 2000)
+        
+        # Remove xtick labels at both ends
+        xticks = ax.get_xticks()
+        xlabels = [tick.get_text() for tick in ax.get_xticklabels()]
+        if len(xlabels) > 2:
+            xlabels[0:2] = ['', '']  # Remove first two labels
+            xlabels[-2:] = ['', '']  # Remove last two labels
+            ax.set_xticklabels(xlabels)
         ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
+        if i > 0:
+            ax.set_yticklabels([])
 
     # Second row: Species richness maps (2 panels, each spanning 3 columns)
     ax_sr1 = fig.add_subplot(gs[1, 0:3])
@@ -215,21 +224,20 @@ if __name__ == '__main__':
                 cmap=CMAP_BR, 
                 cbar_kwargs=cbar_kwargs, 
                 vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                title='Area = 1 km$^2$')
+                vmax=rast.quantile(0.99))
     plot_bounding_boxes(ax_sr1, dict_sar, dict_plot, buffer_size_meters=20000)
     ax_sr1.set_aspect('equal')
 
     # SR at 50000m resolution
     name = "sr_50000"
     rast = rasters[name]
+    cbar_kwargs['location'] = 'right'
     plot_raster(ax_sr2, 
                 rast, 
                 cmap=CMAP_BR, 
                 cbar_kwargs=cbar_kwargs, 
                 vmin=rast.quantile(0.01), 
-                vmax=rast.quantile(0.99),
-                title='Area = 2500 km$^2$')
+                vmax=rast.quantile(0.99))
     plot_bounding_boxes(ax_sr2, dict_sar, dict_plot, buffer_size_meters=50000)
     ax_sr2.set_aspect('equal')
 
@@ -244,6 +252,7 @@ if __name__ == '__main__':
     name = "dsr_1000"
     rast = np.maximum(0., rasters[name])
     rast = rast.where(rasters[name[1:]] > 0)
+    cbar_kwargs['location'] = 'left'
     plot_raster(ax_dsr1, 
                 rast, 
                 cmap=CMAP_DSR, 
@@ -251,11 +260,13 @@ if __name__ == '__main__':
                 vmin=rast.quantile(0.01), 
                 vmax=rast.quantile(0.99))
     ax_dsr1.set_aspect('equal')
+    ax_dsr1.set_title('Area = 1 km$^2$', y=-0.1)
 
     # dSR at 50000m resolution
     name = "dsr_50000"
     rast = np.maximum(0., rasters[name])
     rast = rast.where(rasters[name[1:]] > 0)
+    cbar_kwargs['location'] = 'right'
     plot_raster(ax_dsr2, 
                 rast, 
                 cmap=CMAP_DSR, 
@@ -263,8 +274,9 @@ if __name__ == '__main__':
                 vmin=rast.quantile(0.01), 
                 vmax=rast.quantile(0.99))
     ax_dsr2.set_aspect('equal')
+    ax_dsr2.set_title('Area = 2500 km$^2$', y=-0.1)
 
-    fig.tight_layout()
+    # fig.tight_layout()
     fig.savefig("figure_5_combined.pdf", dpi=300, transparent=True)
     fig.savefig("figure_5_combined.png", dpi=300, transparent=True)
     fig.savefig("figure_5_combined.svg", dpi=300, transparent=True)
