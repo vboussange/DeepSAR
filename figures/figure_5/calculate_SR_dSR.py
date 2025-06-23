@@ -113,7 +113,7 @@ def get_SR_dSR_stats(model, climate_dataset, res0, predictors, feature_scaler, t
     
     mean_SR1 = np.mean(SR01_list[1], axis=1)
     
-    dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (np.log(res1) - np.log(res0))
+    dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
     mean_dSR_dlogA = np.nanmean(dSR_dlogA, axis=1)
     std_dSR_dlogA = np.std(dSR_dlogA, axis=1)
     return features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA

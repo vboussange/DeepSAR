@@ -19,8 +19,14 @@ from train import Config, Trainer
 # Configuration
 MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
 PLOT_CONFIG = [("Area", "tab:green"), ("Mean climate", "tab:blue"), ("Climate heterogeneity", "tab:red")]
-N_BINS = 20
-SAMPLES_PER_BIN = np.inf
+
+def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
+        """Sample data stratified by log area bins."""
+        gdf = gdf.copy()
+        gdf['log_area_bins'] = pd.cut(gdf['log_megaplot_area'], bins=n_bins, labels=False)
+        return gdf.groupby('log_area_bins', group_keys=False).apply(
+            lambda x: x.sample(min(samples_per_bin, len(x)))
+        )
 
 class ShapleyAnalyzer:
     """Handles Shapley value computation and analysis."""
@@ -29,19 +35,11 @@ class ShapleyAnalyzer:
         self.model = model
         self.predictors = results_fit_split["predictors"]
         self.feature_scaler = results_fit_split["feature_scaler"]
-        
-    def _sample_data_by_area(self, gdf, n_bins=100, samples_per_bin=SAMPLES_PER_BIN):
-        """Sample data stratified by log area bins."""
-        gdf = gdf.copy()
-        gdf['log_area_bins'] = pd.cut(gdf['log_megaplot_area'], bins=n_bins, labels=False)
-        return gdf.groupby('log_area_bins', group_keys=False).apply(
-            lambda x: x.sample(min(samples_per_bin, len(x)))
-        )
     
     def compute_shapley_values(self, gdf):
         """Compute Shapley values for given dataframe."""
         # Sample data
-        gdf_sampled = self._sample_data_by_area(gdf)
+        gdf_sampled = sample_data_by_area(gdf)
         
         # Prepare features
         X = self.feature_scaler.transform(gdf_sampled[self.predictors].values)
@@ -81,7 +79,7 @@ class ResidualAnalyzer:
         
         # Assuming target is species richness
         predictions = self.target_scaler.inverse_transform(predictions.reshape(-1, 1)).flatten()
-        residuals = gdf["sr"] - predictions
+        residuals = predictions - gdf["sr"]
         relative_residuals = residuals / (gdf["sr"])  # Relative residuals
         
         df_residuals = pd.DataFrame({
@@ -89,7 +87,10 @@ class ResidualAnalyzer:
             'megaplot_area': gdf['megaplot_area'].values,
             'log_megaplot_area': gdf['log_megaplot_area'].values,
             'relative_residuals': relative_residuals,
-            "coverage": gdf["coverage"].values
+            "coverage": gdf["coverage"].values,
+            "log_area_bins": gdf["log_area_bins"].values, 
+            "sr": gdf["sr"].values
+
         })
         
         return df_residuals
@@ -139,7 +140,7 @@ def plot_shapley_values(df_shap, ax, config_plot):
     """Plot Shapley values vs area."""
     for var_name, color in config_plot:
         # Bin by area
-        df_shap['area_bins'] = pd.cut(df_shap['log_megaplot_area_values'], bins=N_BINS, labels=False)
+        df_shap['area_bins'] = pd.cut(df_shap['log_megaplot_area_values'], bins=20, labels=False)
         
         # Aggregate by bins
         grouped = df_shap.groupby('area_bins')
@@ -156,10 +157,7 @@ def plot_shapley_values(df_shap, ax, config_plot):
 
 def plot_residuals(df_residuals, ax):
     """Plot relative residuals vs area as scatter plot."""
-    # Calculate relative residuals (residuals as percentage of observed values)
-    # Assuming 'sr' is available in the original data, we need to add it to df_residuals
-    # For now, we'll compute relative residuals as residuals / (residuals + predictions)
-    # This requires getting predictions first
+
     
     # Create scatter plot of relative residuals
     relative_residuals = df_residuals['relative_residuals'] 
@@ -180,17 +178,17 @@ def plot_residuals(df_residuals, ax):
     ax.fill_between(mean_areas, mean_residuals - std_residuals, mean_residuals + std_residuals,
                    alpha=0.3, color='lightgray', label='±1 std')
     
-    # Plot individual residuals
     ax.scatter(
-        df_residuals['megaplot_area'], relative_residuals, 
-        c="tab:orange", alpha=0.5, s=10
+        df_residuals['megaplot_area'], 
+        relative_residuals, 
+        c="tab:orange", alpha=0.5, s=10,
     )
     
     # Plot mean trend line
     # ax.plot(mean_areas, mean_residuals, color='red', linewidth=2, label='Mean residuals')
     
     ax.axhline(y=0, color='red', linestyle='--', alpha=0.5)
-    ax.set_ylim(relative_residuals.quantile(0.01), -relative_residuals.quantile(0.01))
+    # ax.set_ylim(relative_residuals.quantile(0.01), -relative_residuals.quantile(0.01))
     
     ax.set_xscale("log")
     ax.set_ylabel("Relative residuals")
@@ -207,7 +205,8 @@ if __name__ == "__main__":
     df_shap = aggregate_shapley_features(df_shap, config)
     
     # Compute residuals
-    df_residuals = residual_analyzer.compute_residuals(test_data)
+    data_residuals = sample_data_by_area(test_data, n_bins=100, samples_per_bin=20)
+    df_residuals = residual_analyzer.compute_residuals(data_residuals)
     
     # Create plots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 3.5))
