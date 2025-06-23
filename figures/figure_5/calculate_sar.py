@@ -91,8 +91,7 @@ if __name__ == "__main__":
                 
             dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
 
-        minx, miny, maxx, maxy = x, y - window_size, x + window_size, y
-        dict_SAR[loc]["coords_epsg_3035"] = (minx, miny, maxx, maxy)
+        dict_SAR[loc]["coords_epsg_3035"] = (x, y)
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
         dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"])

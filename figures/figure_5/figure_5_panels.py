@@ -1,4 +1,3 @@
-# TODO: to fix bounding boxes which are shifted, this problem did not appear in 7ec7ab7 version
 import matplotlib.pyplot as plt
 import pickle
 import xarray as xr
@@ -73,12 +72,7 @@ def plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=100000):
         sar_data = dict_sar[loc]
         color = loc_info['c']
 
-        minx, miny, maxx, maxy = sar_data['coords_epsg_3035']
-        bbox = box(minx, miny, maxx, maxy)
-        gdf_bbox = gpd.GeoDataFrame({'geometry': [bbox]}, crs='EPSG:3035')
-        centroid_proj = gdf_bbox.centroid.geometry.iloc[0]
-
-        x_centroid, y_centroid = centroid_proj.coords[0]
+        x_centroid, y_centroid = sar_data['coords_epsg_3035']
         minx_proj = x_centroid - buffer_size_meters
         maxx_proj = x_centroid + buffer_size_meters
         miny_proj = y_centroid - buffer_size_meters
