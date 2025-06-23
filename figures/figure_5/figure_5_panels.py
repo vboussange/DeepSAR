@@ -155,7 +155,9 @@ if __name__ == '__main__':
     # Plot each location on a separate axis
     locations = list(dict_plot.keys())
     axes = [ax1, ax2, ax3]
-
+        
+    # Add labels under the vertical lines
+    labels = ['A', 'B', 'C']
     for i, (loc, ax) in enumerate(zip(locations, axes)):
         loc_info = dict_plot[loc]
         sar_data = dict_sar[loc]
@@ -171,7 +173,7 @@ if __name__ == '__main__':
         median_sr_smooth = np.convolve(median_sr, np.ones(window_size)/window_size, mode='valid')
         q05_sr_smooth = np.convolve(q05_sr, np.ones(window_size)/window_size, mode='valid')
         q95_sr_smooth = np.convolve(q95_sr, np.ones(window_size)/window_size, mode='valid')
-        area_smooth = area[window_size-1:]
+        area_smooth = area[window_size-1:] / 1e6  # Convert area to km^2
         
         ax.plot(area_smooth, median_sr_smooth,
                 color=color, 
@@ -184,13 +186,16 @@ if __name__ == '__main__':
         # Add vertical lines
         ax.axvline(x=1e6, color='gray', linestyle='--', alpha=0.7)
         ax.axvline(x=25e8, color='gray', linestyle='--', alpha=0.7)
+
+        ax.text(1e6, ax.get_ylim()[0] - 50, f'{labels[i]}1', ha='center', va='top', fontsize=8)
+        ax.text(25e8, ax.get_ylim()[0] - 50, f'{labels[i]}2', ha='center', va='top', fontsize=8)
         
         ax.set_xscale('log')
         
         if i == 0:
-            ax.set_ylabel("SR")
+            ax.set_ylabel("Species richness")
         if i == 1:
-            ax.set_xlabel("Area")
+            ax.set_xlabel("Area (km$^2$)")
         ax.set_xlim(1e5, 1e10)
         ax.set_ylim(500, 2000)
         ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
@@ -211,7 +216,7 @@ if __name__ == '__main__':
                 cbar_kwargs=cbar_kwargs, 
                 vmin=rast.quantile(0.01), 
                 vmax=rast.quantile(0.99),
-                title='Area = $10^6$m$^2$')
+                title='Area = 1 km$^2$')
     plot_bounding_boxes(ax_sr1, dict_sar, dict_plot, buffer_size_meters=20000)
     ax_sr1.set_aspect('equal')
 
@@ -224,7 +229,7 @@ if __name__ == '__main__':
                 cbar_kwargs=cbar_kwargs, 
                 vmin=rast.quantile(0.01), 
                 vmax=rast.quantile(0.99),
-                title='Area = $25\cdot 10^8$m$^2$')
+                title='Area = 2500 km$^2$')
     plot_bounding_boxes(ax_sr2, dict_sar, dict_plot, buffer_size_meters=50000)
     ax_sr2.set_aspect('equal')
 
