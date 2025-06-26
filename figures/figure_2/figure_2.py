@@ -134,7 +134,7 @@ if __name__ == "__main__":
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
    
     datasets = ['eva', 'gift']
-    colors = ['tab:blue', 'tab:purple']
+    colors = ["#f72585","#4cc9f0"]
     
     
     axes = [ax1, ax2]
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     # Add individual data points
     for i, data in enumerate(all_data):
         x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
-        ax3.scatter(x, data, alpha=0.6, s=10, color='tab:blue', zorder=3)
+        ax3.scatter(x, data, alpha=0.6, s=10, color="#f72585", zorder=3)
 
     # Set labels and formatting
     ax3.set_xticks(x_pos)
@@ -293,7 +293,7 @@ if __name__ == "__main__":
     x = mask["sr"]
     y = mask["predicted_sr"]
     
-    ax4.scatter(x, y, alpha=0.6, s=10, color='tab:purple')
+    ax4.scatter(x, y, alpha=0.6, s=10, color="#4cc9f0")
     
     # Add 1:1 line
     max_val = np.nanmax([x.max(), y.max()])
@@ -321,8 +321,8 @@ if __name__ == "__main__":
     
     # Add panel labels (a, b, c, d) in Nature style
     ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax3.text(0.9, 0.95, 'c', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax2.text(0.1, 0.1, 'c', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax3.text(0.9, 0.95, 'b', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     ax4.text(0.15, 0.95, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     
     plt.tight_layout()

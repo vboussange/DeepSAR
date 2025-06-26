@@ -18,7 +18,7 @@ from train import Config, Trainer
 
 # Configuration
 MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
-PLOT_CONFIG = [("Area", "tab:green"), ("Mean climate", "tab:blue"), ("Climate heterogeneity", "tab:red")]
+PLOT_CONFIG = [("Area", "#f72585"), ("Climate heterogeneity", "#4cc9f0"), ("Mean climate", "#3a0ca3"), ]
 
 def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
         """Sample data stratified by log area bins."""
@@ -52,7 +52,7 @@ class ShapleyAnalyzer:
                 return self.model(X).flatten()
 
         explainer = ShapleyValueSampling(forward_fn)
-        shap_values = explainer.attribute(features).cpu().numpy()
+        shap_values = explainer.attribute(features, n_samples=400).cpu().numpy()
         
         # Create DataFrame
         df_shap = pd.DataFrame(shap_values, columns=self.predictors)
@@ -146,14 +146,20 @@ def plot_shapley_values(df_shap, ax, config_plot):
         grouped = df_shap.groupby('area_bins')
         mean_vals = grouped[var_name].mean()
         std_vals = grouped[var_name].std()
-        mean_areas = grouped['log_megaplot_area_values'].mean()
+        mean_areas = np.exp(grouped['log_megaplot_area_values'].mean())  / 1e6 
         
-        # Plot with error bars
-        ax.errorbar(np.exp(mean_areas), mean_vals, yerr=std_vals, 
-                   fmt='o', color=color, label=var_name, alpha=0.7)
-    
+        # Plot mean values without error bars (incompatible with log scale)
+        ax.plot(mean_areas, mean_vals, 'o-', color=color, label=var_name, alpha=0.7)
+        # Add confidence intervals as shaded regions instead of error bars
+        # Calculate confidence intervals (assuming normal distribution)
+        ci_lower = mean_vals - std_vals 
+        ci_upper = mean_vals + std_vals 
+        
+        # Fill between for confidence interval
+        ax.fill_between(mean_areas, ci_lower, ci_upper, alpha=0.2, color=color)    
     ax.set_xscale("log")
-    ax.set_ylabel("Relative absolute Shapley values")
+    ax.set_yscale("log")
+    ax.set_ylabel("Relative absolute\nShapley values")
 
 def plot_residuals(df_residuals, ax):
     """Plot relative residuals vs area as scatter plot."""
@@ -171,17 +177,17 @@ def plot_residuals(df_residuals, ax):
     # Compute statistics for each bin
     grouped = df_residuals.groupby('area_bins')
     mean_residuals = grouped['relative_residuals'].mean()
-    std_residuals = grouped['relative_residuals'].std()
-    mean_areas = grouped['megaplot_area'].mean()
+    std_residuals = grouped['relative_residuals'].std() 
+    mean_areas = grouped['megaplot_area'].mean() / 1e6  # Convert to km²
     
     # Plot the trend with shaded region for ±std
     ax.fill_between(mean_areas, mean_residuals - std_residuals, mean_residuals + std_residuals,
                    alpha=0.3, color='lightgray', label='±1 std')
     
     ax.scatter(
-        df_residuals['megaplot_area'], 
+        df_residuals['megaplot_area'] / 1e6,  # Convert to km²
         relative_residuals, 
-        c="tab:orange", alpha=0.5, s=10,
+        c="#ffc300", alpha=0.5, s=10,
     )
     
     # Plot mean trend line
@@ -194,6 +200,9 @@ def plot_residuals(df_residuals, ax):
     ax.set_ylabel("Relative residuals")
 
 if __name__ == "__main__":
+    # Set random seeds for reproducibility
+    np.random.seed(42)
+
     model, results_fit_split, test_data, config = load_data_and_model()
     
     # Initialize analyzers
@@ -209,7 +218,7 @@ if __name__ == "__main__":
     df_residuals = residual_analyzer.compute_residuals(data_residuals)
     
     # Create plots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 3.5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3.))
     
     # Plot Shapley values
     plot_shapley_values(df_shap, ax1, PLOT_CONFIG)
@@ -218,11 +227,18 @@ if __name__ == "__main__":
     plot_residuals(df_residuals, ax2)
     
     # Add legend
-    ax1.legend(frameon=True, fancybox=True, loc='center left')
-    fig.supxlabel("Area (m²)")
-    plt.tight_layout()
+    ax1.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc='center', ncol=2)
+    ax1.set_ylim(1e-2, 1.5)
+    fig.supxlabel("Area (km²)")
+    fig.tight_layout()
     
+    # Add subplot labels in Nature style
+    ax1.text(0.95,0.95, 'a', transform=ax1.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
+    ax2.text(0.95,0.95, 'b', transform=ax2.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
+    # Add grids to both subplots
+    ax1.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3)
     # Save figure
-    fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
+    fig.savefig("figure_3.pdf", dpi=300, bbox_inches='tight')
     plt.show()
 
