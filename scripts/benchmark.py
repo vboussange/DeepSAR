@@ -263,7 +263,7 @@ if __name__ == "__main__":
             ("area+climate", ["log_observed_area", "log_megaplot_area"] + feats, nn.MSELoss(), frac, base_arch)
         )
     # vary architecture
-    for n in [0, 2, 4, 6]:
+    for n in [0, 2, 4]:
         exps.append(
             ("area+climate",
              ["log_observed_area", "log_megaplot_area"] + feats,

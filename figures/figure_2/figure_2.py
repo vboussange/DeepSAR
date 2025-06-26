@@ -19,8 +19,95 @@ sys.path.append(str(Path(__file__).parent / "../../scripts/"))
 from src.neural_4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from scipy.stats import ttest_ind
+from statsmodels.stats.multicomp import MultiComparison
+from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 import scipy.stats as stats
+
+def report_model_performance_and_significance(df_plot, metric, output_file="model_performance_significance.txt"):
+    """
+    Report model performance and statistical significance for eva and gift datasets.
+    
+    Parameters:
+    -----------
+    df_plot : pd.DataFrame
+        Combined dataframe with model results
+    output_file : str
+        Path to output text file for results
+    """
+    datasets = ['eva', 'gift']
+    
+    with open(output_file, "w") as file:
+        for dataset in datasets:
+            metric_col = f"{metric}_{dataset}"
+            
+            # Get available models for this dataset
+            available_models = []
+            model_data_dict = {}
+            
+            for model in df_plot['model'].unique():
+                model_data = df_plot[df_plot['model'] == model]
+                if not model_data.empty and metric_col in model_data.columns:
+                    performance = model_data[metric_col].dropna().values
+                    if len(performance) > 0:
+                        available_models.append(model)
+                        model_data_dict[model] = performance
+            
+            if not available_models:
+                continue
+                
+            print(f"\n{dataset.upper()} Dataset Performance", file=file)
+            print("=" * 50, file=file)
+            
+            # Performance summary table
+            dataset_results = []
+            for model in available_models:
+                performance = model_data_dict[model]
+                dataset_results.append({
+                    'Model': model,
+                    'RMSE_mean': np.mean(performance),
+                    'RMSE_std': np.std(performance),
+                    'N': len(performance)
+                })
+            
+            results_df = pd.DataFrame(dataset_results)
+            results_df['RMSE'] = results_df.apply(lambda x: f"{x['RMSE_mean']:.4f} ± {x['RMSE_std']:.4f}", axis=1)
+            summary_table = results_df[['Model', 'RMSE', 'N']]
+            print(summary_table.to_string(index=False), file=file)
+            
+            # Statistical significance tests (pairwise comparisons)
+            print(f"\nPairwise Statistical Significance Tests ({dataset.upper()})", file=file)
+            print("-" * 50, file=file)
+            
+            
+            # Create significance matrix
+            n_models = len(available_models)
+            for i in range(n_models):
+                for j in range(i+1, n_models):
+                    model1, model2 = available_models[i], available_models[j]
+                    data1, data2 = model_data_dict[model1], model_data_dict[model2]
+                    
+                    # Calculate means for relative difference
+                    median1, median2 = np.median(data1), np.median(data2)
+                    rel_diff = ((median2 - median1) / median1) * 100
+                    
+                    # Perform t-test
+                    statistic, p_value = ttest_ind(data1, data2)
+                    
+                    # Determine significance level
+                    if p_value < 0.001:
+                        sig_level = "***"
+                    elif p_value < 0.01:
+                        sig_level = "**"
+                    elif p_value < 0.05:
+                        sig_level = "*"
+                    else:
+                        sig_level = "ns"
+                    
+                    print(f"{model1} vs {model2}: t={statistic:.3f}, p={p_value:.4f} {sig_level}, rel_diff={rel_diff:+.1f}%", file=file)
+            
+            print(f"\nSignificance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant", file=file)
 
 
 if __name__ == "__main__":
@@ -34,24 +121,31 @@ if __name__ == "__main__":
     df_chao2 = pd.read_csv(path_chao2_results)
     
     # Create combined figure
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
     # First two plots: boxplots for EVA and GIFT datasets
     df_plot = pd.concat([df_nw[(df_nw.train_frac == 1.) & (df_nw.num_params > 4e5)], # TODO: to fix
                          df_chao2], 
                         ignore_index=True)
+    # Replace "climate" with "environment" in the model column
+    df_plot['model'] = df_plot['model'].str.replace('climate', 'environment')
     metric = "rmse"
+    report_model_performance_and_significance(df_plot, metric, output_file="model_performance_significance.txt")
 
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+   
     datasets = ['eva', 'gift']
     colors = ['tab:blue', 'tab:purple']
+    
+    
     axes = [ax1, ax2]
+    
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
         # Define models based on dataset
         if dataset == 'eva':
-            models = ["area", "climate", "area+climate"]  # Exclude chao2_estimator for eva
+            models = ["area", "environment", "area+environment"]  # Exclude chao2_estimator for eva
         else:
-            models = ["chao2_estimator", "area", "climate", "area+climate"]
+            models = ["chao2_estimator", "area", "environment", "area+environment"]
         
         box_data = []
         
@@ -85,6 +179,45 @@ if __name__ == "__main__":
         ax.set_xticklabels(models, rotation=45, ha='right', fontsize=10)
         ax.set_ylabel(f'{metric.upper()}') if j == 0 else None
         ax.set_title(f'{dataset.upper()} test dataset')
+        # Increase y-axis limits by 10%
+        y_min, y_max = ax.get_ylim()
+        y_range = y_max - y_min
+        ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+        
+        # Statistical significance annotations
+        
+        alpha = 0.05
+        spread = 0.6
+        
+        # Flatten data and create groups for statistical comparison
+        flat_data = []
+        group_labels = []
+        for i, data in enumerate(box_data):
+            flat_data.extend(data)
+            group_labels.extend([models[i]] * len(data))
+        
+        if len(set(group_labels)) > 1:  # Only if we have multiple groups
+            mc = MultiComparison(flat_data, group_labels)
+            test_results = mc.allpairtest(stats.ttest_ind, alpha=alpha)
+            
+            comp_matrix = create_comp_matrix_allpair_t_test(test_results)
+            letters = multcomp_letters(comp_matrix < alpha)
+            
+            # Add letter annotations above boxplots
+            for i, model in enumerate(models):
+                if model in letters:
+                    # Calculate whisker position for annotation placement
+                    data_vals = box_data[i]
+                    q75 = np.percentile(data_vals, 75)
+                    iqr = np.percentile(data_vals, 75) - np.percentile(data_vals, 25)
+                    whisker_top = q75 + 1.5 * iqr
+                    ypos = min(whisker_top, max(data_vals)) + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.02
+                    
+                    # Get median position
+                    median_val = np.median(data_vals)
+                    ax.text(i + 0.7, median_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01, 
+                            letters[model], ha='left', va='bottom', 
+                            fontsize=10, color='black')
 
     # Third plot: errorbar plot for training fractions
     ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
@@ -181,6 +314,16 @@ if __name__ == "__main__":
     ax4.set_yscale('log')
     ax4.set_xscale('log')
     # ax4.set_title('Model vs GIFT\nobservations')
+    
+    # Add grid lines to ax1 and ax2
+    ax1.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+    ax2.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+    
+    # Add panel labels (a, b, c, d) in Nature style
+    ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax3.text(0.9, 0.95, 'c', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax4.text(0.15, 0.95, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     
     plt.tight_layout()
     plt.show()
