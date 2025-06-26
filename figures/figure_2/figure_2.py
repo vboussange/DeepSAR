@@ -25,6 +25,58 @@ from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 import scipy.stats as stats
 
+
+def report_relative_bias(eva_test_data, gift_dataset, output_file="relative_bias_report.txt"):
+    """
+    Calculate and report relative bias for both EVA and GIFT datasets.
+    
+    Parameters:
+    -----------
+    eva_test_data : pd.DataFrame
+        EVA test dataset with observed and predicted SR values
+    gift_dataset : pd.DataFrame
+        GIFT dataset with observed and predicted SR values
+    output_file : str
+        Path to output text file for bias results
+    """
+    with open(output_file, "w") as file:
+        print("Relative Bias Analysis", file=file)
+        print("=" * 50, file=file)
+        print("Relative bias calculated as (observed - predicted) / observed", file=file)
+        print("Positive values indicate model underestimation, negative values indicate overestimation\n", file=file)
+        
+        # EVA dataset bias
+        eva_mask = eva_test_data[["sr", "predicted_sr"]].dropna()
+        eva_observed = eva_mask["sr"]
+        eva_predicted = eva_mask["predicted_sr"]
+        eva_relative_bias = (eva_observed - eva_predicted) / eva_observed
+        
+        print("EVA Dataset", file=file)
+        print("-" * 20, file=file)
+        print(f"Mean relative bias: {eva_relative_bias.mean():.4f}", file=file)
+        print(f"Median relative bias: {eva_relative_bias.median():.4f}", file=file)
+        print(f"Std relative bias: {eva_relative_bias.std():.4f}", file=file)
+        print(f"Min relative bias: {eva_relative_bias.min():.4f}", file=file)
+        print(f"Max relative bias: {eva_relative_bias.max():.4f}", file=file)
+        print(f"N observations: {len(eva_relative_bias)}", file=file)
+        
+        # GIFT dataset bias
+        gift_mask = gift_dataset[["sr", "predicted_sr"]].dropna()
+        gift_observed = gift_mask["sr"]
+        gift_predicted = gift_mask["predicted_sr"]
+        gift_relative_bias = (gift_observed - gift_predicted) / gift_observed
+        
+        print("\nGIFT Dataset", file=file)
+        print("-" * 20, file=file)
+        print(f"Mean relative bias: {gift_relative_bias.mean():.4f}", file=file)
+        print(f"Median relative bias: {gift_relative_bias.median():.4f}", file=file)
+        print(f"Std relative bias: {gift_relative_bias.std():.4f}", file=file)
+        print(f"Min relative bias: {gift_relative_bias.min():.4f}", file=file)
+        print(f"Max relative bias: {gift_relative_bias.max():.4f}", file=file)
+        print(f"N observations: {len(gift_relative_bias)}", file=file)
+
+    print("Relative bias analysis saved to 'relative_bias_report.txt'")
+
 def report_model_performance_and_significance(df_plot, metric, output_file="model_performance_significance.txt"):
     """
     Report model performance and statistical significance for eva and gift datasets.
@@ -136,7 +188,6 @@ if __name__ == "__main__":
     datasets = ['eva', 'gift']
     colors = ["#f72585","#4cc9f0"]
     
-    
     axes = [ax1, ax2]
     
 
@@ -219,46 +270,72 @@ if __name__ == "__main__":
                             letters[model], ha='left', va='bottom', 
                             fontsize=10, color='black')
 
-    # Third plot: errorbar plot for training fractions
+    # Third plot: observed vs predicted for area+environment model on EVA dataset
     ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
-    metric = "rmse_gift"
     
-    df_plot_train = df_nw[(df_nw['model'] == 'area+climate') & (df_nw['num_params'] > 4e5)]
-    train_fracs = sorted(df_plot_train['train_frac'].unique())
-    
-    means = []
-    stds = []
-    all_data = []
-
-    for train_frac in train_fracs:
-        data = df_plot_train[df_plot_train['train_frac'] == train_frac][metric].values
-        means.append(np.mean(data))
-        stds.append(np.std(data))
-        all_data.append(data)
-
-    # Create errorbar plot
-    x_pos = range(1, len(train_fracs) + 1)
-    ax3.errorbar(x_pos, means, yerr=stds, fmt='-', capsize=0, capthick=1, 
-                 color='black', markersize=6, linewidth=1, zorder=2)
-
-    # Add individual data points
-    for i, data in enumerate(all_data):
-        x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
-        ax3.scatter(x, data, alpha=0.6, s=10, color="#f72585", zorder=3)
-
-    # Set labels and formatting
-    ax3.set_xticks(x_pos)
-    ax3.set_xticklabels([f'$10^{{{int(np.log10(frac))}}}$' if i % 2 == 0 else '' for i, frac in enumerate(train_fracs)])
-    ax3.set_xlabel('Nb. of\ntraining samples', fontsize=8)
-    # ax3.set_ylabel('RMSE')
-
-    # Fourth plot: model predictions vs GIFT observations
-    # Load model and data for prediction comparison
-    gift_data_dir = Path("../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
+    # Load model and data for EVA predictions
+    eva_data_dir = Path("../../data/processed/EVA/6c2d61d/")
     path_results = Path("../../scripts/results/train_seed_1/checkpoint_MSEfit_large_0b85791.pth")
     
     # Load model results
     result_modelling = torch.load(path_results, map_location="cpu")
+    config = result_modelling["config"]
+
+    # Load EVA dataset
+    # Load and prepare data
+    eva_dataset = gpd.read_parquet(config.path_eva_data)
+    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
+    # eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_megaplot_area"]
+    # eva_dataset = eva_dataset[eva_dataset["num_plots"] > 10] # todo: to change
+    
+    # Filter test data
+    eva_test_data = eva_dataset[eva_dataset["test"]].sample(n=400)
+    
+    # Extract model components
+    predictors = result_modelling["predictors"]
+    feature_scaler = result_modelling["feature_scaler"]
+    target_scaler = result_modelling["target_scaler"]
+    
+    # Make predictions
+    X = eva_test_data[predictors].copy()
+    X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
+    
+    # Initialize model
+    model = initialize_ensemble_model(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
+    
+    with torch.no_grad():
+        y_pred = model(X).numpy()
+        y_pred = target_scaler.inverse_transform(y_pred)
+    
+    eva_test_data["predicted_sr"] = y_pred.squeeze()
+    
+    # Plot predictions vs observations for EVA
+    mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
+    x_eva = mask_eva["sr"]
+    y_eva = mask_eva["predicted_sr"]
+    eva_relative_bias = (x_eva - y_eva) / x_eva
+    eva_median_bias = eva_relative_bias.median()
+    ax3.text(0.1, 0.06, f'Rel. bias: {eva_median_bias:.3f}', 
+            transform=ax3.transAxes, 
+            fontsize=10,
+            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
+
+    ax3.scatter(x_eva, y_eva, alpha=0.6, s=10, color="#f72585")
+    
+    # Add 1:1 line
+    max_val = np.nanmax([x_eva.max(), y_eva.max()])
+    min_val = np.nanmin([x_eva.min(), y_eva.min()])
+    ax3.plot([min_val, max_val], [min_val, max_val], linestyle='--',color="black", linewidth=1)
+    
+    ax3.set_xlabel('EVA observed SR', fontsize=8)
+    ax3.set_ylabel('Predicted SR', fontsize=8)
+    ax3.set_yscale('log')
+    ax3.set_xscale('log')
+
+    # Fourth plot: model predictions vs GIFT observations
+    # Load model and data for prediction comparison
+    gift_data_dir = Path("../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
     
     # Load GIFT dataset
     gift_dataset = gpd.read_parquet(gift_data_dir / "megaplot_data.parquet")
@@ -266,54 +343,41 @@ if __name__ == "__main__":
     gift_dataset["log_observed_area"] = np.log(gift_dataset["megaplot_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
-    # Extract model components
-    config = result_modelling["config"]
-    predictors = result_modelling["predictors"]
-    feature_scaler = result_modelling["feature_scaler"]
-    target_scaler = result_modelling["target_scaler"]
-    
-    # Make predictions
-    X = gift_dataset[predictors].copy()
-    X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
-    
-    # Initialize model (requires src.neural_4pweibull)
-    model = initialize_ensemble_model(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
+    # Make predictions for GIFT
+    X_gift = gift_dataset[predictors].copy()
+    X_gift = torch.tensor(feature_scaler.transform(X_gift), dtype=torch.float32)
     
     with torch.no_grad():
-        y_pred = model(X).numpy()
-        y_pred = target_scaler.inverse_transform(y_pred)
+        y_pred_gift = model(X_gift).numpy()
+        y_pred_gift = target_scaler.inverse_transform(y_pred_gift)
     
-    gift_dataset["predicted_sr"] = y_pred.squeeze()
+    gift_dataset["predicted_sr"] = y_pred_gift.squeeze()
     
     # Create inset axes in ax2
     ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)
     
-    # Plot predictions vs observations
-    mask = gift_dataset[["sr", "predicted_sr"]].dropna()
-    x = mask["sr"]
-    y = mask["predicted_sr"]
-    
-    ax4.scatter(x, y, alpha=0.6, s=10, color="#4cc9f0")
+    # Plot predictions vs observations for GIFT
+    mask_gift = gift_dataset[["sr", "predicted_sr"]].dropna()
+    x_gift = mask_gift["sr"]
+    y_gift = mask_gift["predicted_sr"]
+    gift_relative_bias = (x_gift - y_gift) / x_gift
+    gift_median_bias = gift_relative_bias.median()
+
+    ax4.text(0.1, 0.06, f'Rel. bias: {gift_median_bias:.3f}', 
+            transform=ax4.transAxes, 
+            fontsize=10,
+            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
+    ax4.scatter(x_gift, y_gift, alpha=0.6, s=10, color="#4cc9f0")
     
     # Add 1:1 line
-    max_val = np.nanmax([x.max(), y.max()])
-    min_val = np.nanmin([x.min(), y.min()])
-    ax4.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1)
-    
-    # Calculate metrics
-    # r2_val = stats.pearsonr(x, y)[0]**2
-    # rmse_val = np.sqrt(mean_squared_error(x, y))
-    
-    # Add text with metrics
-    # ax4.text(0.05, 0.95, f"R²={r2_val:.2f}\nRMSE={rmse_val:.2f}", 
-    #         transform=ax4.transAxes, verticalalignment='top',
-    #         bbox=dict(boxstyle="round", fc="w", alpha=0.7))
+    max_val_gift = np.nanmax([x_gift.max(), y_gift.max()])
+    min_val_gift = np.nanmin([x_gift.min(), y_gift.min()])
+    ax4.plot([min_val_gift, max_val_gift], [min_val_gift, max_val_gift],  linestyle='--', color="black", linewidth=1)
     
     ax4.set_xlabel('GIFT observed SR', fontsize=8)
     ax4.set_ylabel('Predicted SR', fontsize=8)
     ax4.set_yscale('log')
     ax4.set_xscale('log')
-    # ax4.set_title('Model vs GIFT\nobservations')
     
     # Add grid lines to ax1 and ax2
     ax1.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
@@ -322,9 +386,11 @@ if __name__ == "__main__":
     # Add panel labels (a, b, c, d) in Nature style
     ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     ax2.text(0.1, 0.1, 'c', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax3.text(0.9, 0.95, 'b', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax3.text(0.15, 0.95, 'b', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     ax4.text(0.15, 0.95, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     
     plt.tight_layout()
     plt.show()
     fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
+    
+    report_relative_bias(eva_test_data, gift_dataset)
