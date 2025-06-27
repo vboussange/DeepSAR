@@ -38,6 +38,11 @@ CMAP_BR = LinearSegmentedColormap.from_list("species_richness", COLORS_BR[::-1])
 COLORS_DSR = ["#00296b","#003f88","#00509d","#fdc500","#ffd500"]
 CMAP_DSR = LinearSegmentedColormap.from_list("dsr", COLORS_DSR)
 
+COLORS_GO = ["#ff9f1c", "#ffbf69", "#ffffff", "#cbf3f0", "#2ec4b6"]
+CMAP_GO = LinearSegmentedColormap.from_list("custom_cmap", COLORS_GO)
+
+
+
 class ResultData:
     def __init__(self, gdf, config, aggregate_labels, test_partition_idx):
         self.gdf = gdf
