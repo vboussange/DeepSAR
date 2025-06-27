@@ -10,6 +10,10 @@ import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
 from src.neural_4pweibull import initialize_ensemble_model
+import sys
+sys.path.append(str(Path(__file__).parent / "../../scripts/"))
+from src.neural_4pweibull import initialize_ensemble_model
+from train import Config, Trainer
 
 # Configuration
 MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
@@ -117,5 +121,5 @@ if __name__ == "__main__":
     fig.supxlabel("Area (km²)")
     fig.tight_layout()
     ax.grid(True, alpha=0.3)
-    fig.savefig("figure_3_shapley.pdf", dpi=300, bbox_inches='tight')
+    fig.savefig("figure_3.pdf", dpi=300, bbox_inches='tight')
     plt.show()

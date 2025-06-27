@@ -133,13 +133,16 @@ for i in range(n_replicates):
     d2_rep = d2_absolute_error_score(y_true_valid, y_pred_replicate)
     rmse_rep = root_mean_squared_error(y_true_valid, y_pred_replicate)
     mape_rep = mean_absolute_percentage_error(y_true_valid, y_pred_replicate)
+    gift_relative_bias = (y_true_valid - y_pred_replicate) / y_true_valid
+    median_relative_bias = np.median(gift_relative_bias)
     
     metrics_replicates.append({
         'run': i,
         'r2_gift': r2_rep,
         'd2_gift': d2_rep,
         'rmse_gift': rmse_rep,
-        'mape_gift': mape_rep
+        'mape_gift': mape_rep,
+        'median_relative_bias': median_relative_bias,
     })
 
 # Convert to DataFrame for analysis
@@ -149,10 +152,11 @@ metrics_df.to_csv(CONFIG["run_folder"] / f'{CONFIG["run_name"]}.csv', index=Fals
 
 # Calculate summary statistics
 print("Metrics across replicates:")
-print(f"R2: {metrics_df['r2_gift'].mean():.3f} ± {metrics_df['r2'].std():.3f}")
-print(f"D2: {metrics_df['d2_gift'].mean():.3f} ± {metrics_df['d2'].std():.3f}")
-print(f"RMSE: {metrics_df['rmse_gift'].mean():.3f} ± {metrics_df['rmse'].std():.3f}")
-print(f"MAPE: {metrics_df['mape_gift'].mean():.3f} ± {metrics_df['mape'].std():.3f}")
+print(f"R2: {metrics_df['r2_gift'].mean():.3f} ± {metrics_df['r2_gift'].std():.3f}")
+print(f"D2: {metrics_df['d2_gift'].mean():.3f} ± {metrics_df['d2_gift'].std():.3f}")
+print(f"RMSE: {metrics_df['rmse_gift'].mean():.3f} ± {metrics_df['rmse_gift'].std():.3f}")
+print(f"MAPE: {metrics_df['mape_gift'].mean():.3f} ± {metrics_df['mape_gift'].std():.3f}")
+print(f"Median Relative Bias: {metrics_df['median_relative_bias'].mean():.3f} ± {metrics_df['median_relative_bias'].std():.3f}")
     
 # output_path = Path(__file__).parent / f"{Path(__file__).stem}.parquet"
 # gift_dataset.to_parquet(output_path)
