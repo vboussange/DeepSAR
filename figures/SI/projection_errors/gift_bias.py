@@ -81,6 +81,7 @@ bias_threshold = gift_dataset["bias"].quantile(0.95)
 plot_data = gift_dataset[gift_dataset["bias"] <= bias_threshold]
 bias_threshold = plot_data["bias"].quantile(0.05)
 plot_data = plot_data[plot_data["bias"] >= bias_threshold]
+# plot_data = gift_dataset.copy()
 
 # Define custom colormap
 colors = ["#ff9f1c", "#ffbf69", "#ffffff", "#cbf3f0", "#2ec4b6"]
@@ -99,12 +100,12 @@ ax2.set_ylabel("Relative bias")
 ax2.set_position([0.05, 0.3, 0.3, 0.4])  # 
 
 # Filter out rows with NaN or infinite values
-plot_data = plot_data[["sampling_effort", "bias"]].replace([np.inf, -np.inf], np.nan).dropna()
+valid_data = plot_data[["sampling_effort", "bias"]].replace([np.inf, -np.inf], np.nan).dropna()
 
 # Calculate R²
-r2 = stats.pearsonr(plot_data["sampling_effort"], plot_data["bias"])[0] ** 2
+r2, p_value = stats.pearsonr(valid_data["sampling_effort"], valid_data["bias"])
 
-ax2.text(0.05, 0.95, f"$R^2 = {r2:.2f}$", 
+ax2.text(0.05, 0.25, f"$\\rho = {r2:.2f}$\n$p$-value$ = {p_value:.2g}$", 
          transform=ax2.transAxes, 
          fontsize=12, 
          verticalalignment='top', 
