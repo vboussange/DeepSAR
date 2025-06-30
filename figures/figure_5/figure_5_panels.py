@@ -24,11 +24,6 @@ rcparams = {
         }
 plt.rcParams.update(rcparams)
 
-
-seed = 1
-MODEL = "large"
-HASH = "a53390d"
-
 # Constants for file paths
 RAST_PATH = Path(f"./projections")
 SAR_PATH = Path(f"./SARs")

@@ -26,24 +26,32 @@ from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 import scipy.stats as stats
 
 
-def report_relative_bias(eva_test_data, gift_dataset, output_file="relative_bias_report.txt"):
+def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
-    Calculate and report relative bias for both EVA and GIFT datasets.
+    Report model performance, statistical significance, and relative bias for eva and gift datasets.
     
     Parameters:
     -----------
+    df_plot : pd.DataFrame
+        Combined dataframe with model results
     eva_test_data : pd.DataFrame
         EVA test dataset with observed and predicted SR values
     gift_dataset : pd.DataFrame
         GIFT dataset with observed and predicted SR values
+    metric : str
+        Performance metric to analyze
     output_file : str
-        Path to output text file for bias results
+        Path to output text file for results
     """
+    datasets = ['eva', 'gift']
+    
     with open(output_file, "w") as file:
-        print("Relative Bias Analysis", file=file)
-        print("=" * 50, file=file)
         print("Relative bias calculated as (observed - predicted) / observed", file=file)
         print("Positive values indicate model underestimation, negative values indicate overestimation\n", file=file)
+        
+        # Relative Bias Analysis
+        print("RELATIVE BIAS ANALYSIS", file=file)
+        print("=" * 50, file=file)
         
         # EVA dataset bias
         eva_mask = eva_test_data[["sr", "predicted_sr"]].dropna()
@@ -74,23 +82,11 @@ def report_relative_bias(eva_test_data, gift_dataset, output_file="relative_bias
         print(f"Min relative bias: {gift_relative_bias.min():.4f}", file=file)
         print(f"Max relative bias: {gift_relative_bias.max():.4f}", file=file)
         print(f"N observations: {len(gift_relative_bias)}", file=file)
-
-    print("Relative bias analysis saved to 'relative_bias_report.txt'")
-
-def report_model_performance_and_significance(df_plot, metric, output_file="model_performance_significance.txt"):
-    """
-    Report model performance and statistical significance for eva and gift datasets.
-    
-    Parameters:
-    -----------
-    df_plot : pd.DataFrame
-        Combined dataframe with model results
-    output_file : str
-        Path to output text file for results
-    """
-    datasets = ['eva', 'gift']
-    
-    with open(output_file, "w") as file:
+        
+        # Model Performance and Statistical Significance Analysis
+        print("\n\nMODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE", file=file)
+        print("=" * 60, file=file)
+        
         for dataset in datasets:
             metric_col = f"{metric}_{dataset}"
             
@@ -109,7 +105,7 @@ def report_model_performance_and_significance(df_plot, metric, output_file="mode
             if not available_models:
                 continue
                 
-            print(f"\n{dataset.upper()} Dataset Performance", file=file)
+            print(f"\n{dataset.upper()} Dataset", file=file)
             print("=" * 50, file=file)
             
             # Performance summary table
@@ -131,7 +127,6 @@ def report_model_performance_and_significance(df_plot, metric, output_file="mode
             # Statistical significance tests (pairwise comparisons)
             print(f"\nPairwise Statistical Significance Tests ({dataset.upper()})", file=file)
             print("-" * 50, file=file)
-            
             
             # Create significance matrix
             n_models = len(available_models)
@@ -161,6 +156,7 @@ def report_model_performance_and_significance(df_plot, metric, output_file="mode
             
             print(f"\nSignificance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant", file=file)
 
+    print(f"Model performance and bias analysis saved to '{output_file}'")
 
 if __name__ == "__main__":
 
@@ -181,7 +177,6 @@ if __name__ == "__main__":
     # Replace "climate" with "environment" in the model column
     df_plot['model'] = df_plot['model'].str.replace('climate', 'environment')
     metric = "rmse"
-    report_model_performance_and_significance(df_plot, metric, output_file="model_performance_significance.txt")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
    
@@ -272,10 +267,10 @@ if __name__ == "__main__":
 
     # Third plot: observed vs predicted for area+environment model on EVA dataset
     ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
-    
+    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
     # Load model and data for EVA predictions
     eva_data_dir = Path("../../data/processed/EVA/6c2d61d/")
-    path_results = Path("../../scripts/results/train_seed_1/checkpoint_MSEfit_large_0b85791.pth")
+    path_results = Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
     
     # Load model results
     result_modelling = torch.load(path_results, map_location="cpu")
@@ -393,4 +388,4 @@ if __name__ == "__main__":
     plt.show()
     fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
     
-    report_relative_bias(eva_test_data, gift_dataset)
+    report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric)

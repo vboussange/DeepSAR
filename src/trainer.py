@@ -97,11 +97,14 @@ class Trainer:
         best_val_loss = float('inf')
         best_model_log = None
         best_model = None
+        train_losses = []
+        val_losses = []
 
         for epoch in range(n_epochs):
             train_loss, val_loss = self.train_step()
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
-            # for loader, name in zip([self.train_loader, self.val_loader, self.test_loader], ["train", "val", "test"]): # TODO: to modify
             metric_log = {}
             if self.test_loader:
                 loader, name = self.test_loader, "test"
@@ -116,7 +119,13 @@ class Trainer:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model = copy.deepcopy(self.model).to('cpu')
-                best_model_log = metric_log
+                best_model_log = metric_log.copy()  # ensure a copy is stored
+
+        # Append loss vectors to the best_model_log
+        if best_model_log is None:
+            best_model_log = {}
+        best_model_log["train_losses"] = train_losses
+        best_model_log["val_losses"] = val_losses
 
         self.model = best_model
         return best_model, best_model_log
