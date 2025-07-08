@@ -78,11 +78,11 @@ def aggregate_shapley_features(df_shap, config):
     std_features = [f"std_{var}" for var in config.climate_variables]
     mean_features = config.climate_variables
     
-    df_shap["Climate heterogeneity"] = np.abs(df_shap[std_features]).sum(axis=1)
-    df_shap["Mean climate"] = np.abs(df_shap[mean_features]).sum(axis=1)
+    df_shap["Environmental heterogeneity"] = np.abs(df_shap[std_features]).sum(axis=1)
+    df_shap["Mean environmental conditions"] = np.abs(df_shap[mean_features]).sum(axis=1)
     df_shap["Area"] = np.abs(df_shap[["log_megaplot_area"]]).sum(axis=1)
     
-    feature_cols = ["Area", "Climate heterogeneity", "Mean climate"]
+    feature_cols = ["Area", "Environmental heterogeneity", "Mean environmental conditions"]
     total_importance = df_shap[feature_cols].sum(axis=1)
     df_shap[feature_cols] = df_shap[feature_cols].div(total_importance, axis=0)
     
