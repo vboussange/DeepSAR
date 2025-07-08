@@ -221,6 +221,29 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
 
     return plot_data
 
+
+def export_dataset_statistics(plot_gdf, species_dict, output_file_path):
+    """
+    Calculate and export dataset statistics to a text file.
+    
+    Args:
+        plot_gdf: GeoDataFrame containing plot data
+        species_dict: Dictionary mapping plot IDs to species lists
+        output_file_path: Path where statistics file should be saved
+    """
+    logging.info("Calculating dataset statistics...")
+    num_entries = len(plot_gdf)
+    all_species = np.concatenate([species_dict[idx] for idx in plot_gdf.index])
+    num_distinct_species = len(np.unique(all_species))
+
+    stats_file_path = output_file_path / "dataset_statistics.txt"
+    logging.info(f"Exporting dataset statistics to {stats_file_path}")
+    with open(stats_file_path, 'w') as f:
+        f.write(f"Dataset Statistics\n")
+        f.write(f"==================\n")
+        f.write(f"Number of entries: {num_entries}\n")
+        f.write(f"Number of distinct species: {num_distinct_species}\n")
+
 if __name__ == "__main__":
     # Set up the random seed for reproducibility
     random.seed(CONFIG["random_state"])
@@ -234,6 +257,9 @@ if __name__ == "__main__":
     
     # Loading data
     plot_gdf, species_dict, climate_raster = load_and_preprocess_data()
+
+    export_dataset_statistics(plot_gdf, species_dict, output_file_path)
+    
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
     plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
     

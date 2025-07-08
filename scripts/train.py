@@ -1,8 +1,6 @@
 """
 Training ensemble models.
 """
-
-
 import copy
 import random
 import logging
@@ -10,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import multiprocessing as mp
-
+        
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -18,7 +16,7 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.neural_4pweibull import Neural4PWeibull, MSELogLoss
+from src.neural_4pweibull import Neural4PWeibull
 from src.trainer import Trainer
 from src.ensemble_model import EnsembleModel
 from src.dataset import create_dataloader
@@ -103,9 +101,6 @@ class EnsembleTrainer:
 
     @staticmethod
     def _single_run(config, df, predictors, ensemble_idx, device):
-        import torch
-        import numpy as np
-        import random
 
         gdf_train_val = df[df["test"] == False]
         gdf_test = df[df["test"] == True]
@@ -120,7 +115,6 @@ class EnsembleTrainer:
         np.random.seed(config.seed + ensemble_idx)
         random.seed(config.seed + ensemble_idx)
 
-        from sklearn.model_selection import train_test_split
 
         train_idx, val_idx = train_test_split(
             gdf_train_val.index,

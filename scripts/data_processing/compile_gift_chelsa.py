@@ -73,6 +73,8 @@ def load_and_preprocess_data():
     """
     logging.info("Loading EVA data...")
     plot_gdf = gpd.read_file(CONFIG["gift_data_dir"] / "plot_data.gpkg")
+    species_df = pd.read_parquet(CONFIG["gift_data_dir"] / "species_data.parquet")
+    
     logging.info("Loading climate raster...")
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
 
@@ -81,7 +83,7 @@ def load_and_preprocess_data():
     climate_dataset = climate_dataset.rio.reproject(CONFIG["crs"]).sortby("y")
     climate_raster = climate_dataset.to_array()
     climate_raster = climate_raster.sel(variable=CONFIG["env_vars"])
-    return plot_gdf, climate_raster
+    return plot_gdf, species_df, climate_raster
 
 # def clip_GIFT_SR(plot_gdf, species_dict, habitat_map):
 #     for i, row in plot_gdf.iterrows():
@@ -114,6 +116,29 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
         megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
     return megaplot_data
 
+
+def export_dataset_statistics(plot_gdf, species_df, output_file_path):
+    """
+    Calculate and export dataset statistics to a text file.
+    
+    Args:
+        plot_gdf: GeoDataFrame containing plot data
+        species_dict: Dictionary mapping plot IDs to species lists
+        output_file_path: Path where statistics file should be saved
+    """
+    logging.info("Calculating dataset statistics...")
+    num_entries = len(plot_gdf)
+    all_species = species_df['work_species_cleaned'].unique()
+    num_distinct_species = len(all_species)
+
+    stats_file_path = output_file_path / "dataset_statistics.txt"
+    logging.info(f"Exporting dataset statistics to {stats_file_path}")
+    with open(stats_file_path, 'w') as f:
+        f.write(f"Dataset Statistics\n")
+        f.write(f"==================\n")
+        f.write(f"Number of entries: {num_entries}\n")
+        f.write(f"Number of distinct species: {num_distinct_species}\n")
+        
 if __name__ == "__main__":    
     random.seed(CONFIG["random_state"])
     np.random.seed(CONFIG["random_state"])
@@ -123,7 +148,8 @@ if __name__ == "__main__":
     CONFIG["output_file_path"].mkdir(parents=True, exist_ok=True)
     CONFIG["output_file_name"] = Path(f"augmented_data.pkl")
     
-    plot_gdf, climate_raster = load_and_preprocess_data()
+    plot_gdf, species_df, climate_raster = load_and_preprocess_data()
+    export_dataset_statistics(plot_gdf, species_df, CONFIG["output_file_path"])
     plot_gdf = compile_climate_data_megaplot(plot_gdf, climate_raster, verbose=True)
 
     # exporting megaplot_data to gpkg

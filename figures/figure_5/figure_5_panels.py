@@ -271,6 +271,6 @@ if __name__ == '__main__':
     ax_dsr2.set_title('Area = 2500 km$^2$', y=-0.1)
 
     # fig.tight_layout()
-    fig.savefig("figure_5_combined.pdf", dpi=300, transparent=True)
-    fig.savefig("figure_5_combined.png", dpi=300, transparent=True)
-    fig.savefig("figure_5_combined.svg", dpi=300, transparent=True)
+    fig.savefig("figure_5_panels.pdf", dpi=300, transparent=True)
+    fig.savefig("figure_5_panels.png", dpi=300, transparent=True)
+    fig.savefig("figure_5_panels.svg", dpi=300, transparent=True)
