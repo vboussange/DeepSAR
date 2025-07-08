@@ -17,7 +17,7 @@ from train import Config, Trainer
 
 # Configuration
 MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
-PLOT_CONFIG = [("Area", "#f72585"), ("Climate heterogeneity", "#4cc9f0"), ("Mean climate", "#3a0ca3")]
+PLOT_CONFIG = [("Area", "#f72585"), ("Environmental heterogeneity", "#4cc9f0"), ("Mean environmental conditions", "#3a0ca3")]
 
 def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
     """Sample data stratified by log area bins."""
