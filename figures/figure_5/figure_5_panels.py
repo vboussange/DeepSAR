@@ -24,11 +24,6 @@ rcparams = {
         }
 plt.rcParams.update(rcparams)
 
-
-seed = 1
-MODEL = "large"
-HASH = "a53390d"
-
 # Constants for file paths
 RAST_PATH = Path(f"./projections")
 SAR_PATH = Path(f"./SARs")
@@ -239,7 +234,7 @@ if __name__ == '__main__':
     ax_dsr1 = fig.add_subplot(gs[2, 0:3])
     ax_dsr2 = fig.add_subplot(gs[2, 3:6])
 
-    cbar_kwargs['label'] = 'Sensitivity of SR\nto area ($\\frac{d S}{d A}$)'
+    cbar_kwargs['label'] = 'Species turnover ($\\frac{d S}{d A}$)'
     cbar_kwargs['location'] = 'left'
 
     # dSR at 1000m resolution

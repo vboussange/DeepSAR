@@ -1,3 +1,5 @@
+"""Plotting species richness against area and coverage for EVA and GIFT datasets."""
+
 import torch
 from pathlib import Path
 import seaborn as sns
@@ -14,12 +16,13 @@ from src.neural_4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 
 # Assuming load_preprocessed_data is already defined
+MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
 
 def load_data():
     
     # Load model and data for EVA predictions
-    path_results = Path("../../../scripts/results/train_seed_1/checkpoint_MSEfit_large_0b85791.pth")
-    
+    path_results = Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
+        
     # Load model results
     result_modelling = torch.load(path_results, map_location="cpu")
     config = result_modelling["config"]
@@ -44,29 +47,6 @@ def load_data():
     
     return eva_dataset, gift_dataset
 
-def create_subplot_for_habitat(ax, gdf, hab_name):
-    """Creates a scatter plot and histograms for a specific habitat."""
-    # Binning log-transformed area and calculating std of species richness (log_sr)
-    # gdf['log_area_bins'] = pd.cut(gdf['log_megaplot_area'], bins=100, labels=False)
-    # std_sr = gdf.groupby('log_area_bins')['log_sr'].std()
-    # log_megaplot_area = gdf.groupby('log_area_bins')['log_megaplot_area'].mean()
-    # Scatter plot using hexbin for faster rendering with many points
-    hexbin = ax.hexbin(np.exp(gdf.log_megaplot_area), 
-                       np.exp(gdf.log_sr), 
-                       gridsize=30, 
-                       cmap='viridis', 
-                       xscale="log",
-                       yscale = "log",
-                       mincnt=1)
-
-    ax.set_xlabel("Area")
-    ax.set_ylabel("Species Richness")
-    # Add a colorbar to indicate density
-    cbar = plt.colorbar(hexbin, ax=ax, shrink=0.5)
-    cbar.set_label('Data density')
-
-    # Set the title with habitat name and the number of data points
-    ax.set_title(f"{hab_name}")
 
 if __name__ == "__main__":
     eva_dataset, gift_dataset = load_data()
