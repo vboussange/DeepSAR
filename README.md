@@ -11,9 +11,9 @@ Victor Boussange, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portie
 To install the dependencies and load the environment, make sure you have conda (or mamba) and 
 
 ```
-mamba env create --prefix ./.env-torch --file environment-torch.yml
-mamba activate ./.env-torch
-pip install -e .
+uv sync
+uv pip install torch --torch-backend=auto
+uv pip install -e .
 ```
 
 ### Data
