@@ -18,11 +18,11 @@ import logging
 from tqdm import tqdm
 import warnings
 
-from src.data_processing.utils_gift import GIFTDataset
-from src.data_processing.utils_env_pred import CHELSADataset
-from src.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
-from src.utils import save_to_pickle
-from src.data_processing.utils_polygons import (
+from deepsar.data_processing.utils_gift import GIFTDataset
+from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
+from deepsar.utils import save_to_pickle
+from deepsar.data_processing.utils_polygons import (
     partition_polygon_gdf,
 )
 import git
@@ -97,13 +97,13 @@ def load_and_preprocess_data():
 
 #     return plot_gdf
 
-def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
+def compile_climate_data_sp_unit(sp_unit_data, climate_raster, verbose=False):
     """
     Calculate area and convert landcover binary raster to multipoint for each SAR data row.
     Returns processed SAR data.
     """
     # only retain pixels which correspond to habitat map
-    for i, row in tqdm(megaplot_data.iterrows(), total=megaplot_data.shape[0], desc="Compiling climate", disable=not verbose):
+    for i, row in tqdm(sp_unit_data.iterrows(), total=sp_unit_data.shape[0], desc="Compiling climate", disable=not verbose):
         # climate
         # Use the geometry directly to clip the climate raster
         env_vars = climate_raster.rio.clip([row.geometry], drop=True, all_touched=True)
@@ -113,8 +113,8 @@ def compile_climate_data_megaplot(megaplot_data, climate_raster, verbose=False):
             _m = np.nanmean(env_vars, axis=(1, 2))
             _std = np.nanstd(env_vars, axis=(1, 2))
         env_pred_stats = np.concatenate([_m, _std])
-        megaplot_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
-    return megaplot_data
+        sp_unit_data.loc[i, CLIMATE_COL_NAMES] = env_pred_stats
+    return sp_unit_data
 
 
 def export_dataset_statistics(plot_gdf, species_df, output_file_path):
@@ -150,10 +150,10 @@ if __name__ == "__main__":
     
     plot_gdf, species_df, climate_raster = load_and_preprocess_data()
     export_dataset_statistics(plot_gdf, species_df, CONFIG["output_file_path"])
-    plot_gdf = compile_climate_data_megaplot(plot_gdf, climate_raster, verbose=True)
+    plot_gdf = compile_climate_data_sp_unit(plot_gdf, climate_raster, verbose=True)
 
-    # exporting megaplot_data to gpkg
-    output_path = CONFIG["output_file_path"] / "megaplot_data.parquet"
+    # exporting sp_unit_data to gpkg
+    output_path = CONFIG["output_file_path"] / "compiled_data.parquet"
     print(f"Exporting {output_path}")
     plot_gdf.to_parquet(output_path)
     

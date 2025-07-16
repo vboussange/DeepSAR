@@ -10,7 +10,7 @@ import geopandas as gpd
 from shapely.geometry import box
 from pathlib import Path
 from scipy import stats
-from src.plotting import CMAP_BR, CMAP_DSR
+from deepsar.plotting import CMAP_BR, CMAP_DSR
 from matplotlib import colors
 import seaborn as sns
 from matplotlib.gridspec import GridSpec

@@ -15,11 +15,11 @@ from sklearn.metrics import mean_squared_error
 from tqdm import tqdm
 import warnings
 
-from src.generate_sar_data_eva import clip_EVA_SR, generate_random_square
-from src.data_processing.utils_eva import EVADataset
-from src.data_processing.utils_gift import GIFTDataset
-from src.data_processing.utils_env_pred import CHELSADataset
-from src.utils import save_to_pickle
+from deepsar.generate_sar_data_eva import clip_EVA_SR, generate_random_square
+from deepsar.data_processing.utils_eva import EVADataset
+from deepsar.data_processing.utils_gift import GIFTDataset
+from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.utils import save_to_pickle
 
 import git
 import random
@@ -148,7 +148,7 @@ def calculate_rarefaction_data(country, eva_dataset, eva_species_dict, gift_data
     plots_within = eva_dataset.within(test_geom)
     df_test = eva_dataset[plots_within]
     gift_observed_sr = gift_dataset.loc[test_idx].sr
-    gift_polygon_area = gift_dataset.loc[test_idx]["megaplot_area"]
+    gift_polygon_area = gift_dataset.loc[test_idx]["sp_unit_area"]
     
     if len(df_test) == 0:
         print(f"No EVA plots within GIFT plot for {country}")

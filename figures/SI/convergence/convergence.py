@@ -16,7 +16,7 @@ from train import Config
 
 
 if __name__ == "__main__":
-    path_results = Path("../../../scripts/results/train/checkpoint_MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791.pth")
+    path_results = Path("../../../scripts/results/train/checkpoint_MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791.pth")
     
     # Load model results
     result_modelling = torch.load(path_results, map_location="cpu")

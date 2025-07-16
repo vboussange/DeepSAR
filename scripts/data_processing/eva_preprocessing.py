@@ -10,7 +10,7 @@ from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
-from src.data_processing.utils_eunis import extract_habitat_lev1
+from deepsar.data_processing.utils_eunis import extract_habitat_lev1
 
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/species_data.csv"

@@ -5,7 +5,7 @@ from pathlib import Path
 from math import radians
 import geopandas as gpd
 from tqdm import tqdm 
-from src.data_processing.utils_polygons import random_size_from_range, place_randomly_rectangle
+from deepsar.data_processing.utils_polygons import random_size_from_range, place_randomly_rectangle
 from shapely.geometry import Point, MultiPoint, box
 from scipy.spatial import KDTree
 import logging 

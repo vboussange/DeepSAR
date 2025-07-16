@@ -10,8 +10,8 @@ from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 
 from pathlib import Path
-from src.data_processing.utils_env_pred import CHELSADataset
-from src.neural_4pweibull import initialize_ensemble_model
+from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.neural_4pweibull import initialize_ensemble_model
 import pandas as pd
 from tqdm import tqdm
 
@@ -32,7 +32,6 @@ def create_raster(X_map, ypred):
     return rast
 
 def plot_raster(rast, label, ax, cmap, vmin=None, vmax=None):
-        # world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres')) 
         # world.boundary.plot(ax=ax, linewidth=0.1, edgecolor='black')
         cbar_kwargs = {'orientation':'horizontal', 'shrink':0.6, 'aspect':40, "label":"","pad":0.05, "location":"bottom"} #if display_cbar else {}
         # rolling window for smoothing
@@ -61,7 +60,7 @@ def create_features(predictor_labels, coarse_mean, coarse_std, res):
     df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
     X_map = pd.concat([df_mean, df_std], axis=1)
     
-    X_map = X_map.assign(log_observed_area=np.log(res**2), log_megaplot_area=np.log(res**2))
+    X_map = X_map.assign(log_observed_area=np.log(res**2), log_sp_unit_area=np.log(res**2))
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
@@ -69,7 +68,7 @@ def get_SR_dSR_stats(model, climate_dataset, res0, predictors, feature_scaler, t
     """
     Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
     dataset at a specified resolution. dSR is obtained as a gradient of SR with
-    respect to log_megaplot_area. Does not account for changes in climate
+    respect to log_sp_unit_area. Does not account for changes in climate
     features with area.
     """
     
@@ -127,7 +126,7 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     seed = 1
-    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
     plotting = True
     
     projection_path = Path(__file__).parent / Path(f"projections/")

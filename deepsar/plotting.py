@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats as stats
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.multicomp import MultiComparison
-from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 from matplotlib.colors import LinearSegmentedColormap
 
 RCPARAMS_DICT = {

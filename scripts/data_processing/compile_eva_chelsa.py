@@ -1,5 +1,5 @@
 """
-Compiles megaplots based on EVA and CHELSA data, for habitat "all".
+Compiles training samples based on EVA and CHELSA data.
 """
 
 import pandas as pd
@@ -12,10 +12,10 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import warnings
 
-from src.generate_sar_data_eva import clip_EVA_SR, generate_random_square
-from src.data_processing.utils_eva import EVADataset
-from src.data_processing.utils_env_pred import CHELSADataset
-from src.utils import save_to_pickle
+from deepsar.generate_sar_data_eva import clip_EVA_SR, generate_random_square
+from deepsar.data_processing.utils_eva import EVADataset
+from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.utils import save_to_pickle
 
 import git
 import random
@@ -46,8 +46,8 @@ CONFIG = {
     "block_length": 1e6, # in meters
     "area_range_train": (1e4, 1e12),  # in m2
     "area_range_test": (1e4, 1e10),  # in m2
-    "megaplot_test_size": 0.005, # in fraction of total EVA records
-    "megaplot_train_size": 3, # in fraction of total EVA train records
+    "sp_unit_test_size": 0.005, # in fraction of total EVA records
+    "sp_unit_train_size": 3, # in fraction of total EVA train records
     "num_polygon_max": np.inf,
     "crs": "EPSG:3035",
     "random_state": 2,
@@ -85,42 +85,42 @@ def load_and_preprocess_data():
 
 def run_SR_compilation(plot_gdf, 
                        species_dict, 
-                       megaplots, # a list of geometries or an int
+                       sp_units, # a list of geometries or an int
                        area_range = None, 
                        verbose=CONFIG["verbose"]):
     
     """
-    Calculate species richness, area and observed area for each megaplot,
+    Calculate species richness, area and observed area for each spatial unit,
     defined as bags of EVA raw plots contained in `plot_gdf`. Returns a gpd
-    dataframe, together with a set of used plots. `megaplots` can be a list of
-    geometries corresponding to the megaplots, or an int, in which case random squares are generated.
+    dataframe, together with a set of used plots. `sp_units` can be a list of
+    geometries corresponding to the sp_units, or an int, in which case random squares are generated.
     """
     data = pd.DataFrame({
         "observed_area": pd.Series(dtype="float"),
-        "megaplot_area": pd.Series(dtype="float"),
+        "sp_unit_area": pd.Series(dtype="float"),
         "sr": pd.Series(dtype="int"),
         "num_plots": pd.Series(dtype="int"),
         "geometry": pd.Series(dtype="object"),
     })
-    if isinstance(megaplots, int):
-        nb_megaplots = megaplots
+    if isinstance(sp_units, int):
+        nb_sp_units = sp_units
     else:
-        nb_megaplots = len(megaplots)
-    miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
+        nb_sp_units = len(sp_units)
+    miniters = max(nb_sp_units // 100, 1)  # Refresh every 1%
     used_plots = set()
     row_idx = 0
-    for i in tqdm(range(nb_megaplots),
+    for i in tqdm(range(nb_sp_units),
                 desc="Compiling SR", 
                 disable=not verbose,
-                total=nb_megaplots, 
+                total=nb_sp_units, 
                 miniters=miniters,
                 maxinterval=float("inf")):
         
         # generating random square
-        if isinstance(megaplots, int):
+        if isinstance(sp_units, int):
             box = generate_random_square(plot_gdf, area_range)
         else:
-            box = megaplots.iloc[i]
+            box = sp_units.iloc[i]
             
         # identifying plots within the square
         plots_within_box = plot_gdf.within(box)
@@ -136,25 +136,25 @@ def run_SR_compilation(plot_gdf,
         species = np.concatenate([species_dict[idx] for idx in df_samp.index])
         sr = len(np.unique(species))
         observed_area = np.sum(df_samp['observed_area'])
-        megaplot_area = max(box.area, observed_area)
+        sp_unit_area = max(box.area, observed_area)
         num_plots = len(df_samp)
-        data.loc[row_idx, ["observed_area", "megaplot_area", "sr", "num_plots", "geometry"]] = [observed_area, megaplot_area, sr, num_plots, box]
+        data.loc[row_idx, ["observed_area", "sp_unit_area", "sr", "num_plots", "geometry"]] = [observed_area, sp_unit_area, sr, num_plots, box]
         used_plots.update(df_samp.index)
         row_idx += 1
             
     data = gpd.GeoDataFrame(data, crs = plot_gdf.crs, geometry="geometry")
     return data, used_plots
 
-def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbose"]):
+def run_climate_compilation(sp_unit_data, climate_raster, verbose=CONFIG["verbose"]):
     """
     Based on a gpd dataframe return by `run_SR_compilation`, calculate
-    environmental covariates for each megaplot.
+    environmental covariates for each sp_unit.
     """
-    nb_megaplots = len(megaplot_data)
-    miniters = max(nb_megaplots // 100, 1)  # Refresh every 1%
+    nb_sp_units = len(sp_unit_data)
+    miniters = max(nb_sp_units // 100, 1)  # Refresh every 1%
     
-    for plot_id, row in tqdm(megaplot_data.iterrows(), 
-                       total=nb_megaplots, 
+    for plot_id, row in tqdm(sp_unit_data.iterrows(), 
+                       total=nb_sp_units, 
                        desc="Compiling climate", 
                        disable=not verbose,
                        miniters=miniters,
@@ -171,17 +171,17 @@ def run_climate_compilation(megaplot_data, climate_raster, verbose=CONFIG["verbo
             _m = np.nanmean(env_vars, axis=(1, 2))
             _std = np.nanstd(env_vars, axis=(1, 2))
         env_pred_stats = np.concatenate([_m, _std])
-        megaplot_data.loc[plot_id, CLIMATE_COL_NAMES] = env_pred_stats
-    return megaplot_data
+        sp_unit_data.loc[plot_id, CLIMATE_COL_NAMES] = env_pred_stats
+    return sp_unit_data
 
-def run_megaplot_compilation(plot_gdf, species_dict, climate_raster, megaplots, area_range):
+def run_sp_unit_compilation(plot_gdf, species_dict, climate_raster, sp_units, area_range):
     """
-    Compiles species richness and environmental covariates for each megaplot.
+    Compiles species richness and environmental covariates for each spatial unit.
     """
-    megaplot_data, used_plots = run_SR_compilation(plot_gdf, species_dict, megaplots, area_range)
-    assert (megaplot_data.sr > 0).all()
-    megaplot_data = run_climate_compilation(megaplot_data, climate_raster)
-    return megaplot_data, used_plots
+    sp_unit_data, used_plots = run_SR_compilation(plot_gdf, species_dict, sp_units, area_range)
+    assert (sp_unit_data.sr > 0).all()
+    sp_unit_data = run_climate_compilation(sp_unit_data, climate_raster)
+    return sp_unit_data, used_plots
 
 
 # TODO: raw plots are not used anymore, we should simplify this
@@ -202,7 +202,7 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
 
     plot_data = plot_data.rename({"area_m2": "observed_area", "level_1":"habitat_id"}, axis=1)
     plot_data.loc[:, [f"std_{var}" for var in CONFIG["env_vars"]]] = 0.
-    plot_data["megaplot_area"] = plot_data["observed_area"]
+    plot_data["sp_unit_area"] = plot_data["observed_area"]
     plot_data["num_plots"] = 1
     
     logging.info("Calculating climate vars...")
@@ -217,7 +217,7 @@ def run_plot_compilation(plot_data, species_dict, climate_raster):
     std_env_vars = np.zeros_like(env_vars)
     plot_data[CLIMATE_COL_NAMES] = np.concatenate([env_vars, std_env_vars], axis=1)
     
-    plot_data = plot_data[["sr", "observed_area", "megaplot_area", "geometry", "num_plots"] + CLIMATE_COL_NAMES]
+    plot_data = plot_data[["sr", "observed_area", "sp_unit_area", "geometry", "num_plots"] + CLIMATE_COL_NAMES]
 
     return plot_data
 
@@ -263,41 +263,41 @@ if __name__ == "__main__":
     # plot_gdf = plot_gdf.sample(n=1000, random_state=CONFIG["random_state"])     # Sample 1000 rows for debugging purposes
     plot_data_all = run_plot_compilation(plot_gdf, species_dict, climate_raster)
     
-    # Generating test megaplots
-    nb_megaplot_test = min(int(CONFIG["megaplot_test_size"] * len(plot_data_all)), CONFIG["num_polygon_max"])
-    logging.info("Compiling megaplot test dataset...")
-    EVA_megaplot_test, used_plots = run_megaplot_compilation(plot_data_all, 
+    # Generating test sp_units
+    nb_sp_unit_test = min(int(CONFIG["sp_unit_test_size"] * len(plot_data_all)), CONFIG["num_polygon_max"])
+    logging.info("Compiling sp_unit test dataset...")
+    EVA_sp_unit_test, used_plots = run_sp_unit_compilation(plot_data_all, 
                                                              species_dict, 
                                                              climate_raster, 
-                                                             nb_megaplot_test,
+                                                             nb_sp_unit_test,
                                                              CONFIG["area_range_test"])
     
-    # Generating training megaplots
-    EVA_raw_megaplot_train = plot_data_all[~plot_data_all.index.isin(used_plots)]
-    logging.info("Compiling megaplot train dataset...")
-    nb_megaplots_train = min(CONFIG["megaplot_train_size"] * len(EVA_raw_megaplot_train), CONFIG["num_polygon_max"])
-    EVA_megaplot_train, _ = run_megaplot_compilation(EVA_raw_megaplot_train,
+    # Generating training sp_units
+    EVA_raw_sp_unit_train = plot_data_all[~plot_data_all.index.isin(used_plots)]
+    logging.info("Compiling sp_unit train dataset...")
+    nb_sp_units_train = min(CONFIG["sp_unit_train_size"] * len(EVA_raw_sp_unit_train), CONFIG["num_polygon_max"])
+    EVA_sp_unit_train, _ = run_sp_unit_compilation(EVA_raw_sp_unit_train,
                                                     species_dict,
                                                     climate_raster,
-                                                    nb_megaplots_train,
+                                                    nb_sp_units_train,
                                                     CONFIG["area_range_train"])
     
-    EVA_megaplot_test["test"] = True
-    EVA_megaplot_train["test"] = False
+    EVA_sp_unit_test["test"] = True
+    EVA_sp_unit_train["test"] = False
     
     # Save checkpoint
-    megaplot_data = pd.concat([EVA_megaplot_test, EVA_megaplot_train], ignore_index=True, verify_integrity=True)
+    sp_unit_data = pd.concat([EVA_sp_unit_test, EVA_sp_unit_train], ignore_index=True, verify_integrity=True)
     
     # export the full compilation to pickle
-    output_path = output_file_path / "eva_chelsa_megaplot_data.pkl"
+    output_path = output_file_path / "eva_chelsa_compiled_data.pkl"
     logging.info(f"Exporting {output_path}")
     save_to_pickle(output_path, 
-                   megaplot_data=megaplot_data, 
+                   sp_unit_data=sp_unit_data, 
                    config=CONFIG)
     
-    # exporting megaplot_data to gpkg
-    output_path = output_file_path / "eva_chelsa_megaplot_data.parquet"
+    # exporting sp_unit_data to gpkg
+    output_path = output_file_path / "eva_chelsa_compiled_data.parquet"
     logging.info(f"Exporting {output_path}")
-    megaplot_data.to_parquet(output_path)
+    sp_unit_data.to_parquet(output_path)
     
     logging.info(f'Full compilation saved at {output_file_path}.')

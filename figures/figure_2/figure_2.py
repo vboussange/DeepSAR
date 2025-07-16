@@ -9,19 +9,19 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.metrics import mean_squared_error
-from src.plotting import boxplot_bypreds
+from deepsar.plotting import boxplot_bypreds
 import pandas as pd
 from matplotlib.patches import Patch
 import geopandas as gpd
 
 import sys
 sys.path.append(str(Path(__file__).parent / "../../scripts/"))
-from src.neural_4pweibull import initialize_ensemble_model
+from deepsar.neural_4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.stats import ttest_ind
 from statsmodels.stats.multicomp import MultiComparison
-from src.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 import scipy.stats as stats
 
@@ -160,7 +160,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
 
 if __name__ == "__main__":
 
-    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/neural4p_weibull_nosmallmegaplots2_basearch6_0b85791_benchmark.csv")    
+    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/neural4p_weibull_nosmallsp_units2_basearch6_0b85791_benchmark.csv")    
     path_chao2_results = Path(f"../../scripts/results/benchmark/chao2_estimator_benchmark.csv")    
 
     
@@ -267,7 +267,7 @@ if __name__ == "__main__":
 
     # Third plot: observed vs predicted for area+environment model on EVA dataset
     ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
-    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
     # Load model and data for EVA predictions
     eva_data_dir = Path("../../data/processed/EVA/6c2d61d/")
     path_results = Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
@@ -279,9 +279,9 @@ if __name__ == "__main__":
     # Load EVA dataset
     # Load and prepare data
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    # eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_megaplot_area"]
+    # eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_sp_unit_area"]
     # eva_dataset = eva_dataset[eva_dataset["num_plots"] > 10] # todo: to change
     
     # Filter test data
@@ -333,9 +333,9 @@ if __name__ == "__main__":
     gift_data_dir = Path("../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
     
     # Load GIFT dataset
-    gift_dataset = gpd.read_parquet(gift_data_dir / "megaplot_data.parquet")
-    gift_dataset["log_megaplot_area"] = np.log(gift_dataset["megaplot_area"])
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["megaplot_area"])
+    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
     # Make predictions for GIFT

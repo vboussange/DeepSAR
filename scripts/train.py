@@ -16,11 +16,11 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
-from src.neural_4pweibull import Neural4PWeibull
-from src.trainer import Trainer
-from src.ensemble_model import EnsembleModel
-from src.dataset import create_dataloader
-from src.utils import symmetric_arch
+from deepsar.neural_4pweibull import Neural4PWeibull
+from deepsar.trainer import Trainer
+from deepsar.ensemble_model import EnsembleModel
+from deepsar.dataset import create_dataloader
+from deepsar.utils import symmetric_arch
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

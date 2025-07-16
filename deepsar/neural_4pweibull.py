@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from src.ensemble_model import EnsembleModel
+from deepsar.ensemble_model import EnsembleModel
 # TODO: work in progress
 
 

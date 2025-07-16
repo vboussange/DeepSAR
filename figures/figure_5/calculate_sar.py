@@ -6,11 +6,11 @@ Using Ensemble model.
 import torch
 import numpy as np
 import pandas as pd
-from src.utils import save_to_pickle
-from src.data_processing.utils_env_pred import CHELSADataset
+from deepsar.utils import save_to_pickle
+from deepsar.data_processing.utils_env_pred import CHELSADataset
 import matplotlib.pyplot as plt
 import xarray as xr
-from src.neural_4pweibull import initialize_ensemble_model
+from deepsar.neural_4pweibull import initialize_ensemble_model
 
 from scripts.train import Config
 
@@ -29,7 +29,7 @@ def load_chelsa_and_reproject(predictors):
 if __name__ == "__main__":
     # creating X_maps for different resolutions
     seed = 1
-    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
     output_dir = Path("SARs")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             df_mean = pd.DataFrame({var: [reduced_climate_dataset[var].mean().item()] for var in reduced_climate_dataset.data_vars})
             df_std = pd.DataFrame({f"std_{var}": [reduced_climate_dataset[var].std().item()] for var in reduced_climate_dataset.data_vars})
             features = pd.concat([df_mean, df_std], axis=1)
-            features = features.assign(log_observed_area=np.log(window_size**2), log_megaplot_area=np.log(window_size**2))
+            features = features.assign(log_observed_area=np.log(window_size**2), log_sp_unit_area=np.log(window_size**2))
             features = features[predictors]
             
             # predictions

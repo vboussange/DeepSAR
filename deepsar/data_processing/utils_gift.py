@@ -9,7 +9,7 @@ import pickle
 import xarray as xr
 import json
 
-from src.data_processing.utils_landcover import EUNISDataset
+from deepsar.data_processing.utils_landcover import EUNISDataset
 
 GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered"
 

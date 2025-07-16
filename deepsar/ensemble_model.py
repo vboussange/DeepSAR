@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from src.mlp import MLP
+from deepsar.mlp import MLP
     
 class EnsembleModel(nn.Module):
     def __init__(self, models):

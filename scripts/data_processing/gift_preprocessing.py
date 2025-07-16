@@ -12,8 +12,8 @@ from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
 from eva_preprocessing import clean_species_name
-from src.data_processing.utils_env_pred import EXTENT_DATASET
-from src.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
+from deepsar.data_processing.utils_env_pred import EXTENT_DATASET
+from deepsar.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
 
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"
 PROCESSED_EVA_DATA = Path(__file__).parent / "../../data/processed/EVA/preprocessing/"

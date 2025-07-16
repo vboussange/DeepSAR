@@ -8,8 +8,8 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from src.neural_4pweibull import initialize_ensemble_model
-from src.plotting import CMAP_GO
+from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.plotting import CMAP_GO
 
 import sys
 sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
@@ -19,12 +19,12 @@ from matplotlib.colors import TwoSlopeNorm
 def load_data(config_path, gift_data_dir):
     """Load and preprocess evaluation and GIFT datasets."""
     eva_dataset = gpd.read_parquet(config_path)
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
 
-    gift_dataset = gpd.read_parquet(gift_data_dir / "megaplot_data.parquet")
-    gift_dataset["log_megaplot_area"] = np.log(gift_dataset["megaplot_area"])
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["megaplot_area"])
+    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     gift_dataset = gift_dataset[gift_dataset.geometry.is_valid]
     gift_dataset["eva_observed_area"] = np.nan
@@ -50,7 +50,7 @@ def make_predictions(model, feature_scaler, target_scaler, gift_dataset, predict
         y_pred_gift = target_scaler.inverse_transform(y_pred_gift)
     gift_dataset["predicted_sr"] = y_pred_gift.squeeze()
     gift_dataset["bias"] = (gift_dataset["sr"] - gift_dataset["predicted_sr"]) / gift_dataset["sr"]
-    gift_dataset["sampling_effort"] = gift_dataset["eva_observed_area"] / gift_dataset["megaplot_area"]
+    gift_dataset["sampling_effort"] = gift_dataset["eva_observed_area"] / gift_dataset["sp_unit_area"]
     return gift_dataset
 
     
@@ -58,7 +58,7 @@ if __name__ == "__main__":
    
     # Define the path to save the processed dataset
     processed_data_path = Path("processed_gift_dataset.parquet")
-    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
 
     # Check if the processed dataset exists
     if processed_data_path.exists():

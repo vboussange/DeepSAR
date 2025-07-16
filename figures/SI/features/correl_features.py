@@ -9,14 +9,14 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from src.neural_4pweibull import initialize_ensemble_model
-from src.plotting import CMAP_BR
+from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.plotting import CMAP_BR
 import sys
 sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from src.neural_4pweibull import initialize_ensemble_model
+from deepsar.neural_4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 
-MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
 
 def load_data_and_model():
     """Load model and data."""
@@ -25,7 +25,7 @@ def load_data_and_model():
     config = results_fit_split["config"]
     
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
     model = initialize_ensemble_model(
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     
     # Load all data to fit PCA globally
     eva_dataset = eva_dataset[predictors]
-    eva_dataset = eva_dataset.rename(columns={"log_megaplot_area": "log_area"})
+    eva_dataset = eva_dataset.rename(columns={"log_sp_unit_area": "log_area"})
     corr_matrix = eva_dataset.corr()
     
     fig, ax = plt.subplots(figsize=(15, 12))

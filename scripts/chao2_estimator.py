@@ -11,7 +11,7 @@ import logging
 
 from tqdm import tqdm
 
-from src.data_processing.utils_eva import EVADataset
+from deepsar.data_processing.utils_eva import EVADataset
 
 from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
                              r2_score, mean_absolute_percentage_error)

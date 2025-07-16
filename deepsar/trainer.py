@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 import pandas as pd
-from src.dataset import create_dataloader
+from deepsar.dataset import create_dataloader
 
 class Trainer:
     """
@@ -128,7 +128,7 @@ class Trainer:
 
 if __name__ == "__main__":
     # testing the Trainer class with a mock dataset and model
-    from src.mlp import MLP
+    from deepsar.mlp import MLP
     
     logging.basicConfig(level=logging.INFO)
 

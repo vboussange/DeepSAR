@@ -8,15 +8,15 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from src.neural_4pweibull import initialize_ensemble_model
-from src.plotting import CMAP_BR
+from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.plotting import CMAP_BR
 import sys
 sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from src.neural_4pweibull import initialize_ensemble_model
+from deepsar.neural_4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 
 # Assuming load_preprocessed_data is already defined
-MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
+MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
 
 def load_data():
     
@@ -29,16 +29,16 @@ def load_data():
 
     # Load EVA dataset
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_megaplot_area"]
+    eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_sp_unit_area"]
     eva_dataset = eva_dataset.sample(n=5000, random_state=42)  # Sample 1000 points for visualization
     gift_data_dir = Path("../../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
     
     # Load GIFT dataset
-    gift_dataset = gpd.read_parquet(gift_data_dir / "megaplot_data.parquet")
-    gift_dataset["log_megaplot_area"] = np.log(gift_dataset["megaplot_area"])
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["megaplot_area"])
+    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
     # Calculate log-transformed species richness (log_sr) for both datasets
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # Plot EVA dataset
     scatter = ax.scatter(
-        np.exp(eva_dataset["log_megaplot_area"]) / 1e6,
+        np.exp(eva_dataset["log_sp_unit_area"]) / 1e6,
         np.exp(eva_dataset["log_sr"]),
         c=eva_dataset["coverage"],
         cmap=CMAP_BR,
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     # Plot GIFT dataset
     ax.scatter(
-        np.exp(gift_dataset["log_megaplot_area"]) / 1e6,
+        np.exp(gift_dataset["log_sp_unit_area"]) / 1e6,
         np.exp(gift_dataset["log_sr"]),
         color=colors[0],
         alpha=1,

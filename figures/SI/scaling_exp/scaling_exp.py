@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 if __name__ == "__main__":
-    path_neural_weibull_results = Path(f"../../../scripts/results/benchmark/neural4p_weibull_nosmallmegaplots2_basearch6_0b85791_benchmark.csv")    
+    path_neural_weibull_results = Path(f"../../../scripts/results/benchmark/neural4p_weibull_nosmallsp_units2_basearch6_0b85791_benchmark.csv")    
     
     # Read the data
     df_nw = pd.read_csv(path_neural_weibull_results)
