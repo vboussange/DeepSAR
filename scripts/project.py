@@ -99,14 +99,14 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     seed = 1
-    MODEL_NAME = "MSEfit_lowlr_nosmallmegaplots2_basearch6_0b85791"
-    plotting = True
+    MODEL_NAME = "0b85791"
+    plotting = False
     
     projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{MODEL_NAME}")
     projection_path.mkdir(parents=True, exist_ok=True)
     
-    path_results = Path(__file__).parent / Path(f"results/train/checkpoint_{MODEL_NAME}.pth")
-    results_fit_split = torch.load(path_results, map_location="cpu")
+    path_results = Path(__file__).parent / Path(f"results/train/deepsar_ensemble_weights_{MODEL_NAME}.pth")
+    results_fit_split = torch.load(path_results, map_location="cpu", weights_only=False)
     config = results_fit_split["config"]    
 
     predictors = results_fit_split["predictors"]
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 
-    for res in [10000, 1000]:
+    for res in range(1000, 100000, 1000):
         print(f"Calculating SR, and stdSR for resolution: {res}m")
         features, SR, std_SR = get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
             ax.set_title(f"Res: {res}m")
             fig.savefig(projection_path / f"SR_raster_{MODEL_NAME}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
         
-        std_SR_rast = create_raster(features, std_SR)
-        std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{MODEL_NAME}_{res:.0f}m.tif")
+        # std_SR_rast = create_raster(features, std_SR)
+        # std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{MODEL_NAME}_{res:.0f}m.tif")
         
-        print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {projection_path}")
+        # print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {projection_path}")
