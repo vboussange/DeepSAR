@@ -12,7 +12,7 @@ stdout/*
 *.CondaPkg
 Manifest.toml
 *.pdf
-!figures/**/*.pdf
+# !figures/**/*.pdf
 julia/results/**/*.txt
 python/figures/**/*.txt
 *.egg-info
@@ -27,6 +27,7 @@ reports/*
 *.pth
 *.csv
 *.zip
+*.svg
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
