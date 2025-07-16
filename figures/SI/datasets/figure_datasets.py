@@ -8,11 +8,11 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from deepsar.plotting import CMAP_BR
 import sys
 sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 
 # Assuming load_preprocessed_data is already defined

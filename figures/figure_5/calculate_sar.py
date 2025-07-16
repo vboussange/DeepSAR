@@ -10,7 +10,7 @@ from deepsar.utils import save_to_pickle
 from deepsar.data_processing.utils_env_pred import CHELSADataset
 import matplotlib.pyplot as plt
 import xarray as xr
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 
 from scripts.train import Config
 

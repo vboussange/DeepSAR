@@ -8,7 +8,7 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from deepsar.plotting import CMAP_GO
 
 import sys

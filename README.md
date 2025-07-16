@@ -1,11 +1,25 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
 
 # DeepSAR: deep learning-based species-area relationship model
 Official implementation of the paper
 
 **Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover**  
 Victor Boussange, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
+
+## Quick start
+### Inference
+We provide a self-contained tutorial to predict species richness maps from pretrained deep SAR model weights: [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
+
+### Training
+To retrain the deep SAR model, you'll need to follow these steps.
+
+0. Make sure you have the (vegetation) plot data and predictor variables under `data/`, and install [the project environment](#environment).
+1. Generate training data with `scripts/data_processing/compile_eva_chelsa.py` (you can generate test data with `scripts/data_processing/compile_gift_chelsa.py`)
+2. Train an ensemble model from the training data with `train.py`. The current deep SAR model, `deep4pweibull`, is defined under `deepsar/deep4pweibull.py`. 
+3. Make predictions with `project.py` (seel also [Inference](#inference)).
+
 
 ### Environment
 To install the dependencies and load the environment, make sure you have conda (or mamba) and 
@@ -29,25 +43,15 @@ As a test dataset, we provide data retrieved from the [GIFT database](https://gi
 
 
 #### Predictors
-As predictors, we used bioclimate variables from the CHELSA dataset. To download the same bioclimate variables, go to `data/CHELSA/` and type type
+As predictors, we currently bioclimate variables from the CHELSA dataset. To download the same bioclimate variables, go to `data/CHELSA/` and type
 
 ```
 wget --no-host-directories --force-directories --input-file=envidat.txt
 ```
 
-## Quick start
-### Inference
-
-### Training
-0. Make sure you have raw vegetation plot data and predictor variables under `data/`.
-1. Generate training data with `scripts/data_processing/compile_eva_chelsa.py` (you can generate test data with `scripts/data_processing/compile_gift_chelsa.py`)
-2. Train an ensemble model with `train.py`
-3. Make predictions with `project.py`.
-
-
 
 # Citations
-If you use the anonymised data, please cite the following references
+If you use the anonymised data, please cite the following references:
 
 ```
 @misc{boussange2025,
@@ -88,9 +92,4 @@ year = {2020}
   doi = {10.1111/avsc.12191},
   urldate = {2024-05-17},
 }
-
-
-
-
-
 ```

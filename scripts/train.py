@@ -16,7 +16,7 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from dataclasses import dataclass, field
-from deepsar.neural_4pweibull import Neural4PWeibull
+from deepsar.deep4pweibull import Neural4PWeibull
 from deepsar.trainer import Trainer
 from deepsar.ensemble_model import EnsembleModel
 from deepsar.dataset import create_dataloader

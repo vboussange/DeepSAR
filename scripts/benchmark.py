@@ -22,7 +22,7 @@ from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
 from sklearn.model_selection import train_test_split
 
 from deepsar.dataset import create_dataloader
-from deepsar.neural_4pweibull import Neural4PWeibull
+from deepsar.deep4pweibull import Neural4PWeibull
 from deepsar.trainer import Trainer
 from deepsar.utils import symmetric_arch
 import warnings

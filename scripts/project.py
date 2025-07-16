@@ -8,7 +8,7 @@ import xarray as xr
 from train import Config
 from pathlib import Path
 from deepsar.data_processing.utils_env_pred import CHELSADataset
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from deepsar.plotting import CMAP_BR
 import pandas as pd
 from tqdm import tqdm

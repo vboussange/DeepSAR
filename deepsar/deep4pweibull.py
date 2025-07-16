@@ -3,8 +3,6 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from deepsar.ensemble_model import EnsembleModel
-# TODO: work in progress
-
 
 class FullyConnectedBlock(nn.Module):
     def __init__(self, in_features, out_features, **kwargs):

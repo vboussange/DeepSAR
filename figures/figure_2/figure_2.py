@@ -16,7 +16,7 @@ import geopandas as gpd
 
 import sys
 sys.path.append(str(Path(__file__).parent / "../../scripts/"))
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.stats import ttest_ind

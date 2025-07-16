@@ -9,10 +9,10 @@ from pathlib import Path
 import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 import sys
 sys.path.append(str(Path(__file__).parent / "../../scripts/"))
-from deepsar.neural_4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import initialize_ensemble_model
 from train import Config, Trainer
 
 # Configuration
