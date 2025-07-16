@@ -1,3 +1,6 @@
+"""Generates figure 5 panels; the figure is further processed in Inkscape."""
+
+
 import matplotlib.pyplot as plt
 import pickle
 import xarray as xr

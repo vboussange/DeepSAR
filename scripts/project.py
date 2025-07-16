@@ -1,5 +1,6 @@
 """
-Projecting spatially MLP and saving to geotiff files.
+Projecting spatially the predictions of ensembled `Neural4PWeibull` model, and saving to geotiff files.
+See `scripts/train.py` for training the ensemble model.
 """
 import torch
 import numpy as np

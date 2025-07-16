@@ -1,5 +1,5 @@
-# This file is used generate an anonymised dataset of vegetation plots.
-# TODO: you need to discard true species name when publishing the dataset
+"""Anonymising species names in EVA and GIFT datasets."""
+
 import hashlib
 import base64
 from pathlib import Path

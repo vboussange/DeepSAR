@@ -1,5 +1,5 @@
 """
-Plotting loss of against iterations for training and validation sets for all habitats.
+Plotting loss of against iterations for training and validation sets.
 
 Using ensemble methods.
 """

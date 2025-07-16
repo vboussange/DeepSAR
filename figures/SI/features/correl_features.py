@@ -1,5 +1,5 @@
 """"
-Plotting figure 3 'prediction power of climate, area, and both on SR'
+Plotting environmental feature correlation structure.'
 """
 import torch
 from pathlib import Path

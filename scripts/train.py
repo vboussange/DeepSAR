@@ -1,5 +1,5 @@
 """
-Training ensemble models.
+Training an ensemble `Neural4PWeibull` model.
 """
 import copy
 import random

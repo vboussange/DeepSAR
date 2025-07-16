@@ -1,15 +1,7 @@
 """
-This script preprocesses the EVA data at the species entry level by - filtering
-for vascular plants - cleaning the species names - matching the species names
-with GIFT species names - saving the matched species names to a CSV file
-
-Further processing steps involve 
-- anonymisation of the species names
-(`eva_anonymisation.py`) 
-
-- preprocessing at the plot level (filtering out for
-duplicates, spatial locations, etc.) (`src/utils_eva.py`, but should be placed
-in `scripts`)
+Preprocesses the EVA data by filtering for vascular plants, cleaning the species
+names, matching the species names with the GIFT backbone, and saving to parquet
+dataframes `species_data` and `plot_data`.
 """
 import pandas as pd
 import re
@@ -20,7 +12,6 @@ from pathlib import Path
 import geopandas as gpd
 from src.data_processing.utils_eunis import extract_habitat_lev1
 
-# ---------------------- CONFIGURATION ---------------------- #
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/species_data.csv"
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/preprocessing"
@@ -38,9 +29,13 @@ COUNTRY_LIST = [
     "Switzerland", "Turkey", "Ukraine", "United Kingdom"
 ]
 
-# ---------------------- UTILITY FUNCTIONS ---------------------- #
 def clean_species_name(name):
-    # Ensure the input is a string to avoid type errors
+    """
+    Cleans and standardizes species names by removing subspecies, variety,
+    cultivar, hybrid, aggregate, uncertainty, and annotation markers, as well as
+    content within brackets and extraneous symbols.
+    """
+
     name = str(name)
 
     cleaned = re.sub(r'\s+subsp\..*$', '', name)    # Remove any text after 'subsp.' (subspecies) and trailing characters
@@ -64,7 +59,14 @@ def clean_species_name(name):
 assert clean_species_name("x_Abies alba subsp. alba s.l. s.s. aggr. (syn)") == "Abies alba"
 
 def find_best_match(row, reference_set: set) -> str:
-    # Exact matching
+    """
+    Finds the best matching species name from a given row against a reference
+    set (GIFT backbone). The function cleans each species name, and checks for an exact match in
+    the `reference_set`. If an exact match is found, it returns the matched
+    name. If no exact match is found, it attempts to find the closest match
+    using string similarity.
+    """
+
     cleaned_names = set()
     for field in FIELDS_PRIORITY:
         cleaned_name = clean_species_name(row[field])
@@ -89,7 +91,11 @@ def find_best_match(row, reference_set: set) -> str:
     return "NA", False
 
 def clean_eva_plots(plot_gdf):
-    # filtering for inconsistent coordinates 
+    """
+    Cleans and filters EVA plot GeoDataFrame based on country extent, coordinate
+    uncertainty, habitat level, and plot size.
+    """
+
     print("Filtering by landcover and extent")
     countries_gdf = gpd.read_file(COUNTRY_DATA)
     eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
@@ -119,7 +125,6 @@ def clean_eva_plots(plot_gdf):
 
     return plot_gdf
     
-# ---------------------- DATA LOADING ---------------------- #
 def load_data():
     eva_species_df = pd.read_csv(EVA_SPECIES_FILE, sep="\t", engine="python", on_bad_lines='skip')
     gift_species_df = pd.read_csv(GIFT_CHECKLIST_FILE)
@@ -149,10 +154,8 @@ def load_data():
 
     
     return eva_species_df, gift_species_df, eva_plot_df
-
-
-# ---------------------- MAIN PROCESSING FUNCTION ---------------------- #
-def main():
+    
+if __name__ == "__main__":
     eva_species_df, gift_species_df, eva_plot_df = load_data()
     # for testing purposes
     # eva_species_df = eva_species_df.sample(1000, random_state=42)
@@ -240,9 +243,3 @@ def main():
     eva_species_preprocessed.to_parquet(OUTPUT_FOLDER / 'species_data.parquet', index=False)
     print(f"\nSaved {len(eva_species_preprocessed)} matched entries to {OUTPUT_FOLDER / 'species_data.parquet'}")
     eva_plot_df.to_file(OUTPUT_FOLDER / "plot_data.gpkg", driver="GPKG")
-
-
-
-# ---------------------- ENTRY POINT ---------------------- #
-if __name__ == "__main__":
-    main()

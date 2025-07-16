@@ -1,3 +1,10 @@
+"""
+This script benchmarks the `Neural4PWeibull` model on EVA and GIFT datasets
+using various experimental configurations. It supports parallel execution across
+multiple devices (CPU/GPU/MPS) and evaluates model performance using R2, D2,
+RMSE, and MAPE. Results are saved as a CSV file for further analysis. 
+"""
+
 import logging
 import random
 import sys
