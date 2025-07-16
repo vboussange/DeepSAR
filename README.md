@@ -1,25 +1,19 @@
-<p align="right" style="margin-top:0;">
-  <a href="https://arxiv.org/abs/2507.06358">
-    <img src="https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg" alt="arXiv">
-  </a>
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
-  </a>
-  <a href="https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb">
-    <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Colab">
-  </a>
-</p>
+[![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb) 
 
-<img src="logo.gif" width="300" align="center" style="display:block;margin-left:auto;margin-right:auto;">
+<p align="center">
+  <img src="logo.gif" width="300" />
+</p>
 
 <!-- # DeepSAR: deep learning-based species-area relationship model  -->
 
-Official implementation of the paper
+Official implementation for
 
 > **Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover**  
 > Victor Boussange, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
 
-<!-- TODO: place GIF animation -->
+If you ❤️ the project, consider giving it a  ⭐️ .
 
 ## Quick start
 ### Inference
