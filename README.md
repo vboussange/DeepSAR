@@ -1,8 +1,8 @@
-[![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
+<img src="logo.gif" width="300" align="left" z-index=9999> [![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
 
-# DeepSAR: deep learning-based species-area relationship model <img src="logo.gif" width="300" align="right" z-index=9999>
+<!-- # DeepSAR: deep learning-based species-area relationship model  -->
 
 Official implementation of the paper
 
