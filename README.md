@@ -2,7 +2,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
 
-# DeepSAR: deep learning-based species-area relationship model
+# DeepSAR: deep learning-based species-area relationship model <img src="logo.gif" width="300" align="right" z-index=9999>
+
 Official implementation of the paper
 
 > **Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover**  
@@ -46,11 +47,14 @@ As a test dataset, we provide data retrieved from the [GIFT database](https://gi
 
 
 #### Predictors
-As predictors, we currently bioclimate variables from the CHELSA dataset. To download the same bioclimate variables, go to `data/CHELSA/` and type
+As predictors, we used in our paper bioclimate variables from the CHELSA dataset. To download the same bioclimate variables (to e.g. use [the pretrained weights](#pretrained-weights)), go to `data/CHELSA/` and type
 
 ```
 wget --no-host-directories --force-directories --input-file=envidat.txt
 ```
+
+#### Pretrained weights
+We provide pretrained weights for the ensembled deep SAR model at `scripts/results/train/`. Check the [Quickstart/inference](#inference) for the how to.
 
 
 # Citations
