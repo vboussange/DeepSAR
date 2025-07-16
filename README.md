@@ -5,12 +5,15 @@
 # DeepSAR: deep learning-based species-area relationship model
 Official implementation of the paper
 
-**Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover**  
-Victor Boussange, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
+> **Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover**  
+> Victor Boussange, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
+
+<!-- TODO: place GIF animation -->
 
 ## Quick start
 ### Inference
 We provide a self-contained tutorial to predict species richness maps from pretrained deep SAR model weights: [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
+<!-- TODO: host .nc CHELSA dataset -->
 
 ### Training
 To retrain the deep SAR model, you'll need to follow these steps.

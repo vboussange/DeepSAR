@@ -45,7 +45,7 @@ class CHELSADataset(EnvironmentalFeatureDataset):
         """
         if self.cache_path.is_file():
             with xr.open_dataset(self.cache_path) as ds:
-                return ds.to_array()
+                return ds
         
         data_arrays = []
         for tiff_path in self.tif_path.glob("*.tif"):
