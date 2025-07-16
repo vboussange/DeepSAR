@@ -134,6 +134,6 @@ if __name__ == "__main__":
             fig.savefig(projection_path / f"SR_raster_{MODEL_NAME}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
         
         std_SR_rast = create_raster(features, std_SR)
-        std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{res:.0f}m.tif")
+        std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{MODEL_NAME}_{res:.0f}m.tif")
         
         print(f"Saved SR, std_SR, dlogSR_dlogA for resolution: {res}m in {projection_path}")
