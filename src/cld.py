@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.stats.multicomp import MultiComparison
 from statsmodels.stats.weightstats import ttest_ind
+
 def multcomp_letters(pd_comp_matrix, letters=None, reversed=False):
     """
     Implementation of https://github.com/cran/multcompView/blob/master/R/multcompLetters.R

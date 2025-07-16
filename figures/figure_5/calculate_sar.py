@@ -1,9 +1,7 @@
 """
-Calculate true SAR at different locations, where environmental variables values change with areas 
+Predicts SAR from an ensembled DeepSAR model at specified locations.
 
 Using Ensemble model.
-
-TODO: this script seems to work, but it needs to be checked.
 """
 import torch
 import numpy as np

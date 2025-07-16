@@ -8,17 +8,13 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 import pandas as pd
-import geopandas as gpd
-from pathlib import Path
-from dataclasses import dataclass, field
-from src.mlp import MLP, CustomMSELoss, inverse_transform_scale_feature_tensor
-from src.ensemble_model import EnsembleModel
 from src.dataset import create_dataloader
-from src.plotting import read_result
-
-from sklearn.metrics import mean_squared_error, r2_score
 
 class Trainer:
+    """
+    Trainer class for managing the training, validation, and testing of a model.
+    """
+    
     def __init__(self, 
                  config,
                  model, 
@@ -130,13 +126,9 @@ class Trainer:
         self.model = best_model
         return best_model, best_model_log
 
-
-
 if __name__ == "__main__":
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.metrics import mean_squared_error, r2_score
-    from torch.utils.data import DataLoader, TensorDataset
-    from src.mlp import CustomMSELoss
+    # testing the Trainer class with a mock dataset and model
+    from src.mlp import MLP
     
     logging.basicConfig(level=logging.INFO)
 
@@ -177,7 +169,6 @@ if __name__ == "__main__":
     # Initialize model and trainer
     model = MLP(5, [16, 16, 16])
 
-    # loss = CustomMSELoss(dSRdA_weight=0.)
     loss = nn.MSELoss()
     
     trainer = Trainer(

@@ -42,56 +42,6 @@ COLORS_GO = ["#ff9f1c", "#ffbf69", "#ffffff", "#cbf3f0", "#2ec4b6"]
 CMAP_GO = LinearSegmentedColormap.from_list("custom_cmap", COLORS_GO)
 
 
-
-class ResultData:
-    def __init__(self, gdf, config, aggregate_labels, test_partition_idx):
-        self.gdf = gdf
-        self.config = config
-        self.aggregate_labels = aggregate_labels
-        self.test_partition_idx = test_partition_idx
-        
-def read_result(path):
-    with open(path, 'rb') as pickle_file:
-        return pickle.load(pickle_file)
-
-def boxplot_byclass(result_modelling=None,
-                    ax=None,
-                    spread=None,
-                    colormap=None,
-                    legend=False,
-                    xlab=None,
-                    ylab=None,
-                    yscale="log",
-                    yname="test_neg_mean_squared_error",
-                    habitats = None,
-                    predictors = None,
-                    widths=0.1):
-    if not habitats:
-        habitats = list(result_modelling.keys())
-    N = len(habitats)  # number of habitats
-    color_palette = sns.color_palette(colormap, N)
-    M = len(predictors)  # number of groups
-    for j, c in enumerate(habitats):
-        y = [
-            -result_modelling[c][k][yname] for k in predictors
-        ]
-        xx = np.arange(1, M + 1) + (
-            j - (N + 1) / 2
-        ) * spread / N  # artificially shift the x values to better visualise the std
-        boxplot(ax, y, xx, color_palette[j], widths)     
-    ax.set_ylabel(ylab)
-    ax.set_yscale(yscale)
-    ax.set_xlabel(xlab)
-    x = predictors
-    ax.set_xticks(np.arange(1, len(x) + 1))
-    ax.set_xticklabels(x, rotation=45)
-    if legend:
-        ax.legend(handles=[
-            Line2D([0], [0], color=color_palette[i], label=habitats[i])
-            for i in range(len(habitats))
-        ])
-        plt.show()
-
 def boxplot_bypreds(result_modelling=None,
                     ax=None,
                     spread=None,
