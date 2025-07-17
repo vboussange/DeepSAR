@@ -14,7 +14,7 @@ EXTENT_DATASET = (
     71.17876083332953,
 )
 
-CHELSA_PATH = Path(Path(__file__).parent, '../../../data/rawCHELSA/').resolve() if socket.gethostname() == 'macbook-pro.home' else Path('/lud11/boussang/data/chelsa/') # 1km res
+CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio') # 1km res
 FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 CACHE_CHELSA = Path(FILE_PATH, '../../data/raw/CHELSA/CHELSA_EU.nc')
 
@@ -26,7 +26,7 @@ class EnvironmentalFeatureDataset():
         
 class CHELSADataset(EnvironmentalFeatureDataset):
     def __init__(self, tif_path=CHELSA_PATH, cache_path=CACHE_CHELSA):
-        CACHE_CHELSA.parent.mkdir(parents=True, exist_ok=True)
+        # CACHE_CHELSA.parent.mkdir(parents=True, exist_ok=True)
         super().__init__(tif_path, cache_path)
 
 
@@ -43,9 +43,9 @@ class CHELSADataset(EnvironmentalFeatureDataset):
         Returns:
             xr.Dataset: Combined dataset of all WorldClim variables.
         """
-        if self.cache_path.is_file():
-            with xr.open_dataset(self.cache_path) as ds:
-                return ds
+        # if self.cache_path.is_file():
+        #     with xr.open_dataset(self.cache_path) as ds:
+        #         return ds
         
         data_arrays = []
         for tiff_path in self.tif_path.glob("*.tif"):
@@ -72,9 +72,9 @@ class CHELSADataset(EnvironmentalFeatureDataset):
         dataset = dataset.sel(x=slice(extent[0], extent[2]), y = slice(extent[3],extent[1]))
         
         # # caching
-        dataset.to_netcdf(self.cache_path)
+        # dataset.to_netcdf(self.cache_path)
         
-        return dataset.to_array()
+        return dataset
 
 
 def get_mean_std_env_pred(row):

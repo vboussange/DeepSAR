@@ -17,20 +17,25 @@ If you ❤️ the project, consider giving it a  ⭐️ .
 
 ## Quick start
 ### Inference
-We provide a self-contained tutorial to predict species richness maps from pretrained deep SAR model weights: [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
+We provide a self-contained tutorial to predict species richness maps from the paper's pretrained deep SAR model: [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
 <!-- TODO: host .nc CHELSA dataset -->
 
 ### Training
 To retrain the deep SAR model, you'll need to follow these steps.
 
-0. Make sure you have the (vegetation) plot data and predictor variables under `data/`, and install [the project environment](#environment).
-1. Generate training data with `scripts/data_processing/compile_eva_chelsa.py` (you can generate test data with `scripts/data_processing/compile_gift_chelsa.py`)
-2. Train an ensemble model from the training data with `train.py`. The current deep SAR model, `deep4pweibull`, is defined under `deepsar/deep4pweibull.py`. 
+0. Make sure you have the (vegetation) plot data and predictor variables under `data/`, and [install the project environment](#environment).
+1. Generate training data following `scripts/data_processing/compile_eva_chelsa.py` (see also `scripts/data_processing/compile_gift_chelsa.py` where we generate our test data).
+2. Now you can train an ensemble model from the training data with `train.py`. The current architecture for the deep SAR model we used thgought the project is `deep4pweibull`. It is defined under `deepsar/deep4pweibull.py`. 
 3. Make predictions with `project.py` (seel also [Inference](#inference)).
 
+## Overview of the project
+- `deepsar/` provides general utility functions for generating the training samples, and defining the deep SAR model
+- `scripts/` provides pipelines for generating the training samples, training the models, and for mapping model predictions.
+- `figures/` provides scripts to generate the figures of our paper
+- `data/` contains ... [the data](#data) associated with the project.
 
-### Environment
-To install the dependencies and load the environment, make sure you have conda (or mamba) and 
+## Installation
+To install the dependencies and load the environment, make sure you have `uv` and 
 
 ```
 uv sync
@@ -38,27 +43,27 @@ uv pip install torch --torch-backend=auto
 uv pip install -e .
 ```
 
-### Data
+## Data
 #### European Vegetation Archive (EVA) dataset
-Anonymised vegetation plot data is located at `data/processed/EVA/anonymised`. It consists of two `.parquet` files:
-- `plot_data.parquet` contains the metadata associated with the vegatation plots
+The anonymised vegetation plot data from which we generated our training samples is located at `data/processed/EVA/anonymised`. It consists of two `.parquet` files:
+- `plot_data.parquet` contains the metadata associated with the vegatation plots,
 - `species_data.parquet` contains anoynimised species names associated with each plot.
 
 To obtain the full dataset, make a request at https://euroveg.org/eva-database/.
 
 #### GIFT database
-As a test dataset, we provide data retrieved from the [GIFT database](https://gift.uni-goettingen.de/home) and harmonized with the EVA dataset, located under `data/processed/GIFT/anonymised`. 
+Regional checklists from the [GIFT database](https://gift.uni-goettingen.de/home), harmonized with the anonymised EVA dataset backbone, are provided as a test dataset. You can find this dataset under `data/processed/GIFT/anonymised`.
 
 
 #### Predictors
-As predictors, we used in our paper bioclimate variables from the CHELSA dataset. To download the same bioclimate variables (to e.g. use [the pretrained weights](#pretrained-weights)), go to `data/CHELSA/` and type
+We used bioclimatic variables from the CHELSA dataset as predictors in our paper. To download the same variables (for example, to use the [pretrained weights](#pretrained-weights)), navigate to `data/CHELSA/` and run:
 
 ```
 wget --no-host-directories --force-directories --input-file=envidat.txt
 ```
 
 #### Pretrained weights
-We provide pretrained weights for the ensembled deep SAR model at `scripts/results/train/`. Check the [Quickstart/inference](#inference) for the how to.
+Pretrained weights for the ensembled deep SAR model `deep4pweibull` are available at `scripts/results/train/`. See the [Quick start: Inference](#inference) section for usage instructions.
 
 
 # Citations
