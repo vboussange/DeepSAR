@@ -1,5 +1,5 @@
 """
-Projecting spatially the predictions of ensembled `Neural4PWeibull` model, and saving to geotiff files.
+Projecting spatially the predictions of ensembled `Deep4PWeibull` model, and saving to geotiff files.
 See `scripts/train.py` for training the ensemble model.
 """
 import torch
@@ -8,7 +8,7 @@ import xarray as xr
 from train import Config
 from pathlib import Path
 from deepsar.data_processing.utils_env_pred import CHELSADataset
-from deepsar.deep4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.plotting import CMAP_BR
 import pandas as pd
 from tqdm import tqdm
@@ -54,7 +54,7 @@ def create_features(predictor_labels, climate_dataset, res):
     df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
     X_map = pd.concat([df_mean, df_std], axis=1)
     
-    X_map = X_map.assign(log_observed_area=np.log(res**2), log_megaplot_area=np.log(res**2))
+    X_map = X_map.assign(log_observed_area=np.log(res**2), log_sp_unit_area=np.log(res**2))
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
@@ -62,7 +62,7 @@ def get_SR_std_SR(model, climate_dataset, res, predictors, feature_scaler, targe
     """
     Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
     dataset at a specified resolution. dSR is obtained as a gradient of SR with
-    respect to log_megaplot_area. Does not account for changes in climate
+    respect to log_sp_unit_area. Does not account for changes in climate
     features with area.
     """
     mean_SR_list = []
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     feature_scaler = results_fit_split["feature_scaler"]
     target_scaler = results_fit_split["target_scaler"]
     
-    model = initialize_ensemble_model(results_fit_split["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(results_fit_split["ensemble_model_state_dict"], predictors, config)
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 

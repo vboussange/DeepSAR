@@ -11,13 +11,11 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from pathlib import Path
 from deepsar.data_processing.utils_env_pred import CHELSADataset
-from deepsar.deep4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import Deep4PWeibull
 import pandas as pd
 from tqdm import tqdm
 
-import sys
-sys.path.append(str(Path(__file__).parent / Path("../../scripts/")))
-from train import Config
+from deepsar.ensemble_trainer import EnsembleConfig
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -126,7 +124,7 @@ def load_chelsa_and_reproject(predictors):
 
 if __name__ == "__main__":
     seed = 1
-    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
+    MODEL_NAME = "deep4pweibull_basearch6_0b85791"
     plotting = True
     
     projection_path = Path(__file__).parent / Path(f"projections/")
@@ -140,7 +138,7 @@ if __name__ == "__main__":
     feature_scaler = results_fit_split["feature_scaler"]
     target_scaler = results_fit_split["target_scaler"]
     
-    model = initialize_ensemble_model(results_fit_split["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(results_fit_split["ensemble_model_state_dict"], predictors, config)
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 

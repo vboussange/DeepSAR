@@ -10,7 +10,7 @@ from deepsar.utils import save_to_pickle
 from deepsar.data_processing.utils_env_pred import CHELSADataset
 import matplotlib.pyplot as plt
 import xarray as xr
-from deepsar.deep4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import Deep4PWeibull
 
 from scripts.train import Config
 
@@ -29,12 +29,11 @@ def load_chelsa_and_reproject(predictors):
 if __name__ == "__main__":
     # creating X_maps for different resolutions
     seed = 1
-    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
     output_dir = Path("SARs")
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
-    path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
+    path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
     results_fit_split = torch.load(path_results, map_location="cpu")
     config = results_fit_split["config"]    
 
@@ -42,7 +41,7 @@ if __name__ == "__main__":
     feature_scaler = results_fit_split["feature_scaler"]
     target_scaler = results_fit_split["target_scaler"]
     
-    model = initialize_ensemble_model(results_fit_split["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(results_fit_split["ensemble_model_state_dict"], predictors, config)
     
     climate_dataset, res_climate_pixel = load_chelsa_and_reproject(predictors)
 

@@ -9,14 +9,11 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from deepsar.deep4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.plotting import CMAP_BR
-import sys
-sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from deepsar.deep4pweibull import initialize_ensemble_model
-from train import Config, Trainer
+from deepsar.ensemble_trainer import EnsembleConfig
 
-MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
+MODEL_NAME = "deep4pweibull_basearch6_0b85791"
 
 def load_data_and_model():
     """Load model and data."""
@@ -28,7 +25,7 @@ def load_data_and_model():
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
-    model = initialize_ensemble_model(
+    model = Deep4PWeibull.initialize_ensemble(
         results_fit_split["ensemble_model_state_dict"], 
         results_fit_split["predictors"], 
         config

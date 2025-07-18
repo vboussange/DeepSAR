@@ -10,16 +10,14 @@ import numpy as np
 import torch
 from pathlib import Path
 
-import sys
-sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from train import Config
+from deepsar.ensemble_trainer import EnsembleConfig
 
 
 if __name__ == "__main__":
-    path_results = Path("../../../scripts/results/train/checkpoint_MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791.pth")
+    path_results = Path("../../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
     
     # Load model results
-    result_modelling = torch.load(path_results, map_location="cpu")
+    result_modelling = torch.load(path_results, map_location="cpu", weights_only=False)
     config = result_modelling["config"]
 
     fig, ax = plt.subplots(figsize=(6, 4))

@@ -13,9 +13,10 @@ class FullyConnectedBlock(nn.Module):
         x = F.leaky_relu(x)
         return x
     
-class Neural4PWeibull(nn.Module):
+class Deep4PWeibull(nn.Module):
+    """Deep SAR model based on the 4-parameter Weibull function."""
     def __init__(self, n_features, layer_sizes, p0):
-        super(Neural4PWeibull, self).__init__()
+        super(Deep4PWeibull, self).__init__()
         layer_sizes = [n_features] + layer_sizes
         
         self.fully_connected_layers = nn.ModuleList(
@@ -68,32 +69,17 @@ class Neural4PWeibull(nn.Module):
         _, c, _, _ = self.predict_b_c_d_e(x)
         return c
     
-class MSELogLoss(nn.Module):
-    def __init__(self, reduction='mean'):
-        super(MSELogLoss, self).__init__()
-        self.reduction = reduction
+    @staticmethod
+    def initialize_ensemble(model_state, predictors, config, device="cuda"):
+        """Load the model and scalers from the saved checkpoint."""
+        models = [Deep4PWeibull(len(predictors)-1, config.layer_sizes, np.ones(4)) for _ in range(config.n_ensembles)]
+        model = EnsembleModel(models)
         
-    def forward(self, input, target):
-        log_input = torch.log(torch.clamp(input, min=1e-8))
-        log_target = torch.log(torch.clamp(target, min=1e-8))
-        loss = (log_input - log_target) ** 2
-        
-        if self.reduction == 'mean':
-            return loss.mean()
-        elif self.reduction == 'sum':
-            return loss.sum()
-        else:
-            return loss
-        
-def initialize_ensemble_model(model_state, predictors, config, device="cuda"):
-    """Load the model and scalers from the saved checkpoint."""
-    models = [Neural4PWeibull(len(predictors)-1, config.layer_sizes, np.ones(4)) for _ in range(config.n_ensembles)]
-    model = EnsembleModel(models)
+        model.load_state_dict(model_state)
+        model = model.to(device)
+        model.eval()
+        return model
     
-    model.load_state_dict(model_state)
-    model = model.to(device)
-    model.eval()
-    return model
 
 if __name__ == "__main__":
     import torch.optim as optim
@@ -122,7 +108,7 @@ if __name__ == "__main__":
     features = np.random.randn(n_samples, n_features)
     log_aplot = np.random.rand(n_samples, 1) * 10 + 1  # avoid log(0)
 
-    model = Neural4PWeibull(n_features=n_features, 
+    model = Deep4PWeibull(n_features=n_features, 
                             layer_sizes=layer_sizes, 
                             p0=p0)
 

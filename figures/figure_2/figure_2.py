@@ -3,28 +3,20 @@ Plotting figure 2 'prediction power of climate, area, and both on SR'
 TODO: change color scheme for plotting.CMAP_BR blue and reds
 """
 import torch
+import pandas as pd
+import geopandas as gpd
 import numpy as np
 from pathlib import Path
-import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from sklearn.metrics import mean_squared_error
-from deepsar.plotting import boxplot_bypreds
-import pandas as pd
-from matplotlib.patches import Patch
-import geopandas as gpd
-
-import sys
-sys.path.append(str(Path(__file__).parent / "../../scripts/"))
-from deepsar.deep4pweibull import initialize_ensemble_model
-from train import Config, Trainer
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from scipy.stats import ttest_ind
-from statsmodels.stats.multicomp import MultiComparison
-from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 import scipy.stats as stats
+from scipy.stats import ttest_ind
+from statsmodels.stats.multicomp import MultiComparison
 
+from deepsar.deep4pweibull import Deep4PWeibull
+from deepsar.benchmarker import BenchmarkConfig
+from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
@@ -160,7 +152,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
 
 if __name__ == "__main__":
 
-    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/neural4p_weibull_nosmallsp_units2_basearch6_0b85791_benchmark.csv")    
+    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/deep4pweibull_basearch6_0b85791_benchmark.csv")    
     path_chao2_results = Path(f"../../scripts/results/benchmark/chao2_estimator_benchmark.csv")    
 
     
@@ -267,22 +259,20 @@ if __name__ == "__main__":
 
     # Third plot: observed vs predicted for area+environment model on EVA dataset
     ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
-    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
     # Load model and data for EVA predictions
     eva_data_dir = Path("../../data/processed/EVA/6c2d61d/")
-    path_results = Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
+    path_results = Path(f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
     
     # Load model results
-    result_modelling = torch.load(path_results, map_location="cpu")
+    result_modelling = torch.load(path_results, map_location="cpu", weights_only=False)
     config = result_modelling["config"]
 
     # Load EVA dataset
     # Load and prepare data
     eva_dataset = gpd.read_parquet(config.path_eva_data)
+    eva_dataset["sp_unit_area"] = eva_dataset["megaplot_area"] # TODO: legacy, to change
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    # eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_sp_unit_area"]
-    # eva_dataset = eva_dataset[eva_dataset["num_plots"] > 10] # todo: to change
     
     # Filter test data
     eva_test_data = eva_dataset[eva_dataset["test"]].sample(n=400)
@@ -297,7 +287,7 @@ if __name__ == "__main__":
     X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
     
     # Initialize model
-    model = initialize_ensemble_model(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
+    model = Deep4PWeibull.initialize_ensemble(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
     
     with torch.no_grad():
         y_pred = model(X).numpy()

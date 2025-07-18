@@ -1,161 +1,20 @@
 """
-Training an ensemble `Neural4PWeibull` model.
+Training an ensemble `Deep4PWeibull` model.
 """
-import copy
-import random
 import logging
-import numpy as np
 import torch
-import torch.nn as nn
-from torch import multiprocessing as mp
-        
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from deepsar.ensemble_trainer import EnsembleConfig, EnsembleTrainer
+import numpy as np
 
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
-from dataclasses import dataclass, field
-from deepsar.deep4pweibull import Neural4PWeibull
-from deepsar.trainer import Trainer
-from deepsar.ensemble_model import EnsembleModel
-from deepsar.dataset import create_dataloader
-from deepsar.utils import symmetric_arch
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 HASH = "0b85791"
-@dataclass
-class Config:
-    devices: list
-    batch_size: int = 1024
-    num_workers: int = 0
-    n_epochs: int = 100
-    val_size: float = 0.1
-    lr: float = 1e-3
-    lr_scheduler_factor: float = 0.5
-    lr_scheduler_patience: int = 5
-    weight_decay: float = 1e-4
-    seed: int = 1
-    hash_data: str = HASH
-    climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
-    n_ensembles: int = 5  # Number of models in the ensemble
-    run_name: str = f"checkpoint_MSEfit_lowlr_nosmallmegaplots2_basearch6_{HASH}"
-    run_folder: str = ""
-    layer_sizes: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
-    path_eva_data: str = Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet"
-
-class EnsembleTrainer:
-    def __init__(self, config, df):
-        self.config = config
-        self.df = df
-        self.devices = config.devices
-        self.n_ensembles = config.n_ensembles
-
-    def run(self, predictors):
-        ctx = mp.get_context('spawn')
-        with ctx.Pool(processes=self.n_ensembles) as pool:
-            args = [
-                (self.config, self.df, predictors, i, self.devices[i % len(self.devices)])
-                for i in range(self.n_ensembles)
-            ]
-            results = pool.starmap(self._single_run, args)
-
-        models = [r["model"] for r in results]
-        logs = [r["log"] for r in results]
-        feature_scaler = results[0]["feature_scaler"]
-        target_scaler = results[0]["target_scaler"]
-        test_loader = results[0]["test_loader"]
-
-        # Create ensemble model
-        ensemble_model = EnsembleModel(models)
-        ensemble_trainer = Trainer(
-            config=self.config,
-            model=ensemble_model,
-            feature_scaler=feature_scaler,
-            target_scaler=target_scaler,
-            train_loader=None,
-            val_loader=None,
-            test_loader=test_loader,
-            compute_loss=nn.MSELoss(),
-            device=self.devices[0]
-        )
-        targets, preds = ensemble_trainer.get_model_predictions(test_loader)
-        pred_trs = target_scaler.inverse_transform(preds)
-        target_trs = target_scaler.inverse_transform(targets)
-        ensemble_mse = mean_squared_error(target_trs, pred_trs)
-        ensemble_r2 = r2_score(target_trs, pred_trs)
-
-        return {
-            "ensemble_model_state_dict": ensemble_model.state_dict(),
-            "logs": logs,
-            "feature_scaler": feature_scaler,
-            "target_scaler": target_scaler,
-            "mean_squared_error_test": ensemble_mse,
-            "r2_test": ensemble_r2,
-            "predictors": predictors,
-        }
-
-    @staticmethod
-    def _single_run(config, df, predictors, ensemble_idx, device):
-
-        gdf_train_val = df[df["test"] == False]
-        gdf_test = df[df["test"] == True]
-        train_val_loader, feature_scaler, target_scaler = create_dataloader(
-            gdf_train_val, predictors, config.batch_size, config.num_workers
-        )
-        test_loader, _, _ = create_dataloader(
-            gdf_test, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler
-        )
-
-        torch.manual_seed(config.seed + ensemble_idx)
-        np.random.seed(config.seed + ensemble_idx)
-        random.seed(config.seed + ensemble_idx)
-
-
-        train_idx, val_idx = train_test_split(
-            gdf_train_val.index,
-            test_size=config.val_size,
-            random_state=config.seed + ensemble_idx,
-        )
-        gdf_train, gdf_val = gdf_train_val.loc[train_idx], gdf_train_val.loc[val_idx]
-
-        train_loader, _, _ = create_dataloader(
-            gdf_train, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler
-        )
-        val_loader, _, _ = create_dataloader(
-            gdf_val, predictors, config.batch_size, config.num_workers, feature_scaler, target_scaler
-        )
-
-        e0 = train_val_loader.dataset.features[:, 0].median()
-        c0 = train_val_loader.dataset.targets.max()
-        d0 = train_val_loader.dataset.targets.min()
-        p0 = [1e-1, c0, d0, e0]
-        model = Neural4PWeibull(len(predictors) - 1, config.layer_sizes, p0).to(device)
-
-        trainer = Trainer(
-            config=config,
-            model=model,
-            feature_scaler=feature_scaler,
-            target_scaler=target_scaler,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            test_loader=test_loader,
-            compute_loss=nn.MSELoss(),
-            device=device,
-        )
-        best_model, log = trainer.train(n_epochs=config.n_epochs, metrics=["mean_squared_error", "r2_score"])
-        best_model = best_model.to("cpu")
-        return {
-            "model": best_model,
-            "log": log,
-            "feature_scaler": feature_scaler,
-            "target_scaler": target_scaler,
-            "test_loader": test_loader,
-        }
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -165,20 +24,23 @@ if __name__ == "__main__":
     else:
         devices = ["cpu"]
 
-    config = Config(devices=devices)
+    config = EnsembleConfig(devices=devices, 
+                            hash_data=HASH, 
+                            run_name=f"checkpoint_deep4pweibull_basearch6_{HASH}", 
+                            path_eva_data=Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet")
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
     eva_dataset = gpd.read_parquet(config.path_eva_data)
     eva_dataset = eva_dataset.dropna()
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_dataset["log_megaplot_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["megaplot_area"]) # TODO: legacy name, to be changed in the future
     eva_dataset = eva_dataset[eva_dataset["num_plots"] > 2]  # TODO: to change
 
     climate_vars = config.climate_variables
     std_climate_vars = ["std_" + env for env in climate_vars]
     climate_features = climate_vars + std_climate_vars
-    predictors = ["log_observed_area", "log_megaplot_area"] + climate_features
+    predictors = ["log_observed_area", "log_sp_unit_area"] + climate_features
 
     ensemble_trainer = EnsembleTrainer(config, eva_dataset)
     results = ensemble_trainer.run(predictors)

@@ -9,14 +9,10 @@ from pathlib import Path
 import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
-from deepsar.deep4pweibull import initialize_ensemble_model
-import sys
-sys.path.append(str(Path(__file__).parent / "../../scripts/"))
-from deepsar.deep4pweibull import initialize_ensemble_model
-from train import Config, Trainer
+from deepsar.deep4pweibull import Deep4PWeibull
+from deepsar.ensemble_trainer import EnsembleConfig
 
 # Configuration
-MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
 PLOT_CONFIG = [("Area", "#f72585"), ("Environmental heterogeneity", "#4cc9f0"), ("Mean environmental conditions", "#3a0ca3")]
 
 def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
@@ -55,7 +51,7 @@ class ShapleyAnalyzer:
 
 def load_data_and_model():
     """Load model and data."""
-    path_results = Path(__file__).parent / f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth"
+    path_results = Path(__file__).parent / f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth"
     results_fit_split = torch.load(path_results, map_location="cpu")
     config = results_fit_split["config"]
     
@@ -65,7 +61,7 @@ def load_data_and_model():
     
     test_data = eva_dataset[eva_dataset["test"]]
     
-    model = initialize_ensemble_model(
+    model = Deep4PWeibull.initialize_ensemble(
         results_fit_split["ensemble_model_state_dict"], 
         results_fit_split["predictors"], 
         config

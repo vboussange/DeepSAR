@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import root_mean_squared_error, r2_score
 import pandas as pd
 from deepsar.dataset import create_dataloader
 
@@ -141,9 +142,9 @@ if __name__ == "__main__":
     df = pd.DataFrame(X, columns=["feature1", "feature2", "feature3"])
     df["log_sr"] = np.log(y)
     df["log_area"] = np.log(A1)
-    df["log_megaplot_area"] = np.log(A2)
+    df["log_sp_unit_area"] = np.log(A2)
     
-    predictors = ["log_area", "log_megaplot_area" , "feature1", "feature2", "feature3"]
+    predictors = ["log_area", "log_sp_unit_area" , "feature1", "feature2", "feature3"]
     
     class MockConfig:
         device: str = "cpu"
@@ -187,7 +188,7 @@ if __name__ == "__main__":
     
 
     # Test train method
-    best_model, best_model_log = trainer.train(n_epochs=100, metrics=["mean_squared_error", "r2_score"])
+    best_model, best_model_log = trainer.train(n_epochs=100, metrics=["root_mean_squared_error", "r2_score"])
     for k in best_model_log.keys():
         print(k, best_model_log[k])
         

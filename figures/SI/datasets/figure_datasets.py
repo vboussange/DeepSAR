@@ -8,15 +8,10 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from deepsar.deep4pweibull import initialize_ensemble_model
 from deepsar.plotting import CMAP_BR
-import sys
-sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from deepsar.deep4pweibull import initialize_ensemble_model
-from train import Config, Trainer
 
 # Assuming load_preprocessed_data is already defined
-MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
+MODEL_NAME = "deep4pweibull_basearch6_0b85791"
 
 def load_data():
     

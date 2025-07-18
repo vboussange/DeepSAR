@@ -8,12 +8,10 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from deepsar.deep4pweibull import initialize_ensemble_model
+from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.plotting import CMAP_GO
+from deepsar.ensemble_trainer import EnsembleConfig
 
-import sys
-sys.path.append(str(Path(__file__).parent / "../../../scripts/"))
-from train import Config, Trainer
 from matplotlib.colors import TwoSlopeNorm
 
 def load_data(config_path, gift_data_dir):
@@ -58,7 +56,7 @@ if __name__ == "__main__":
    
     # Define the path to save the processed dataset
     processed_data_path = Path("processed_gift_dataset.parquet")
-    MODEL_NAME = "MSEfit_lowlr_nosmallsp_units2_basearch6_0b85791"
+    MODEL_NAME = "deep4pweibull_basearch6_0b85791"
 
     # Check if the processed dataset exists
     if processed_data_path.exists():
@@ -74,7 +72,7 @@ if __name__ == "__main__":
         predictors = result_modelling["predictors"]
         feature_scaler = result_modelling["feature_scaler"]
         target_scaler = result_modelling["target_scaler"]
-        model = initialize_ensemble_model(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
+        model = Deep4PWeibull.initialize_ensemble(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
         eva_dataset, gift_dataset = load_data(config.path_eva_data, gift_data_dir)
 
         # Process data
