@@ -19,8 +19,6 @@ class Trainer:
     def __init__(self, 
                  config,
                  model, 
-                 feature_scaler, 
-                 target_scaler,
                  train_loader,
                  val_loader,
                  compute_loss,
@@ -28,8 +26,6 @@ class Trainer:
                  device = "cpu"):
         
         self.model = model.to(device)
-        self.feature_scaler = feature_scaler
-        self.target_scaler = target_scaler
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
@@ -46,7 +42,7 @@ class Trainer:
             )
         self.device = device
         
-    def get_model_predictions(self, loader):
+    def _get_model_predictions(self, loader):
         # we expect the loader to return transformed data
         self.model.eval()
         preds = []
@@ -62,7 +58,7 @@ class Trainer:
         targets = torch.cat(targets, dim=0)
         return targets, preds
     
-    def train_step(self):
+    def _train_step(self):
         self.model.train()
         running_train_loss = 0.0
 
@@ -90,7 +86,7 @@ class Trainer:
 
         return avg_train_loss, avg_val_loss
     
-    def train(self, n_epochs, metrics = []):
+    def run(self, n_epochs, metrics = []):
         best_val_loss = float('inf')
         best_model_log = None
         best_model = None
@@ -98,16 +94,16 @@ class Trainer:
         val_losses = []
 
         for epoch in range(n_epochs):
-            train_loss, val_loss = self.train_step()
+            train_loss, val_loss = self._train_step()
             train_losses.append(train_loss)
             val_losses.append(val_loss)
             print(f"Epoch {epoch + 1}/{n_epochs} | Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
             metric_log = {}
             if self.test_loader:
                 loader, name = self.test_loader, "test"
-                targets, preds = self.get_model_predictions(loader)
-                pred_trs = self.target_scaler.inverse_transform(preds)
-                target_trs = self.target_scaler.inverse_transform(targets)
+                targets, preds = self._get_model_predictions(loader)
+                pred_trs = self.model.target_scaler.inverse_transform(preds)
+                target_trs = self.model.target_scaler.inverse_transform(targets)
                 for m in metrics:
                     metric_value = eval(m)(target_trs, pred_trs)
                     metric_log[name + "_" + m] = metric_value
@@ -141,10 +137,10 @@ if __name__ == "__main__":
     
     df = pd.DataFrame(X, columns=["feature1", "feature2", "feature3"])
     df["log_sr"] = np.log(y)
-    df["log_area"] = np.log(A1)
+    df["log_observed_area"] = np.log(A1)
     df["log_sp_unit_area"] = np.log(A2)
     
-    predictors = ["log_area", "log_sp_unit_area" , "feature1", "feature2", "feature3"]
+    feature_names = ["log_sp_unit_area" , "feature1", "feature2", "feature3"]
     
     class MockConfig:
         device: str = "cpu"
@@ -163,9 +159,9 @@ if __name__ == "__main__":
     train_val_df, test_df = train_test_split(df, test_size = config.test_size, random_state=42)
     train_df, val_df = train_test_split(train_val_df, test_size = config.val_size, random_state=42)
     
-    train_loader, feature_scaler, target_scaler = create_dataloader(train_df, predictors, config.batch_size, config.num_workers)
-    val_loader, _, _ = create_dataloader(val_df, predictors, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
-    test_loader, _, _ = create_dataloader(test_df, predictors, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
+    train_loader, feature_scaler, target_scaler = create_dataloader(train_df, feature_names, config.batch_size, config.num_workers)
+    val_loader, _, _ = create_dataloader(val_df, feature_names, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
+    test_loader, _, _ = create_dataloader(test_df, feature_names, config.batch_size, config.num_workers, feature_scaler=feature_scaler, target_scaler=target_scaler)
 
     # Initialize model and trainer
     model = MLP(5, [16, 16, 16])
@@ -175,8 +171,6 @@ if __name__ == "__main__":
     trainer = Trainer(
         config=config,
         model=model,
-        feature_scaler=feature_scaler,
-        target_scaler=target_scaler,
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,

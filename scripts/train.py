@@ -24,10 +24,12 @@ if __name__ == "__main__":
     else:
         devices = ["cpu"]
 
-    config = EnsembleConfig(devices=devices, 
+    config = EnsembleConfig(devices=devices,
                             hash_data=HASH, 
                             run_name=f"checkpoint_deep4pweibull_basearch6_{HASH}", 
-                            path_eva_data=Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet")
+                            path_eva_data=Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet",
+                            n_epochs=2, # for testing
+                            )
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}")
     config.run_folder.mkdir(exist_ok=True, parents=True)
 
@@ -37,13 +39,13 @@ if __name__ == "__main__":
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["megaplot_area"]) # TODO: legacy name, to be changed in the future
     eva_dataset = eva_dataset[eva_dataset["num_plots"] > 2]  # TODO: to change
 
-    climate_vars = config.climate_variables
+    climate_vars = config.predictors
     std_climate_vars = ["std_" + env for env in climate_vars]
     climate_features = climate_vars + std_climate_vars
-    predictors = ["log_observed_area", "log_sp_unit_area"] + climate_features
+    feature_names = ["log_sp_unit_area"] + climate_features
 
     ensemble_trainer = EnsembleTrainer(config, eva_dataset)
-    results = ensemble_trainer.run(predictors)
+    results = ensemble_trainer.run(feature_names)
 
     results["config"] = config
     logger.info(f"Saving results in {config.run_folder}")

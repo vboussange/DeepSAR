@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from deepsar.ensemble_model import EnsembleModel
+from deepsar.ensemble_model import DeepSAREnsembleModel
+from deepsar.deepsar_model import DeepSARModel
 
 class FullyConnectedBlock(nn.Module):
     def __init__(self, in_features, out_features, **kwargs):
@@ -13,25 +14,23 @@ class FullyConnectedBlock(nn.Module):
         x = F.leaky_relu(x)
         return x
     
-class Deep4PWeibull(nn.Module):
+class Deep4PWeibull(DeepSARModel):
     """Deep SAR model based on the 4-parameter Weibull function."""
-    def __init__(self, n_features, layer_sizes, p0):
-        super(Deep4PWeibull, self).__init__()
-        layer_sizes = [n_features] + layer_sizes
+    def __init__(self,
+                 layer_sizes, 
+                 feature_names = [],
+                 feature_scaler=None, 
+                 target_scaler=None):
+        super(Deep4PWeibull, self).__init__(feature_names=feature_names, 
+                                            feature_scaler=feature_scaler, 
+                                            target_scaler=target_scaler)
+        layer_sizes = [len(feature_names)] + layer_sizes
         
         self.fully_connected_layers = nn.ModuleList(
             [FullyConnectedBlock(in_f, out_f) for in_f, out_f in zip(layer_sizes[:-1], layer_sizes[1:])])
-        
-        # last layer corresponds to the parameters of the Weibull function
         self.last_fully_connected = nn.Linear(layer_sizes[-1], 4)
-        # p0 corresponds to [b, c, d, e]; need to transform it to [b, c, d_offset, e]
-        p0[2] = p0[1] - p0[2]   # d_offset = c - d
-        assert p0[3] > 0, "e must be positive"
         
-        # self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
-        # nn.init.xavier_normal_(self.last_fully_connected.weight, gain=0.2)
-        
-    def weibull_4p(self, x, b, c, d, e):
+    def _weibull_4p(self, x, b, c, d, e):
         """
         4-parameter Weibull function: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - ln(e))))
         """
@@ -43,7 +42,7 @@ class Deep4PWeibull(nn.Module):
         return c + (d - c) * torch.exp(outer_exp)
 
 
-    def predict_b_c_d_e(self, x):
+    def _predict_b_c_d_e(self, x):
         for fully_connected_layer in self.fully_connected_layers:
             x = fully_connected_layer(x)
         x = self.last_fully_connected(x)
@@ -57,29 +56,54 @@ class Deep4PWeibull(nn.Module):
 
     def forward(self, x):
         log_aplot, features = x[:, :1], x[:, 1:]
-        b, c, d, e = self.predict_b_c_d_e(features)
-        sr = self.weibull_4p(log_aplot, b, c, d, e)
-        # log_sr = torch.log(sr)
+        b, c, d, e = self._predict_b_c_d_e(features)
+        sr = self._weibull_4p(log_aplot, b, c, d, e)
         return sr
     
-    def predict_sr(self, x):
+    def _predict_sr(self, x):
         """
         Predicts asymptotic SR from features. `log_aplot` should not appear in `x`.
         """
-        _, c, _, _ = self.predict_b_c_d_e(x)
+        _, c, _, _ = self._predict_b_c_d_e(x)
         return c
     
     @staticmethod
-    def initialize_ensemble(model_state, predictors, config, device="cuda"):
+    def initialize(checkpoint, device="cuda"):
         """Load the model and scalers from the saved checkpoint."""
-        models = [Deep4PWeibull(len(predictors)-1, config.layer_sizes, np.ones(4)) for _ in range(config.n_ensembles)]
-        model = EnsembleModel(models)
-        
+        feature_names = checkpoint["feature_names"]
+        model_state = checkpoint["ensemble_model_state_dict"]
+        config = checkpoint["config"]
+        feature_scaler = checkpoint["feature_scaler"]
+        target_scaler = checkpoint["target_scaler"]
+        model = Deep4PWeibull(config.layer_sizes,
+                              feature_names=feature_names,
+                              feature_scaler=feature_scaler,
+                              target_scaler=target_scaler)
         model.load_state_dict(model_state)
         model = model.to(device)
         model.eval()
         return model
     
+    @staticmethod
+    def initialize_ensemble(checkpoint, device="cuda"):
+        """Load the model and scalers from the saved checkpoint."""
+        feature_names = checkpoint["feature_names"]
+        model_state = checkpoint["ensemble_model_state_dict"]
+        config = checkpoint["config"]
+        feature_scalers = checkpoint["feature_scalers"]
+        target_scalers = checkpoint["target_scalers"]
+        models = []
+        for i in range(config.n_ensembles):
+            models.append(Deep4PWeibull(config.layer_sizes,
+                                        feature_names=feature_names,
+                                        feature_scaler=feature_scalers[i],
+                                        target_scaler=target_scalers[i]))
+        ensemble_model = DeepSAREnsembleModel(models)
+        ensemble_model.load_state_dict(model_state)
+        ensemble_model = ensemble_model.to(device)
+        ensemble_model.eval()
+        return ensemble_model
+
 
 if __name__ == "__main__":
     import torch.optim as optim
@@ -90,10 +114,8 @@ if __name__ == "__main__":
     # Generate synthetic data
     n_features = 5
     layer_sizes = [16, 8]
-    # layer_sizes = []
-    p0 = [1., 6.0, -1, 3.0]  # [b, c, d_offset, e_offset]
 
-    batch_size = 128
+    batch_size = 256
     n_samples = 1000
 
     # True Weibull parameters
@@ -109,11 +131,10 @@ if __name__ == "__main__":
     log_aplot = np.random.rand(n_samples, 1) * 10 + 1  # avoid log(0)
 
     model = Deep4PWeibull(n_features=n_features, 
-                            layer_sizes=layer_sizes, 
-                            p0=p0)
+                        layer_sizes=layer_sizes,)
 
     # Generate targets using the 4-parameter Weibull function
-    y = model.weibull_4p(torch.tensor(log_aplot, dtype=torch.float32), 
+    y = model._weibull_4p(torch.tensor(log_aplot, dtype=torch.float32), 
                          torch.tensor(b_true, dtype=torch.float32), 
                          torch.tensor(c_true, dtype=torch.float32), 
                          torch.tensor(d_true, dtype=torch.float32), 
@@ -128,10 +149,10 @@ if __name__ == "__main__":
     # Model, loss, optimizer
     criterion = nn.MSELoss()
     # criterion = MSELogLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.AdamW(model.parameters(), lr=0.1)
 
     # Training loop
-    n_epochs = 400
+    n_epochs = 20
     for epoch in range(n_epochs):
         perm = torch.randperm(n_samples)
         x_shuffled = x_tensor[perm]
@@ -154,7 +175,7 @@ if __name__ == "__main__":
     model.eval()
     with torch.no_grad():
         # Use the same input to get predicted parameters
-        b_pred, c_pred, d_pred, e_pred = model.predict_b_c_d_e(x_tensor[:, 1:])
+        b_pred, c_pred, d_pred, e_pred = model._predict_b_c_d_e(x_tensor[:, 1:])
         
         # Calculate mean predicted parameters
         b_mean = b_pred.mean().item()

@@ -77,16 +77,16 @@ class Benchmarker:
         self.devices = config.devices
         self.nruns = config.nruns
 
-    def run(self, predictors, loss_fn, layer_sizes, train_frac):
+    def run(self, feature_names, loss_fn, layer_sizes, train_frac):
         # run in parallel on different GPUs
         ctx = mp.get_context('spawn')
         with ctx.Pool(processes=len(self.devices)) as pool:
-            args = [(predictors, loss_fn, layer_sizes, train_frac, i) 
+            args = [(feature_names, loss_fn, layer_sizes, train_frac, i) 
                    for i in range(self.nruns)]
             results = pool.starmap(self._single_run, args)
         
         # Count parameters once
-        tmp = Deep4PWeibull(len(predictors) - 1, layer_sizes, torch.ones(4))
+        tmp = Deep4PWeibull(layer_sizes, feature_names, torch.ones(4))
         num_params = sum(p.numel() for p in tmp.parameters())
         
         return {
@@ -102,7 +102,7 @@ class Benchmarker:
             "num_params": num_params,
         }        
 
-    def _single_run(self, predictors, loss_fn, layer_sizes, train_frac, run_id):
+    def _single_run(self, feature_names, loss_fn, layer_sizes, train_frac, run_id):
         # assign a GPU
         device = self.devices[run_id % len(self.devices)]
         # split EVA into train/val/test
@@ -118,13 +118,13 @@ class Benchmarker:
 
         tr_loader, feat_s, targ_s = create_dataloader(
             df_tr,
-            predictors,
+            feature_names,
             self.config.batch_size,
             self.config.num_workers,
         )
         val_loader, _, _ = create_dataloader(
             df_val,
-            predictors,
+            feature_names,
             self.config.batch_size,
             self.config.num_workers,
             feat_s,
@@ -132,28 +132,25 @@ class Benchmarker:
         )
 
         # init model
-        e0 = tr_loader.dataset.features[:, 0].median().item()
-        c0 = tr_loader.dataset.targets.max().item()
-        d0 = tr_loader.dataset.targets.min().item()
-        p0 = [1e-1, c0, d0, e0]
-        model = Deep4PWeibull(len(predictors) - 1, layer_sizes, p0).to(device)
+        model = Deep4PWeibull(len(feature_names) - 1, 
+                              layer_sizes, 
+                              feature_scaler=feat_s, 
+                              target_scaler=targ_s).to(device)
 
         trainer = Trainer(
             config=self.config,
             model=model,
-            feature_scaler=feat_s,
-            target_scaler=targ_s,
             train_loader=tr_loader,
             val_loader=val_loader,
             compute_loss=loss_fn,
             device=device,
         )
-        best_model, log = trainer.train(n_epochs=self.config.n_epochs)
+        best_model, log = trainer.run(n_epochs=self.config.n_epochs)
         best_model.eval() # model is returned to CPU
 
         # EVA test
         X = torch.tensor(
-            feat_s.transform(eva_test[predictors]), dtype=torch.float32
+            feat_s.transform(eva_test[feature_names]), dtype=torch.float32
         ).to("cpu")
         with torch.no_grad():
             y_pred = (
@@ -168,7 +165,7 @@ class Benchmarker:
 
         # GIFT test (drop one feature if needed)
         Xg = torch.tensor(
-            feat_s.transform(self.gift[predictors]), dtype=torch.float32
+            feat_s.transform(self.gift[feature_names]), dtype=torch.float32
         ).to("cpu")
         Xg = Xg[:, 1:]  # e.g. drop log_sp_unit_area if your predict_fn needs it
         with torch.no_grad():
