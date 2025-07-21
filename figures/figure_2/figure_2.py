@@ -49,7 +49,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
         eva_mask = eva_test_data[["sr", "predicted_sr"]].dropna()
         eva_observed = eva_mask["sr"]
         eva_predicted = eva_mask["predicted_sr"]
-        eva_relative_bias = (eva_observed - eva_predicted) / eva_observed
+        eva_relative_bias = (eva_predicted - eva_observed) / eva_observed
         
         print("EVA Dataset", file=file)
         print("-" * 20, file=file)
@@ -64,7 +64,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
         gift_mask = gift_dataset[["sr", "predicted_sr"]].dropna()
         gift_observed = gift_mask["sr"]
         gift_predicted = gift_mask["predicted_sr"]
-        gift_relative_bias = (gift_observed - gift_predicted) / gift_observed
+        gift_relative_bias = (gift_predicted - gift_observed) / gift_observed
         
         print("\nGIFT Dataset", file=file)
         print("-" * 20, file=file)
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
     x_eva = mask_eva["sr"]
     y_eva = mask_eva["predicted_sr"]
-    eva_relative_bias = (x_eva - y_eva) / x_eva
+    eva_relative_bias = (y_eva - x_eva) / x_eva
     eva_median_bias = eva_relative_bias.median()
     ax3.text(0.1, 0.06, f'Rel. bias: {eva_median_bias:.3f}', 
             transform=ax3.transAxes, 
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     mask_gift = gift_dataset[["sr", "predicted_sr"]].dropna()
     x_gift = mask_gift["sr"]
     y_gift = mask_gift["predicted_sr"]
-    gift_relative_bias = (x_gift - y_gift) / x_gift
+    gift_relative_bias = (y_gift - x_gift) / x_gift
     gift_median_bias = gift_relative_bias.median()
 
     ax4.text(0.1, 0.06, f'Rel. bias: {gift_median_bias:.3f}', 

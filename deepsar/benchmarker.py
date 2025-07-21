@@ -9,7 +9,6 @@ from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
                              r2_score, mean_absolute_percentage_error)
 from sklearn.model_selection import train_test_split
 from deepsar.dataset import create_dataloader
-from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.trainer import Trainer
 
 import torch.multiprocessing as mp
@@ -77,17 +76,17 @@ class Benchmarker:
         self.devices = config.devices
         self.nruns = config.nruns
 
-    def run(self, feature_names, loss_fn, layer_sizes, train_frac):
+    def run(self, feature_names, loss_fn, model_init, train_frac):
+        # Count parameters once
+        tmp = model_init()
+        num_params = sum(p.numel() for p in tmp.parameters())
+        
         # run in parallel on different GPUs
         ctx = mp.get_context('spawn')
         with ctx.Pool(processes=len(self.devices)) as pool:
-            args = [(feature_names, loss_fn, layer_sizes, train_frac, i) 
+            args = [(feature_names, loss_fn, model_init, train_frac, i) 
                    for i in range(self.nruns)]
             results = pool.starmap(self._single_run, args)
-        
-        # Count parameters once
-        tmp = Deep4PWeibull(layer_sizes, feature_names, torch.ones(4))
-        num_params = sum(p.numel() for p in tmp.parameters())
         
         return {
             "logs": [r["log"] for r in results],
@@ -102,7 +101,7 @@ class Benchmarker:
             "num_params": num_params,
         }        
 
-    def _single_run(self, feature_names, loss_fn, layer_sizes, train_frac, run_id):
+    def _single_run(self, feature_names, loss_fn, model_init, train_frac, run_id):
         # assign a GPU
         device = self.devices[run_id % len(self.devices)]
         # split EVA into train/val/test
@@ -132,10 +131,9 @@ class Benchmarker:
         )
 
         # init model
-        model = Deep4PWeibull(len(feature_names) - 1, 
-                              layer_sizes, 
-                              feature_scaler=feat_s, 
-                              target_scaler=targ_s).to(device)
+        model = model_init(feature_names = feature_names,
+                            feature_scaler=feat_s,
+                            target_scaler=targ_s).to(device)
 
         trainer = Trainer(
             config=self.config,
@@ -146,17 +144,9 @@ class Benchmarker:
             device=device,
         )
         best_model, log = trainer.run(n_epochs=self.config.n_epochs)
-        best_model.eval() # model is returned to CPU
 
         # EVA test
-        X = torch.tensor(
-            feat_s.transform(eva_test[feature_names]), dtype=torch.float32
-        ).to("cpu")
-        with torch.no_grad():
-            y_pred = (
-                targ_s.inverse_transform(best_model(X).cpu().numpy())
-                .squeeze()
-            )
+        y_pred = best_model.predict_s(eva_test)
         y_true = eva_test["sr"].values
         r2_eva = r2_score(y_true, y_pred)
         d2_eva = d2_absolute_error_score(y_true, y_pred)
@@ -164,18 +154,12 @@ class Benchmarker:
         mape_eva = mean_absolute_percentage_error(y_true, y_pred)
 
         # GIFT test (drop one feature if needed)
-        Xg = torch.tensor(
-            feat_s.transform(self.gift[feature_names]), dtype=torch.float32
-        ).to("cpu")
-        Xg = Xg[:, 1:]  # e.g. drop log_sp_unit_area if your predict_fn needs it
-        with torch.no_grad():
-            yg = best_model.predict_sr(Xg).cpu().numpy()
-            y_pred_g = targ_s.inverse_transform(yg).squeeze()
+        y_pred_gift = best_model.predict_s_tot(self.gift)
         yg_true = self.gift["sr"].values
-        r2_g = r2_score(yg_true, y_pred_g)
-        d2_g = d2_absolute_error_score(yg_true, y_pred_g)
-        rmse_g = root_mean_squared_error(yg_true, y_pred_g)
-        mape_g = mean_absolute_percentage_error(yg_true, y_pred_g)
+        r2_g = r2_score(yg_true, y_pred_gift)
+        d2_g = d2_absolute_error_score(yg_true, y_pred_gift)
+        rmse_g = root_mean_squared_error(yg_true, y_pred_gift)
+        mape_g = mean_absolute_percentage_error(yg_true, y_pred_gift)
 
         return {
             "log": log,

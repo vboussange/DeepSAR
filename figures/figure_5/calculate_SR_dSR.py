@@ -131,14 +131,14 @@ if __name__ == "__main__":
     projection_path.mkdir(parents=True, exist_ok=True)
     
     path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
-    results_fit_split = torch.load(path_results, map_location="cpu")
-    config = results_fit_split["config"]    
+    checkpoint = torch.load(path_results, map_location="cpu")
+    config = checkpoint["config"]    
 
-    predictors = results_fit_split["predictors"]
-    feature_scaler = results_fit_split["feature_scaler"]
-    target_scaler = results_fit_split["target_scaler"]
+    predictors = checkpoint["predictors"]
+    feature_scaler = checkpoint["feature_scaler"]
+    target_scaler = checkpoint["target_scaler"]
     
-    model = Deep4PWeibull.initialize_ensemble(results_fit_split["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(checkpoint["ensemble_model_state_dict"], predictors, config)
     
     climate_dataset = load_chelsa_and_reproject(predictors)
 

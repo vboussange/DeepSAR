@@ -26,10 +26,10 @@ def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
 class ShapleyAnalyzer:
     """Handles Shapley value computation and analysis."""
     
-    def __init__(self, model, results_fit_split):
+    def __init__(self, model, checkpoint):
         self.model = model
-        self.predictors = results_fit_split["predictors"]
-        self.feature_scaler = results_fit_split["feature_scaler"]
+        self.predictors = checkpoint["predictors"]
+        self.feature_scaler = checkpoint["feature_scaler"]
     
     def compute_shapley_values(self, gdf):
         """Compute Shapley values for given dataframe."""
@@ -52,8 +52,8 @@ class ShapleyAnalyzer:
 def load_data_and_model():
     """Load model and data."""
     path_results = Path(__file__).parent / f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth"
-    results_fit_split = torch.load(path_results, map_location="cpu")
-    config = results_fit_split["config"]
+    checkpoint = torch.load(path_results, map_location="cpu")
+    config = checkpoint["config"]
     
     eva_dataset = gpd.read_parquet(config.path_eva_data)
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
@@ -62,12 +62,12 @@ def load_data_and_model():
     test_data = eva_dataset[eva_dataset["test"]]
     
     model = Deep4PWeibull.initialize_ensemble(
-        results_fit_split["ensemble_model_state_dict"], 
-        results_fit_split["predictors"], 
+        checkpoint["ensemble_model_state_dict"], 
+        checkpoint["predictors"], 
         config
     )
     
-    return model, results_fit_split, test_data, config
+    return model, checkpoint, test_data, config
 
 def aggregate_shapley_features(df_shap, config):
     """Aggregate Shapley values by feature groups."""
@@ -104,8 +104,8 @@ def plot_shapley_values(df_shap, ax, config_plot):
 if __name__ == "__main__":
     np.random.seed(42)
 
-    model, results_fit_split, test_data, config = load_data_and_model()
-    shapley_analyzer = ShapleyAnalyzer(model, results_fit_split)
+    model, checkpoint, test_data, config = load_data_and_model()
+    shapley_analyzer = ShapleyAnalyzer(model, checkpoint)
     df_shap = shapley_analyzer.compute_shapley_values(test_data)
     df_shap = aggregate_shapley_features(df_shap, config)
     

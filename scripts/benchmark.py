@@ -16,7 +16,9 @@ import torch
 import torch.nn as nn
 from deepsar.utils import symmetric_arch
 from deepsar.benchmarker import BenchmarkConfig, Benchmarker
+from deepsar.deep4pweibull import Deep4PWeibull
 import warnings
+from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
@@ -32,8 +34,13 @@ def setup_logger():
         log.setLevel(logging.INFO)
     return log
 
-
 logger = setup_logger()
+
+@dataclass
+class Deep4PWeibullInit():
+    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
+    def __call__(self, **kwargs):
+        return Deep4PWeibull(self.architecture, **kwargs)
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -46,13 +53,15 @@ if __name__ == "__main__":
     root_folder.mkdir(parents=True, exist_ok=True)
     config = BenchmarkConfig(devices=devices,
                              hash_data=HASH,
+                            #  n_epochs=1, # for quick testing
                              run_folder = root_folder,
                              run_name="deep4pweibull_basearch6_" + HASH + "_benchmark")
     
     # load EVA
     eva = gpd.read_parquet(config.path_eva_data)
     eva = eva[eva["num_plots"] > 2]  # TODO: to change
-    
+    eva["log_observed_area"] = np.log(eva["observed_area"])
+
     # load GIFT
     gift = gpd.read_parquet(config.path_gift_data)
 
@@ -62,38 +71,47 @@ if __name__ == "__main__":
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
         data.dropna(inplace=True)
         data["log_sp_unit_area"] = np.log(data["megaplot_area"])  # TODO: legacy name, to be changed in the future
-        data["log_observed_area"] = np.log(data["observed_area"])
 
     benchmark = Benchmarker(config, gift=gift, eva=eva)
 
     # build experiments
     climate = config.climate_variables
     std_climate = ["std_" + v for v in climate]
-    feats = climate + std_climate
-    base_arch = symmetric_arch(6, base=32, factor=4)
+    climate_feats = climate + std_climate
 
     exps = []
     # area only
     exps.append(
-        ("area", ["log_observed_area", "log_sp_unit_area"], nn.MSELoss(), 1.0, base_arch)
+        ("area", 
+         ["log_sp_unit_area"], 
+         nn.MSELoss(), 
+         1.0, 
+         Deep4PWeibullInit())
     )
     # climate only
     exps.append(
-        ("climate", ["log_observed_area"] + feats, nn.MSELoss(), 1.0, base_arch)
+        ("climate", 
+         climate_feats, 
+         nn.MSELoss(), 
+         1.0, 
+         Deep4PWeibullInit())
     )
     # area+climate with varying data fractions
     for frac in np.logspace(np.log10(1e-4), np.log10(1.0), 5):
         exps.append(
-            ("area+climate", ["log_observed_area", "log_sp_unit_area"] + feats, nn.MSELoss(), frac, base_arch)
+            ("area+climate", ["log_sp_unit_area"] + climate_feats, 
+             nn.MSELoss(), 
+             frac, 
+             Deep4PWeibullInit())
         )
     # vary architecture
     for n in [0, 2, 4]:
         exps.append(
             ("area+climate",
-             ["log_observed_area", "log_sp_unit_area"] + feats,
+             ["log_sp_unit_area"] + climate_feats,
              nn.MSELoss(),
              1.0,
-             symmetric_arch(n, base=32, factor=4),
+             Deep4PWeibullInit(symmetric_arch(n, base=32, factor=4))
              )
         )
 
