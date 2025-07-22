@@ -17,14 +17,12 @@ class FullyConnectedBlock(nn.Module):
 class Deep4PWeibull(DeepSARModel):
     """
     Deep SAR model based on the 4-parameter Weibull function.
-    We initialize the model by assuming that target values are scaled between [0, 1].
     """
     def __init__(self,
                  layer_sizes, 
                  feature_names,
                  feature_scaler=None, 
-                 target_scaler=None,
-                 p0 = [1e-1, 1., 0., 0.5]):
+                 target_scaler=None):
         super(Deep4PWeibull, self).__init__(feature_names=feature_names, 
                                             feature_scaler=feature_scaler, 
                                             target_scaler=target_scaler)
@@ -34,9 +32,9 @@ class Deep4PWeibull(DeepSARModel):
             [FullyConnectedBlock(in_f, out_f) for in_f, out_f in zip(layer_sizes[:-1], layer_sizes[1:])])
         self.last_fully_connected = nn.Linear(layer_sizes[-1], 4)
 
-        p0[2] = p0[1] - p0[2]   # d_offset = c - d
-        self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
-        nn.init.xavier_normal_(self.last_fully_connected.weight, gain=0.05)
+        # p0[2] = p0[1] - p0[2]   # d_offset = c - d
+        # self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
+        # nn.init.xavier_normal_(self.last_fully_connected.weight, gain=0.05)
         
     def _weibull_4p(self, x, b, c, d, e):
         """

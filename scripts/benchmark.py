@@ -60,7 +60,6 @@ if __name__ == "__main__":
     # load EVA
     eva = gpd.read_parquet(config.path_eva_data)
     eva = eva[eva["num_plots"] > 2]  # TODO: to change
-    eva["log_observed_area"] = np.log(eva["observed_area"])
 
     # load GIFT
     gift = gpd.read_parquet(config.path_gift_data)
@@ -68,9 +67,10 @@ if __name__ == "__main__":
     # preprocess data
     for data in (eva, gift):
         # replace inf and -inf with NaN, then drop NaN rows
+        data["log_sp_unit_area"] = np.log(data["megaplot_area"])  # TODO: legacy name, to be changed in the future
+        data["log_observed_area"] = np.log(data["observed_area"])
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
         data.dropna(inplace=True)
-        data["log_sp_unit_area"] = np.log(data["megaplot_area"])  # TODO: legacy name, to be changed in the future
 
     benchmark = Benchmarker(config, gift=gift, eva=eva)
 

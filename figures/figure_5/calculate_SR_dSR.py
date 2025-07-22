@@ -130,8 +130,8 @@ if __name__ == "__main__":
     
     climate_dataset = load_chelsa_and_reproject(model)
 
-    # for res in [50000, 1000]:
-    for res in [2000]:
+    for res in [50000, 1000]:
+    # for res in [2000]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
 
         features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(model, climate_dataset, res)

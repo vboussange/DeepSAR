@@ -5,20 +5,20 @@ RELATIVE BIAS ANALYSIS
 ==================================================
 EVA Dataset
 --------------------
-Mean relative bias: 0.7613
-Median relative bias: 0.1935
-Std relative bias: 1.7986
-Min relative bias: -2.0777
-Max relative bias: 20.1357
-N observations: 266
+Mean relative bias: 0.6879
+Median relative bias: 0.1203
+Std relative bias: 2.8670
+Min relative bias: -2.3055
+Max relative bias: 44.2900
+N observations: 274
 
 GIFT Dataset
 --------------------
-Mean relative bias: 0.2600
-Median relative bias: 0.0149
-Std relative bias: 1.1822
-Min relative bias: -0.5335
-Max relative bias: 11.9084
+Mean relative bias: -0.0540
+Median relative bias: -0.2260
+Std relative bias: 0.9043
+Min relative bias: -0.6575
+Max relative bias: 9.2535
 N observations: 125
 
 

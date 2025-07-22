@@ -95,8 +95,6 @@ if __name__ == '__main__':
     dict_plot = {"loc1": {"c": "tab:blue"}, "loc2": {"c": "tab:red"}, "loc3": {"c": "tab:purple"}}
     Path("panels").mkdir(exist_ok=True)
 
-    # Load required rasters
-    kwargs = {'x': 2, 'y': 2, 'center': False, 'min_periods': 2}
     # Define raster processing parameters
     rolling_kwargs = {'x': 2, 'y': 2, 'center': False, 'min_periods': 2}
     

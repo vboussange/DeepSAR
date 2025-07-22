@@ -33,7 +33,7 @@ class DeepSAREnsembleModel(nn.Module):
         SRs = [model.predict_sr_tot(df) for model in self.models]
         return np.mean(SRs, axis=0).squeeze()
     
-    def get_std_s_tot(self, df: pd.DataFrame):
+    def get_std_sr_tot(self, df: pd.DataFrame):
         """
         Predict standard deviation of species richness using the ensemble model;
         `x` should be a 2D array where each row corresponds to a set of (`log_sp_unit_area`, environmental features).
