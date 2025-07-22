@@ -20,7 +20,7 @@ class DeepSARModel(nn.Module):
         """
         self.eval()  # Set the model to evaluation mode
         with torch.no_grad():
-            X = df[["log_observed_area"] + self.feature_names].values
+            X = df[["log_observed_area"] + self.feature_names].values.astype(np.float32)
             if self.feature_scaler is not None:
                 X = self.feature_scaler.transform(X)
             X = torch.tensor(X, dtype=torch.float32).to(next(self.parameters()).device)
@@ -36,7 +36,7 @@ class DeepSARModel(nn.Module):
         """
         self.eval()  # Set the model to evaluation mode
         with torch.no_grad():
-            x = df[self.feature_names].values
+            x = df[self.feature_names].values.astype(np.float32)
             # Add a column of zeros to match the expected input shape of feature scaling
             x = np.concatenate([np.zeros((x.shape[0], 1)), x], axis=1) 
             if self.feature_scaler is not None:

@@ -69,16 +69,28 @@ if __name__ == "__main__":
             df_mean = pd.DataFrame({var: [reduced_climate_dataset[var].mean().item()] for var in reduced_climate_dataset.data_vars})
             df_std = pd.DataFrame({f"std_{var}": [reduced_climate_dataset[var].std().item()] for var in reduced_climate_dataset.data_vars})
             features = pd.concat([df_mean, df_std], axis=1)
-            features = features.assign(log_sp_unit_area=np.log(window_size**2), log_observed_area=np.log(window_size**2))
+            features = features.assign(log_observed_area=np.log(window_size**2), log_sp_unit_area=np.log(window_size**2))
 
             # predictions
             SRs = np.concatenate([m.predict_sr_tot(features) for m in model.models], axis=1) # we have only one sample per prediction
             dict_SAR[loc]["SRs"].append(SRs)
+            
+            ## predictions FIXME: legacy code
+            # feature_scaler = checkpoint["feature_scalers"][0]
+            # target_scaler = checkpoint["target_scalers"][0]
+            # X = features[["log_observed_area"] + model.feature_names].values
+            # X = feature_scaler.transform(X)
+            # with torch.no_grad():
+            #     X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
+            #     ys = np.concatenate([m._predict_sr_tot(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
+            #     SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
+            # dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
 
         dict_SAR[loc]["coords_epsg_3035"] = (x, y)
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
         dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
+        # dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"]) # FIXME: legacy code
             
     dict_SAR["log_area"] = np.log(window_sizes**2)
     

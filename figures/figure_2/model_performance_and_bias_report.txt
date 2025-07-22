@@ -1,0 +1,60 @@
+Relative bias calculated as (observed - predicted) / observed
+Positive values indicate model underestimation, negative values indicate overestimation
+
+RELATIVE BIAS ANALYSIS
+==================================================
+EVA Dataset
+--------------------
+Mean relative bias: 0.7613
+Median relative bias: 0.1935
+Std relative bias: 1.7986
+Min relative bias: -2.0777
+Max relative bias: 20.1357
+N observations: 266
+
+GIFT Dataset
+--------------------
+Mean relative bias: 0.2600
+Median relative bias: 0.0149
+Std relative bias: 1.1822
+Min relative bias: -0.5335
+Max relative bias: 11.9084
+N observations: 125
+
+
+MODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE
+============================================================
+
+EVA Dataset
+==================================================
+           Model             RMSE  N
+            area 96.0425 ± 0.6652  5
+     environment 53.5205 ± 2.2637  5
+area+environment 53.2036 ± 1.2265  5
+
+Pairwise Statistical Significance Tests (EVA)
+--------------------------------------------------
+area vs environment: t=36.044, p=0.0000 ***, rel_diff=-45.3%
+area vs area+environment: t=61.407, p=0.0000 ***, rel_diff=-45.0%
+environment vs area+environment: t=0.246, p=0.8117 ns, rel_diff=+0.7%
+
+Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
+
+GIFT Dataset
+==================================================
+           Model                 RMSE  N
+            area 1663.9643 ± 514.9788  5
+     environment  1052.0648 ± 45.5293  5
+area+environment   926.9998 ± 30.3677  5
+ chao2_estimator   1229.5648 ± 2.6665  5
+
+Pairwise Statistical Significance Tests (GIFT)
+--------------------------------------------------
+area vs environment: t=2.367, p=0.0454 *, rel_diff=-40.9%
+area vs area+environment: t=2.857, p=0.0212 *, rel_diff=-47.1%
+area vs chao2_estimator: t=1.687, p=0.1301 ns, rel_diff=-31.0%
+environment vs area+environment: t=4.570, p=0.0018 **, rel_diff=-10.5%
+environment vs chao2_estimator: t=-7.784, p=0.0001 ***, rel_diff=+16.6%
+area+environment vs chao2_estimator: t=-19.850, p=0.0000 ***, rel_diff=+30.3%
+
+Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
