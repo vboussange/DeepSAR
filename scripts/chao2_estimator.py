@@ -51,7 +51,7 @@ def load_and_preprocess_data():
     eva_dataset = eva_dataset.to_crs(CONFIG["crs"])
     
     logging.info("Loading GIFT data...")
-    gift_dataset = gpd.read_parquet(CONFIG["gift_data_dir"] / "megaplot_data.parquet")
+    gift_dataset = gpd.read_parquet(CONFIG["gift_data_dir"] / "sp_unit_data.parquet")
     gift_dataset = gift_dataset.set_index("entity_ID") 
     gift_dataset = gift_dataset.to_crs(CONFIG["crs"])
     

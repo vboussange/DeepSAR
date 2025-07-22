@@ -60,7 +60,7 @@ class BenchmarkConfig:
             / "processed"
             / "GIFT_CHELSA_compilation"
             / "6c2d61d"
-            / "megaplot_data.parquet"
+            / "sp_unit_data.parquet"
         )
 
 
