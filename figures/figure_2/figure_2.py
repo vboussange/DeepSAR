@@ -264,8 +264,9 @@ if __name__ == "__main__":
     path_results = Path(f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
     
     # Load model results
-    result_modelling = torch.load(path_results, map_location="cpu", weights_only=False)
-    config = result_modelling["config"]
+    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
+    config = checkpoint["config"]
+    model = Deep4PWeibull.initialize_ensemble(checkpoint, "cpu")
 
     # Load EVA dataset
     # Load and prepare data
@@ -277,24 +278,9 @@ if __name__ == "__main__":
     # Filter test data
     eva_test_data = eva_dataset[eva_dataset["test"]].sample(n=400)
     
-    # Extract model components
-    predictors = result_modelling["predictors"]
-    feature_scaler = result_modelling["feature_scaler"]
-    target_scaler = result_modelling["target_scaler"]
-    
-    # Make predictions
-    X = eva_test_data[predictors].copy()
-    X = torch.tensor(feature_scaler.transform(X), dtype=torch.float32)
-    
-    # Initialize model
-    model = Deep4PWeibull.initialize_ensemble(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
-    
-    with torch.no_grad():
-        y_pred = model(X).numpy()
-        y_pred = target_scaler.inverse_transform(y_pred)
-    
-    eva_test_data["predicted_sr"] = y_pred.squeeze()
-    
+    eva_test_data["predicted_sr"] = model.predict_mean_sr(eva_test_data)
+    # eva_test_data["predicted_sr"] = model.models[4].predict_sr(eva_test_data)
+
     # Plot predictions vs observations for EVA
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
     x_eva = mask_eva["sr"]
@@ -324,20 +310,14 @@ if __name__ == "__main__":
     
     # Load GIFT dataset
     gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
-    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["megaplot_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
     # Make predictions for GIFT
-    X_gift = gift_dataset[predictors].copy()
-    X_gift = torch.tensor(feature_scaler.transform(X_gift), dtype=torch.float32)
-    
-    with torch.no_grad():
-        y_pred_gift = model(X_gift).numpy()
-        y_pred_gift = target_scaler.inverse_transform(y_pred_gift)
-    
-    gift_dataset["predicted_sr"] = y_pred_gift.squeeze()
-    
+    gift_dataset["predicted_sr"] = model.predict_mean_sr(gift_dataset)
+    # gift_dataset["predicted_sr"] = model.models[4].predict_sr(gift_dataset)
+
     # Create inset axes in ax2
     ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)
     

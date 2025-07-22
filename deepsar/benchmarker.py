@@ -146,7 +146,7 @@ class Benchmarker:
         best_model, log = trainer.run(n_epochs=self.config.n_epochs)
 
         # EVA test
-        y_pred = best_model.predict_s(eva_test)
+        y_pred = best_model.predict_sr(eva_test)
         y_true = eva_test["sr"].values
         r2_eva = r2_score(y_true, y_pred)
         d2_eva = d2_absolute_error_score(y_true, y_pred)
@@ -154,7 +154,7 @@ class Benchmarker:
         mape_eva = mean_absolute_percentage_error(y_true, y_pred)
 
         # GIFT test (drop one feature if needed)
-        y_pred_gift = best_model.predict_s_tot(self.gift)
+        y_pred_gift = best_model.predict_sr_tot(self.gift)
         yg_true = self.gift["sr"].values
         r2_g = r2_score(yg_true, y_pred_gift)
         d2_g = d2_absolute_error_score(yg_true, y_pred_gift)

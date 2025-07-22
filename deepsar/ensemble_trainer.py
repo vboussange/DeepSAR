@@ -59,7 +59,7 @@ class EnsembleTrainer:
         target_scalers = [r["model"].target_scaler for r in results]
         ensemble_model = DeepSAREnsembleModel(models)
         
-        pred_s = ensemble_model.predict_mean_s(df_test)
+        pred_s = ensemble_model.predict_mean_sr(df_test)
         ensemble_mse = root_mean_squared_error(df_test["sr"], pred_s)
         ensemble_r2 = r2_score(df_test["sr"], pred_s)
 

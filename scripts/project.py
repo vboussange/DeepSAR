@@ -76,7 +76,7 @@ def batch_predict(model, climate_dataset, res, batch_size=4096):
         with torch.no_grad():
             current_batch_size = min(batch_size, total_length - i)
             X = features.iloc[i:i+current_batch_size,:]
-            mean_SR_list.append(model.predict_mean_s_tot(X))
+            mean_SR_list.append(model.predict_mean_sr_tot(X))
             std_SR_list.append(model.get_std_s_tot(X))
         
     mean_SR = np.concatenate(mean_SR_list, axis=0)

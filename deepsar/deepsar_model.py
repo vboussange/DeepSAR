@@ -14,7 +14,7 @@ class DeepSARModel(nn.Module):
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
         
-    def predict_s(self, df: pd.DataFrame):
+    def predict_sr(self, df: pd.DataFrame):
         """
         Public method to predict species richness given sampling effort informed by column `log_observed_area`.
         """
@@ -30,7 +30,7 @@ class DeepSARModel(nn.Module):
             return y_pred
         
         
-    def predict_s_tot(self, df: np.ndarray):
+    def predict_sr_tot(self, df: pd.DataFrame):
         """
         Public method to predict total species richness. 
         """
@@ -44,7 +44,7 @@ class DeepSARModel(nn.Module):
             x = torch.tensor(x, dtype=torch.float32).to(next(self.parameters()).device)
             # x = x.unsqueeze(0)
             x = x[:, 1:]  # Exclude the first column (log_observed_area)
-            y_pred = self._predict_sr(x) # predicting asymptote, no need to feed log_observed_area
+            y_pred = self._predict_sr_tot(x) # predicting asymptote, no need to feed log_observed_area
             if self.target_scaler is not None:
                 y_pred = self.target_scaler.inverse_transform(y_pred.cpu().numpy())
             return y_pred

@@ -12,15 +12,13 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from deepsar.deep4pweibull import Deep4PWeibull
 
-from scripts.train import Config
-
 from pathlib import Path
 from pyproj import Transformer
 
 
-def load_chelsa_and_reproject(predictors):
+def load_chelsa_and_reproject(model):
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
-    climate_dataset = climate_dataset[[v for v in climate_dataset.data_vars if v in predictors]]
+    climate_dataset = climate_dataset[[v for v in climate_dataset.data_vars if v in model.feature_names]]
     climate_dataset = climate_dataset.rio.reproject("EPSG:3035")
     res_climate_pixel = abs(climate_dataset.rio.resolution()[0])  # X resolution (in meters)
     return climate_dataset, res_climate_pixel
@@ -34,12 +32,12 @@ if __name__ == "__main__":
 
 
     path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
-    checkpoint = torch.load(path_results, map_location="cpu")
+    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
 
     
-    model = Deep4PWeibull.initialize_ensemble(checkpoint["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(checkpoint)
     
-    climate_dataset, res_climate_pixel = load_chelsa_and_reproject(predictors)
+    climate_dataset, res_climate_pixel = load_chelsa_and_reproject(model)
 
     
     dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long
@@ -71,23 +69,16 @@ if __name__ == "__main__":
             df_mean = pd.DataFrame({var: [reduced_climate_dataset[var].mean().item()] for var in reduced_climate_dataset.data_vars})
             df_std = pd.DataFrame({f"std_{var}": [reduced_climate_dataset[var].std().item()] for var in reduced_climate_dataset.data_vars})
             features = pd.concat([df_mean, df_std], axis=1)
-            features = features.assign(log_observed_area=np.log(window_size**2), log_sp_unit_area=np.log(window_size**2))
-            features = features[predictors]
-            
+            features = features.assign(log_sp_unit_area=np.log(window_size**2), log_observed_area=np.log(window_size**2))
+
             # predictions
-            X = features.values
-            X = feature_scaler.transform(X)
-            with torch.no_grad():
-                X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-                ys = np.concatenate([m.predict_sr(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
-                SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
-                
-            dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
+            SRs = np.concatenate([m.predict_sr_tot(features) for m in model.models], axis=1) # we have only one sample per prediction
+            dict_SAR[loc]["SRs"].append(SRs)
 
         dict_SAR[loc]["coords_epsg_3035"] = (x, y)
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
-        dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"])
+        dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
             
     dict_SAR["log_area"] = np.log(window_sizes**2)
     

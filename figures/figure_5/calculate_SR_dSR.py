@@ -58,11 +58,11 @@ def create_features(predictor_labels, coarse_mean, coarse_std, res):
     df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
     X_map = pd.concat([df_mean, df_std], axis=1)
     
-    X_map = X_map.assign(log_observed_area=np.log(res**2), log_sp_unit_area=np.log(res**2))
+    X_map = X_map.assign(log_sp_unit_area=np.log(res**2))
     return X_map[predictor_labels]
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_dSR_stats(model, climate_dataset, res0, predictors, feature_scaler, target_scaler, batch_size=4096):
+def get_SR_dSR_stats(model, climate_dataset, res0, batch_size=2**15):
     """
     Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
     dataset at a specified resolution. dSR is obtained as a gradient of SR with
@@ -81,8 +81,8 @@ def get_SR_dSR_stats(model, climate_dataset, res0, predictors, feature_scaler, t
     coarse_mean1 = coarse_mean1.rio.reproject_match(coarse_mean0).assign_coords(x=coarse_mean0.x, y=coarse_mean0.y)
     coarse_std1 = coarse_std1.rio.reproject_match(coarse_std0).assign_coords(x=coarse_std0.x, y=coarse_std0.y)
 
-    features0 = create_features(predictors, coarse_mean0, coarse_std0, res0)
-    features1 = create_features(predictors, coarse_mean1, coarse_std1, res1)
+    features0 = create_features(model.feature_names, coarse_mean0, coarse_std0, res0)
+    features1 = create_features(model.feature_names, coarse_mean1, coarse_std1, res1)
 
     total_length = len(features0)
 
@@ -94,31 +94,24 @@ def get_SR_dSR_stats(model, climate_dataset, res0, predictors, feature_scaler, t
         for i in tqdm(range(0, total_length, batch_size), desc = "Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
             with torch.no_grad():
                 current_batch_size = min(batch_size, total_length - i)
-                # features = get_true_sar.interpolate_features(X_map_dict, log_area_tensor, res_climate_pixel, predictors, batch_index=slice(i, i + current_batch_size))
                 X = features.iloc[i:i+current_batch_size,:]
-                X = feature_scaler.transform(X.values)
-                X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-                ys = [m.predict_sr(X[:, 1:]) for m in model.models] # predicting asymptote, no need to feed log_observed_area
-                SRs = [target_scaler.inverse_transform(y.cpu().numpy()) for y in ys]
+                SRs = [m.predict_sr_tot(X) for m in model.models]
                 SR_list.append(np.concatenate(SRs, axis=1))
         SR01_list.append(np.concatenate(SR_list, axis=0))
 
 
-
     mean_SR = np.mean(SR01_list[0], axis=1)
     std_SR = np.std(SR01_list[0], axis=1)
-    
-    mean_SR1 = np.mean(SR01_list[1], axis=1)
-    
+        
     dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
     mean_dSR_dlogA = np.nanmean(dSR_dlogA, axis=1)
     std_dSR_dlogA = np.std(dSR_dlogA, axis=1)
     return features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
 
 
-def load_chelsa_and_reproject(predictors):
+def load_chelsa_and_reproject(model):
     climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
-    climate_dataset = climate_dataset[[v for v in climate_dataset.data_vars if v in predictors]]
+    climate_dataset = climate_dataset[[v for v in climate_dataset.data_vars if v in model.feature_names]]
     climate_dataset = climate_dataset.rio.reproject("EPSG:3035")
     return climate_dataset
 
@@ -131,21 +124,17 @@ if __name__ == "__main__":
     projection_path.mkdir(parents=True, exist_ok=True)
     
     path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
-    checkpoint = torch.load(path_results, map_location="cpu")
-    config = checkpoint["config"]    
-
-    predictors = checkpoint["predictors"]
-    feature_scaler = checkpoint["feature_scaler"]
-    target_scaler = checkpoint["target_scaler"]
+    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
     
-    model = Deep4PWeibull.initialize_ensemble(checkpoint["ensemble_model_state_dict"], predictors, config)
+    model = Deep4PWeibull.initialize_ensemble(checkpoint, "cuda")
     
-    climate_dataset = load_chelsa_and_reproject(predictors)
+    climate_dataset = load_chelsa_and_reproject(model)
 
-    for res in [50000, 1000]:
+    # for res in [50000, 1000]:
+    for res in [2000]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
 
-        features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(model, climate_dataset, res, predictors, feature_scaler, target_scaler)
+        features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(model, climate_dataset, res)
 
         # Create and save rasters
         raster_configs = [

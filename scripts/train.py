@@ -28,7 +28,7 @@ if __name__ == "__main__":
                             hash_data=HASH, 
                             run_name=f"checkpoint_deep4pweibull_basearch6_{HASH}", 
                             path_eva_data=Path(__file__).parent / f"../data/processed/EVA_CHELSA_compilation/{HASH}/eva_chelsa_megaplot_data.parquet",
-                            n_epochs=2, # for testing
+                            # n_epochs=2, # for testing
                             )
     config.run_folder = Path(Path(__file__).parent, 'results', f"{Path(__file__).stem}")
     config.run_folder.mkdir(exist_ok=True, parents=True)

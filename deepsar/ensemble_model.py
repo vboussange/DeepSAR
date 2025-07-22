@@ -17,27 +17,27 @@ class DeepSAREnsembleModel(nn.Module):
         assert all(model.feature_names == feature_names for model in self.models), "All models must have the same feature_names."
         return feature_names
     
-    def predict_mean_s(self, df: pd.DataFrame):
-        SRs = [model.predict_s(df) for model in self.models]
-        return np.mean(SRs, axis=0)
+    def predict_mean_sr(self, df: pd.DataFrame):
+        SRs = [model.predict_sr(df) for model in self.models]
+        return np.mean(SRs, axis=0).squeeze()
     
-    def get_std_s(self, df: pd.DataFrame):
-        SRs = [model.predict_s(df) for model in self.models]
-        return np.std(SRs, axis=0)
+    def get_std_sr(self, df: pd.DataFrame):
+        SRs = [model.predict_sr(df) for model in self.models]
+        return np.std(SRs, axis=0).squeeze()
     
-    def predict_mean_s_tot(self, df: pd.DataFrame):
+    def predict_mean_sr_tot(self, df: pd.DataFrame):
         """
         Predict mean species richness using the ensemble model;
         `x` should be a 2D array where each row corresponds to a set of (log_sp_unit_area, environmental features).
         """
-        SRs = [model.predict_s_tot(df) for model in self.models]
-        return np.mean(SRs, axis=0)
+        SRs = [model.predict_sr_tot(df) for model in self.models]
+        return np.mean(SRs, axis=0).squeeze()
     
     def get_std_s_tot(self, df: pd.DataFrame):
         """
         Predict standard deviation of species richness using the ensemble model;
         `x` should be a 2D array where each row corresponds to a set of (`log_sp_unit_area`, environmental features).
         """
-        SRs = [model.predict_s_tot(df) for model in self.models]
-        return np.std(SRs, axis=0)
+        SRs = [model.predict_sr_tot(df) for model in self.models]
+        return np.std(SRs, axis=0).squeeze()
 
