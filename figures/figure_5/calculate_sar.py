@@ -53,6 +53,7 @@ if __name__ == "__main__":
     for loc in dict_SAR:
         print(loc)
         y, x = transformer.transform(*dict_SAR[loc]["coords"])
+        dict_SAR[loc]["coords_epsg_3035"] = (x, y)
         for window_size in window_sizes:
             # predictor compilation
             if window_size < res_climate_pixel:
@@ -85,8 +86,6 @@ if __name__ == "__main__":
             #     ys = np.concatenate([m._predict_sr_tot(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
             #     SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
             # dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
-
-        dict_SAR[loc]["coords_epsg_3035"] = (x, y)
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
         dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
