@@ -76,7 +76,7 @@ class Benchmarker:
         self.devices = config.devices
         self.nruns = config.nruns
 
-    def run(self, feature_names, loss_fn, model_init, train_frac):
+    def run(self, loss_fn, model_init, train_frac):
         # Count parameters once
         tmp = model_init()
         num_params = sum(p.numel() for p in tmp.parameters())
@@ -84,7 +84,7 @@ class Benchmarker:
         # run in parallel on different GPUs
         ctx = mp.get_context('spawn')
         with ctx.Pool(processes=len(self.devices)) as pool:
-            args = [(feature_names, loss_fn, model_init, train_frac, i) 
+            args = [(loss_fn, model_init, train_frac, i) 
                    for i in range(self.nruns)]
             results = pool.starmap(self._single_run, args)
         
@@ -101,7 +101,7 @@ class Benchmarker:
             "num_params": num_params,
         }        
 
-    def _single_run(self, feature_names, loss_fn, model_init, train_frac, run_id):
+    def _single_run(self, loss_fn, model_init, train_frac, run_id):
         # assign a GPU
         device = self.devices[run_id % len(self.devices)]
         # split EVA into train/val/test
@@ -117,13 +117,13 @@ class Benchmarker:
 
         tr_loader, feat_s, targ_s = create_dataloader(
             df_tr,
-            feature_names,
+            model_init.feature_names,
             self.config.batch_size,
             self.config.num_workers,
         )
         val_loader, _, _ = create_dataloader(
             df_val,
-            feature_names,
+            model_init.feature_names,
             self.config.batch_size,
             self.config.num_workers,
             feat_s,
@@ -131,8 +131,7 @@ class Benchmarker:
         )
 
         # init model
-        model = model_init(feature_names = feature_names,
-                            feature_scaler=feat_s,
+        model = model_init(feature_scaler=feat_s,
                             target_scaler=targ_s).to(device)
 
         trainer = Trainer(

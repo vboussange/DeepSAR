@@ -38,9 +38,12 @@ logger = setup_logger()
 
 @dataclass
 class Deep4PWeibullInit():
+    feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     def __call__(self, **kwargs):
-        return Deep4PWeibull(self.architecture, **kwargs)
+        return Deep4PWeibull(feature_names=self.feature_names, 
+                             layer_sizes=self.architecture, 
+                             **kwargs)
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -83,42 +86,40 @@ if __name__ == "__main__":
     # area only
     exps.append(
         ("area", 
-         ["log_sp_unit_area"], 
          nn.MSELoss(), 
          1.0, 
-         Deep4PWeibullInit())
+         Deep4PWeibullInit(feature_names=["log_sp_unit_area"]))
     )
     # climate only
     exps.append(
         ("climate", 
-         climate_feats, 
          nn.MSELoss(), 
          1.0, 
-         Deep4PWeibullInit())
+         Deep4PWeibullInit(feature_names=climate_feats))
     )
     # area+climate with varying data fractions
     for frac in np.logspace(np.log10(1e-4), np.log10(1.0), 5):
         exps.append(
-            ("area+climate", ["log_sp_unit_area"] + climate_feats, 
+            ("area+climate",
              nn.MSELoss(), 
              frac, 
-             Deep4PWeibullInit())
+             Deep4PWeibullInit(feature_names=["log_sp_unit_area"] + climate_feats))
         )
     # vary architecture
     for n in [0, 2, 4]:
         exps.append(
             ("area+climate",
-             ["log_sp_unit_area"] + climate_feats,
              nn.MSELoss(),
              1.0,
-             Deep4PWeibullInit(symmetric_arch(n, base=32, factor=4))
+             Deep4PWeibullInit(feature_names=["log_sp_unit_area"] + climate_feats,
+                               architecture=symmetric_arch(n, base=32, factor=4))
              )
         )
 
     rows = []
-    for name, preds, loss_fn, frac, arch in exps:
-        logger.info(f"Running {name}, frac={frac:.2f}, arch={arch}")
-        out = benchmark.run(preds, loss_fn, arch, frac)
+    for name, loss_fn, frac, init in exps:
+        logger.info(f"Running {name}, frac={frac:.2f}, model={init}")
+        out = benchmark.run(loss_fn, init, frac)
         for run_id in range(benchmark.nruns):
             rows.append(
                 {
