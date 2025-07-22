@@ -63,7 +63,7 @@ Regional checklists from the [GIFT database](https://gift.uni-goettingen.de/home
 
 ### Predictors
 
-Bioclimatic variables from the CHELSA dataset were used as predictors. To download them (e.g., for [pretrained weights](#pretrained-weights)), navigate to `data/CHELSA/` and run:
+Bioclimatic variables from the CHELSA dataset were used as predictors. To download them (e.g., for use with [pretrained weights](#pretrained-weights)), navigate to `data/CHELSA/` and run:
 
 ```bash
 wget --no-host-directories --force-directories --input-file=envidat.txt
@@ -114,6 +114,5 @@ If you use the anonymised data, please cite:
   pages = {173--180},
   issn = {1654-109X},
   doi = {10.1111/avsc.12191},
-  urldate = {2024-05-17},
 }
 ```
