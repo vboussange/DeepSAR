@@ -79,8 +79,8 @@ If you use the anonymised data, please cite:
 
 ```bibtex
 @misc{boussange2025,
-  title={Deep learning-based species-area models reveal multi-scale patterns of species richness and turnover}, 
-  author={Victor Boussange and Philipp Brun and Johanna T. Malle and Gabriele Midolo and Jeanne Portier and Théophile Sanchez and Niklaus E. Zimmermann and Irena Axmanová and Helge Bruelheide and Milan Chytrý and Stephan Kambach and Zdeňka Lososová and Martin Večeřa and Idoia Biurrun and Klaus T. Ecker and Jonathan Lenoir and Jens-Christian Svenning and Dirk Nikolaus Karger},
+  title={Multi-scale species richness estimation with deep learning}, 
+  author={Victor Boussange and Bert Wuyts and Philipp Brun and Johanna T. Malle and Gabriele Midolo and Jeanne Portier and Théophile Sanchez and Niklaus E. Zimmermann and Irena Axmanová and Helge Bruelheide and Milan Chytrý and Stephan Kambach and Zdeňka Lososová and Martin Večeřa and Idoia Biurrun and Klaus T. Ecker and Jonathan Lenoir and Jens-Christian Svenning and Dirk Nikolaus Karger},
   year={2025},
   eprint={2507.06358},
   archivePrefix={arXiv},
