@@ -26,25 +26,26 @@ def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
 class ShapleyAnalyzer:
     """Handles Shapley value computation and analysis."""
     
-    def __init__(self, model, checkpoint):
-        self.model = model
-        self.predictors = checkpoint["predictors"]
-        self.feature_scaler = checkpoint["feature_scaler"]
+    def __init__(self, model):
+        model.eval()
+        self.model = model.models[0] # we only use the first model of the ensemble
     
     def compute_shapley_values(self, gdf):
         """Compute Shapley values for given dataframe."""
         gdf_sampled = sample_data_by_area(gdf)
-        X = self.feature_scaler.transform(gdf_sampled[self.predictors].values)
-        features = torch.tensor(X, dtype=torch.float32).to(next(self.model.parameters()).device)
+        features = torch.tensor(gdf_sampled[["log_observed_area"] + model.feature_names].values, dtype=torch.float32)
+        feature_scaler = self.model.feature_scaler
+        X = torch.tensor(feature_scaler.transform(features), dtype=torch.float32).to(next(self.model.parameters()).device)
+        X = X[:, 1:]  # Exclude the first column (log_observed_area)
         
         def forward_fn(X):
             with torch.no_grad():
-                return self.model(X).flatten()
+                return self.model._predict_sr_tot(X).flatten()
 
         explainer = ShapleyValueSampling(forward_fn)
-        shap_values = explainer.attribute(features, n_samples=400).cpu().numpy()
+        shap_values = explainer.attribute(X, n_samples=400).cpu().numpy()
         
-        df_shap = pd.DataFrame(shap_values, columns=self.predictors)
+        df_shap = pd.DataFrame(shap_values, columns=self.model.feature_names)
         df_shap["log_sp_unit_area_values"] = gdf_sampled["log_sp_unit_area"].values
         
         return df_shap
@@ -52,28 +53,23 @@ class ShapleyAnalyzer:
 def load_data_and_model():
     """Load model and data."""
     path_results = Path(__file__).parent / f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth"
-    checkpoint = torch.load(path_results, map_location="cpu")
+    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
     config = checkpoint["config"]
-    
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["megaplot_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
     test_data = eva_dataset[eva_dataset["test"]]
     
-    model = Deep4PWeibull.initialize_ensemble(
-        checkpoint["ensemble_model_state_dict"], 
-        checkpoint["predictors"], 
-        config
-    )
-    
-    return model, checkpoint, test_data, config
+    model = Deep4PWeibull.initialize_ensemble(checkpoint)
+
+    return model, config, test_data
 
 def aggregate_shapley_features(df_shap, config):
     """Aggregate Shapley values by feature groups."""
-    std_features = [f"std_{var}" for var in config.climate_variables]
-    mean_features = config.climate_variables
-    
+    std_features = [f"std_{var}" for var in config.predictors]
+    mean_features = config.predictors
+
     df_shap["Environmental heterogeneity"] = np.abs(df_shap[std_features]).sum(axis=1)
     df_shap["Mean environmental conditions"] = np.abs(df_shap[mean_features]).sum(axis=1)
     df_shap["Area"] = np.abs(df_shap[["log_sp_unit_area"]]).sum(axis=1)
@@ -104,8 +100,8 @@ def plot_shapley_values(df_shap, ax, config_plot):
 if __name__ == "__main__":
     np.random.seed(42)
 
-    model, checkpoint, test_data, config = load_data_and_model()
-    shapley_analyzer = ShapleyAnalyzer(model, checkpoint)
+    model, config, test_data = load_data_and_model()
+    shapley_analyzer = ShapleyAnalyzer(model)
     df_shap = shapley_analyzer.compute_shapley_values(test_data)
     df_shap = aggregate_shapley_features(df_shap, config)
     

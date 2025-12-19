@@ -38,9 +38,9 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
     datasets = ['eva', 'gift']
     
     with open(output_file, "w") as file:
-        print("Relative bias calculated as (observed - predicted) / observed", file=file)
-        print("Positive values indicate model underestimation, negative values indicate overestimation\n", file=file)
-        
+        print("Relative bias calculated as (predicted - observed) / observed", file=file)
+        print("Positive values indicate model overestimation, negative values indicate underestimation\n", file=file)
+
         # Relative Bias Analysis
         print("RELATIVE BIAS ANALYSIS", file=file)
         print("=" * 50, file=file)
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
     # Filter test data
-    eva_test_data = eva_dataset[eva_dataset["test"]].sample(n=400)
+    eva_test_data = eva_dataset[eva_dataset["test"]]#.sample(n=400)
     
     eva_test_data["predicted_sr"] = model.predict_mean_sr(eva_test_data)
     # eva_test_data["predicted_sr"] = model.models[4].predict_sr(eva_test_data)
