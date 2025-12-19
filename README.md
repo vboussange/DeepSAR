@@ -25,7 +25,7 @@ We provide a self-contained tutorial to predict species richness maps from the p
 To retrain the deep SAR model, follow these steps:
 
 0. Ensure you have [all required data](#data) (biodiversity data and environmental features) under `data/`, and [install the project environment](#installation).
-1. Generate training data using `scripts/data_processing/compile_eva_chelsa.py` (see also `scripts/data_processing/compile_gift_chelsa.py` for test data generation).
+1. Generate training data using `scripts/data_processing/compile_eva_chelsa.py` (see also `scripts/data_processing/align_gift_chelsa.py` for test data generation).
 2. Train the ensemble model with `train.py`. The main architecture is `Deep4PWeibull`, defined in `deepsar/deep4pweibull.py`.
 3. Generate predictions using `project.py` (see also [Inference](#inference)).
 

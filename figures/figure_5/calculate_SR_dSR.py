@@ -10,7 +10,7 @@ from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 
 from pathlib import Path
-from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_features import CHELSADataset
 from deepsar.deep4pweibull import Deep4PWeibull
 import pandas as pd
 from tqdm import tqdm

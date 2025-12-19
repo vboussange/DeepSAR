@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import pandas as pd
 from deepsar.utils import save_to_pickle
-from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_features import CHELSADataset
 import matplotlib.pyplot as plt
 import xarray as xr
 from deepsar.deep4pweibull import Deep4PWeibull

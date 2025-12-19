@@ -19,7 +19,7 @@ from tqdm import tqdm
 import warnings
 
 from deepsar.data_processing.utils_gift import GIFTDataset
-from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_features import CHELSADataset
 from deepsar.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
 from deepsar.utils import save_to_pickle
 from deepsar.data_processing.utils_polygons import (

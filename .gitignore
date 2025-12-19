@@ -5,7 +5,8 @@ envs
 data/**
 !data/**/*.txt
 # Allow subdirectories themselves to be tracked (important for ! rules to work)
-!data/**/ 
+!data/**/
+data/raw/Corine_Landcover/**
 *.png
 *.jld2
 stdout/*

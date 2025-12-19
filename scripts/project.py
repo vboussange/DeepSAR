@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 from deepsar.ensemble_trainer import EnsembleConfig
 from pathlib import Path
-from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_features import CHELSADataset
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.plotting import CMAP_BR
 import pandas as pd

@@ -14,7 +14,7 @@ import warnings
 
 from deepsar.generate_sar_data_eva import clip_EVA_SR, generate_random_square
 from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.data_processing.utils_env_pred import CHELSADataset
+from deepsar.data_processing.utils_features import CHELSADataset
 from deepsar.utils import save_to_pickle
 
 import git
