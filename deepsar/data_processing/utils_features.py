@@ -9,17 +9,16 @@ import dask
 from rasterio.enums import Resampling
 
 # Default paths
-# CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio')
-# DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_dem_3035_europe_100m.tif')
-# LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif')
-# CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features')
-# CACHE_PATH = CACHE_DIR / 'aligned_features_EPSG3035_cog.tif'
+CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio')
+DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_dem_3035_europe_100m.tif')
+LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif')
+CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features')
 
 # debug paths
-CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/debug')
-DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_debug_100m_ch.tif')
-LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20_ch.tif')
-CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features_debug')
+# CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/debug')
+# DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_debug_100m_ch.tif')
+# LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20_ch.tif')
+# CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features_debug')
 
 class EnvironmentalFeatureDataset():
     """
@@ -79,7 +78,7 @@ class EnvironmentalFeatureDataset():
                 
         # we do not merge lc_ds here as it is np.int16
         chelsa_dem_ds = xr.merge([
-            dem_da,
+            dem_ds,
             chelsa_ds
         ])
         
@@ -102,7 +101,7 @@ class EnvironmentalFeatureDataset():
                     return ds
         
         data_arrays = []
-        for tiff_path in self.chelsa_path.glob("*.tif"):
+        for tiff_path in tqdm(self.chelsa_path.glob("*.tif"), desc="Loading CHELSA variables"):
             print("Loading and interpolating", tiff_path)
             with rioxarray.open_rasterio(tiff_path, mask_and_scale=True) as da:
                 da = da.sel(band=1, drop=True)
@@ -115,12 +114,19 @@ class EnvironmentalFeatureDataset():
                 data_arrays.append(da)
                 
         dataset = xr.merge(data_arrays, join="left")
+        dataset.rio.write_crs(ref_da.rio.crs, inplace=True)
         
+        # Remove _FillValue from attributes to avoid conflicts with encoding
+        for var in dataset.data_vars:
+            if '_FillValue' in dataset[var].attrs:
+                del dataset[var].attrs['_FillValue']
+        encoding = {var: {'dtype': 'float32', '_FillValue': np.nan} for var in dataset.data_vars}
+
         # caching
         if use_cache:
             self.chelsa_cache.parent.mkdir(parents=True, exist_ok=True)
             print(f"Caching CHELSA to {self.chelsa_cache}")
-            dataset.to_netcdf(self.chelsa_cache)
+            dataset.to_netcdf(self.chelsa_cache, engine='netcdf4', encoding=encoding)
         return dataset
             
     def _load_dem(self, use_cache=False):
@@ -133,7 +139,7 @@ class EnvironmentalFeatureDataset():
         if use_cache and self.dem_cache.exists():
             print(f"Loading DEM from cache: {self.dem_cache}")
             dataset = xr.open_dataset(self.dem_cache)
-            return dataset['elevation']
+            return dataset
         
         print("Loading DEM data...")
         
@@ -164,7 +170,7 @@ class EnvironmentalFeatureDataset():
         if use_cache and self.lc_cache.exists():
             print(f"Loading landcover from cache: {self.lc_cache}")
             lc_ds = xr.open_dataset(self.lc_cache)
-            if lc_ds.rio.bounds == ref_da.rio.bounds:
+            if lc_ds.rio.bounds() == ref_da.rio.bounds():
                 return lc_ds
             else:
                 print("Cache does not match reference grid, recompiling.")
@@ -197,19 +203,23 @@ class EnvironmentalFeatureDataset():
             lc_remapped.values = remapped_flat.reshape(lc_da.shape)
             
             # Cast to int16 to save memory (sufficient for landcover classes)
-            lc_remapped = lc_remapped.astype(np.int16)
+            # Use -9999 as a fill value for NaN before casting to int16
+            lc_remapped = lc_remapped.fillna(-9999).astype(np.int16)
             
             # Store the mapping as attributes
             lc_remapped.attrs['class_mapping'] = str([int(k) for k in class_mapping.values()])
             lc_remapped.attrs['original_classes'] = str([int(k) for k in class_mapping.keys()])
                         
             lc_ds = xr.Dataset({'landcover': lc_remapped})
-            
+            lc_ds.rio.write_crs(ref_da.rio.crs, inplace=True)
+
             # Save to cache with parallel computation
             if use_cache:
                 self.lc_cache.parent.mkdir(parents=True, exist_ok=True)
                 print(f"Caching landcover to {self.lc_cache}")
-                lc_ds.to_netcdf(self.lc_cache)
+                # Specify encoding to handle int16 with fill value
+                encoding = {'landcover': {'dtype': 'int16', '_FillValue': -9999}}
+                lc_ds.to_netcdf(self.lc_cache, encoding=encoding)
             
             return lc_ds
             
@@ -234,7 +244,4 @@ class EnvironmentalFeatureDataset():
 
 if __name__ == "__main__":
     features = EnvironmentalFeatureDataset()
-    env_features_ds, lc_ds = features.load(use_cache=False)
-    
-    lc_ds.to_netcdf(CACHE_DIR / "landcover_debug.nc")
-    env_features_ds.to_netcdf(CACHE_DIR / "env_features_debug.nc", engine='netcdf4')
+    env_features_ds, lc_ds = features.load(use_cache=True)
