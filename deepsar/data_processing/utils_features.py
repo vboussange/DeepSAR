@@ -4,21 +4,16 @@ from pathlib import Path
 import numpy as np
 import os
 from tqdm import tqdm
-from dask import delayed
-import dask
 from rasterio.enums import Resampling
 
-# Default paths
-CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio')
-DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_dem_3035_europe_100m.tif')
-LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif')
-CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features')
+# Default base paths (can be overridden via environment variables)
+BASE_DIR = Path(os.getenv('DEEPSAR_DATA_DIR', Path(__file__).parent.parent.parent / 'data'))
 
-# debug paths
-# CHELSA_PATH = Path(Path(__file__).parent, '../../data/raw/CHELSA/debug')
-# DEM_PATH = Path(Path(__file__).parent, '../../data/raw/EEA_DEM/eudem_debug_100m_ch.tif')
-# LC_PATH = Path(Path(__file__).parent, '../../data/raw/Corine_Landcover/CLC2018_CLC2018_V2018_20_ch.tif')
-# CACHE_DIR = Path(Path(__file__).parent, '../../data/processed/environmental_features_debug')
+# Default paths with environment variable support
+CHELSA_PATH = Path(os.getenv('CHELSA_PATH', BASE_DIR / 'raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio'))
+DEM_PATH = Path(os.getenv('DEM_PATH', BASE_DIR / 'raw/EEA_DEM/eudem_dem_3035_europe_100m.tif'))
+LC_PATH = Path(os.getenv('LC_PATH', BASE_DIR / 'raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif'))
+CACHE_DIR = Path(os.getenv('CACHE_DIR', BASE_DIR / 'processed/environmental_features'))
 
 class EnvironmentalFeatureDataset():
     """
@@ -29,7 +24,11 @@ class EnvironmentalFeatureDataset():
     - All rasters aligned to the same spatial grid
     - Remapped landcover classes (stored as integers for memory efficiency)
     - Consistent coordinate reference system (default: EPSG:3035)
+    - Optimized caching with compression and float32 coordinates
     """
+    
+    # Compression settings for netCDF files (zlib with complevel 5 is a good balance)
+    COMPRESSION_ENCODING = {'zlib': True, 'complevel': 5}
     
     def __init__(self, 
                  chelsa_path=CHELSA_PATH, 
@@ -77,13 +76,7 @@ class EnvironmentalFeatureDataset():
         lc_ds = self._load_landcover(ref_da, use_cache)
                 
         # we do not merge lc_ds here as it is np.int16
-        chelsa_dem_ds = xr.merge([
-            dem_ds,
-            chelsa_ds
-        ])
-        
-        # for var in chelsa_dem_ds.data_vars:
-        #     chelsa_dem_ds[var] = chelsa_dem_ds[var].rio.write_nodata(np.nan)
+        chelsa_dem_ds = xr.merge([dem_ds, chelsa_ds])
         
         return chelsa_dem_ds, lc_ds
     
@@ -91,38 +84,36 @@ class EnvironmentalFeatureDataset():
         """Load CHELSA bioclimatic variables and reproject to target CRS.
         
         Args:
-            bbox: Bounding box (minx, miny, maxx, maxy) in target_crs to crop the data.
+            ref_da: Reference DataArray to match grid and extent.
             use_cache: Whether to use cached data if available.
         """
         # Check cache
         if use_cache and self.chelsa_cache.is_file():
-            with xr.open_dataset(self.chelsa_cache) as ds:
-                if ds.rio.bounds() == ref_da.rio.bounds():
-                    return ds
+            print(f"Loading CHELSA from cache: {self.chelsa_cache}")
+            ds = xr.open_dataset(self.chelsa_cache)
+            if ds.rio.bounds() == ref_da.rio.bounds():
+                return ds
+            else:
+                print("Cache does not match reference grid, recompiling.")
         
         data_arrays = []
-        for tiff_path in tqdm(self.chelsa_path.glob("*.tif"), desc="Loading CHELSA variables"):
-            print("Loading and interpolating", tiff_path)
+        for tiff_path in tqdm(sorted(self.chelsa_path.glob("*.tif")), desc="Loading CHELSA variables"):
             with rioxarray.open_rasterio(tiff_path, mask_and_scale=True) as da:
                 da = da.sel(band=1, drop=True)
-                # extracting name and renaming
+                # Extract variable name and rename
                 name = tiff_path.stem.split("CHELSA_")[1].split("_1981-2010_V.2.1")[0]
                 da = da.rename(name)
-                # interpolating and reprojecting
+                # Reproject to match reference grid
                 da = da.rio.reproject_match(ref_da, resampling=Resampling.bilinear)
-                # da = da.rio.write_nodata(np.nan)
                 data_arrays.append(da)
                 
         dataset = xr.merge(data_arrays, join="left")
         dataset.rio.write_crs(ref_da.rio.crs, inplace=True)
         
-        # Remove _FillValue from attributes to avoid conflicts with encoding
-        for var in dataset.data_vars:
-            if '_FillValue' in dataset[var].attrs:
-                del dataset[var].attrs['_FillValue']
-        encoding = {var: {'dtype': 'float32', '_FillValue': np.nan} for var in dataset.data_vars}
-
-        # caching
+        # Optimize encoding: float32 for data and coordinates, with compression
+        encoding = self._get_optimized_encoding(dataset, dtype='float32')
+        
+        # Cache the dataset
         if use_cache:
             self.chelsa_cache.parent.mkdir(parents=True, exist_ok=True)
             print(f"Caching CHELSA to {self.chelsa_cache}")
@@ -130,7 +121,7 @@ class EnvironmentalFeatureDataset():
         return dataset
             
     def _load_dem(self, use_cache=False):
-        """Load DEM elevation data and reproject to target CRS.
+        """Load DEM elevation data.
         
         Args:
             use_cache: Whether to use cached data if available.
@@ -148,22 +139,25 @@ class EnvironmentalFeatureDataset():
         
         with rioxarray.open_rasterio(self.dem_path, mask_and_scale=True) as da:
             dem_da = da.sel(band=1, drop=True)
-            dem_da = xr.Dataset({'elevation': dem_da})
+            dem_ds = xr.Dataset({'elevation': dem_da})
             
-            # Save to cache with parallel computation
+            # Optimize encoding: float32 for data and coordinates, with compression
+            encoding = self._get_optimized_encoding(dem_ds, dtype='float32')
+            
+            # Cache the dataset
             if use_cache:
                 self.dem_cache.parent.mkdir(parents=True, exist_ok=True)
                 print(f"Caching DEM to {self.dem_cache}")
-                dem_da.to_netcdf(self.dem_cache)
+                dem_ds.to_netcdf(self.dem_cache, engine='netcdf4', encoding=encoding)
             
-            return dem_da
+            return dem_ds
         
     
     def _load_landcover(self, ref_da, use_cache=False):
         """Load and remap Corine Land Cover data and reproject to target CRS.
         
         Args:
-            bbox: Bounding box (minx, miny, maxx, maxy) in target_crs to crop the data.
+            ref_da: Reference DataArray to match grid and extent.
             use_cache: Whether to use cached data if available.
         """
         # Check cache
@@ -188,22 +182,18 @@ class EnvironmentalFeatureDataset():
             print("Extracting unique landcover classes from raster...")
             unique_classes = np.unique(lc_da.values)
                         
-            # Remap landcover classes to consecutive integers using vectorized operation
+            # Remap landcover classes to consecutive integers
             class_mapping = {orig_class: idx for idx, orig_class in enumerate(unique_classes)}
             
-            # Vectorized remapping using numpy's searchsorted (parallelized with dask)
-            # Create lookup arrays for efficient remapping
+            # Vectorized remapping using numpy's searchsorted
             new_values = np.arange(len(unique_classes))
-            
-            # Vectorized remapping using searchsorted
             lc_remapped = lc_da.copy()
             flat_values = lc_da.values.flatten()
             indices = np.searchsorted(unique_classes, flat_values)
             remapped_flat = new_values[indices]
             lc_remapped.values = remapped_flat.reshape(lc_da.shape)
             
-            # Cast to int16 to save memory (sufficient for landcover classes)
-            # Use -9999 as a fill value for NaN before casting to int16
+            # Use -9999 as fill value for int16 data
             lc_remapped = lc_remapped.fillna(-9999).astype(np.int16)
             
             # Store the mapping as attributes
@@ -213,33 +203,54 @@ class EnvironmentalFeatureDataset():
             lc_ds = xr.Dataset({'landcover': lc_remapped})
             lc_ds.rio.write_crs(ref_da.rio.crs, inplace=True)
 
-            # Save to cache with parallel computation
+            # Optimize encoding: int16 for data, float32 for coordinates, with compression
+            encoding = self._get_optimized_encoding(lc_ds, dtype='int16', fill_value=-9999)
+            
+            # Cache the dataset
             if use_cache:
                 self.lc_cache.parent.mkdir(parents=True, exist_ok=True)
                 print(f"Caching landcover to {self.lc_cache}")
-                # Specify encoding to handle int16 with fill value
-                encoding = {'landcover': {'dtype': 'int16', '_FillValue': -9999}}
-                lc_ds.to_netcdf(self.lc_cache, encoding=encoding)
+                lc_ds.to_netcdf(self.lc_cache, engine='netcdf4', encoding=encoding)
             
             return lc_ds
-            
-        print(f"✓ Cached {len(dataset.data_vars)} variables to {self.cache_path}")
     
-    def _load_from_cache(self):
-        """Load dataset from cached COG file."""
-        # Load multi-band COG as DataArray with chunking for parallel access
-        stacked_da = rioxarray.open_rasterio(self.cache_path, mask_and_scale=True, chunks=self.chunk_size)
+    def _get_optimized_encoding(self, dataset, dtype='float32', fill_value=None):
+        """Generate optimized encoding dict for netCDF with compression and coordinate precision.
         
-        # Convert DataArray back to Dataset
-        var_names = stacked_da.coords['band'].values
-        data_vars = {}
-        for i, var_name in enumerate(var_names, start=1):
-            data_vars[str(var_name)] = stacked_da.sel(band=i, drop=True)
+        Args:
+            dataset: xarray Dataset to generate encoding for.
+            dtype: Data type for variables (default: 'float32').
+            fill_value: Fill value for missing data (default: np.nan for float, -9999 for int).
+            
+        Returns:
+            dict: Encoding dictionary with compression and coordinate settings.
+        """
+        # Set default fill value based on dtype
+        if fill_value is None:
+            fill_value = np.nan if 'float' in dtype else -9999
         
-        dataset = xr.Dataset(data_vars)
-        print(f"✓ Loaded {len(dataset.data_vars)} variables from cache")
+        # Encoding for data variables
+        encoding = {}
+        for var in dataset.data_vars:
+            # Remove conflicting attributes
+            if '_FillValue' in dataset[var].attrs:
+                del dataset[var].attrs['_FillValue']
+            
+            encoding[var] = {
+                'dtype': dtype,
+                '_FillValue': fill_value,
+                **self.COMPRESSION_ENCODING
+            }
         
-        return dataset
+        # Encoding for coordinates (always float32 for precision/storage balance)
+        for coord in dataset.coords:
+            if coord not in ['band', 'spatial_ref']:  # Skip non-spatial coords
+                encoding[coord] = {
+                    'dtype': 'float32',
+                    **self.COMPRESSION_ENCODING
+                }
+        
+        return encoding
 
 
 if __name__ == "__main__":
