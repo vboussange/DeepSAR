@@ -122,6 +122,13 @@ def clean_eva_plots(plot_gdf):
         ((plot_gdf.level_1.isin(['Q', 'S', 'R'])) & (plot_gdf.area_m2.between(1, 100))) |
         ((plot_gdf.level_1 == 'T') & (plot_gdf.area_m2.between(100, 1000)))
     ]
+    
+    # filtering for date
+    print("Filtering for recording date")
+    plot_gdf = plot_gdf[
+        (plot_gdf.recording_date.isna()) |
+        (plot_gdf.recording_date.dt.year.between(1975, 2025))
+    ]
 
     return plot_gdf
     

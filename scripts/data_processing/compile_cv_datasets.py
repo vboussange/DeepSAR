@@ -1,16 +1,22 @@
 """
-Compiles training samples based on EVA and CHELSA data using Spatial Block Cross-Validation.
+Compiles training samples based on EVA and CHELSA data using Simple Cross-Validation (Random Split).
 
 This script generates training data for species-area relationship models by:
 1. Loading EVA species data.
-2. Assigning spatial blocks (checkerboard) to each plot.
-3. Splitting data into 5 folds based on spatial blocks.
+2. Assigning random folds to each plot.
+3. Splitting data into 5 folds.
 4. For each fold:
     - Generating random spatial units (polygons) for training (using training plots).
     - Generating random spatial units (polygons) for testing (using testing plots).
     - Computing species richness within each polygon.
     - Extracting environmental feature statistics.
     - Saving the datasets.
+
+Optimized for large-scale datasets using:
+- JAX for vectorized species richness computations
+- Dask for parallel raster processing  
+- Memory-efficient one-hot encoding for landcover
+- GeoParquet for efficient storage
 """
 
 import geopandas as gpd
@@ -38,7 +44,7 @@ numba_logger.setLevel(logging.WARNING)
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../data/processed/training_samples/sbcv",
+        f"../../data/processed/training_samples/cv",
     ),
     "env_vars": [
         "bio1",
@@ -57,33 +63,25 @@ CONFIG = {
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for climate compilation
     "n_splits": 5,
-    "block_size": 10_000, # Block size in meters (e.g., 10km)
     "ratio_samples_plots": 0.01, # ratio of genrated train/val/test samples to raw plots
 }
 
-def assign_checkerboard_folds(gdf, n_splits=5, block_size=10000):
+def assign_random_folds(gdf, n_splits=5, random_state=42):
     """
-    Assigns spatial folds to a GeoDataFrame using a checkerboard pattern.
+    Assigns random folds to a GeoDataFrame.
     
     Args:
         gdf: GeoDataFrame with plot data
         n_splits: Number of folds
-        block_size: Size of the checkerboard blocks in meters (assuming projected CRS)
+        random_state: Random seed
     """
-    # Calculate bounds
-    minx, miny, maxx, maxy = gdf.total_bounds
+    rng = np.random.default_rng(random_state)
+    n_samples = len(gdf)
     
-    # Assign grid indices
-    # Use floor to get grid index
-    grid_x = np.floor((gdf.geometry.x - minx) / block_size).astype(int)
-    grid_y = np.floor((gdf.geometry.y - miny) / block_size).astype(int)
+    # Generate random fold assignments
+    folds = rng.integers(0, n_splits, size=n_samples)
     
-    gdf['grid_x'] = grid_x
-    gdf['grid_y'] = grid_y
-    
-    # Assign folds (checkerboard pattern)
-    # (x + y) % n_splits creates diagonal stripes
-    gdf['spatial_split'] = (gdf['grid_x'] + gdf['grid_y']) % n_splits
+    gdf['spatial_split'] = folds # Keeping column name consistent for downstream logic
     
     return gdf
 
@@ -160,12 +158,12 @@ if __name__ == "__main__":
     df = EVADataset().load_species_matrix()
     logging.info(f"Loaded {len(df):,} plots")
     
-    # Assign spatial folds
-    logging.info("Assigning spatial folds...")
-    df = assign_checkerboard_folds(
+    # Assign random folds
+    logging.info("Assigning random folds...")
+    df = assign_random_folds(
         df, 
         n_splits=CONFIG["n_splits"], 
-        block_size=CONFIG["block_size"]
+        random_state=CONFIG["random_state"]
     )
     
     # Load environmental rasters
@@ -179,14 +177,12 @@ if __name__ == "__main__":
         
         # Define fold indices
         test_fold_id = fold_id
-        val_fold_id = (fold_id + 1) % CONFIG["n_splits"]
         
         # Split data
         test_df = df[df['spatial_split'] == test_fold_id]
-        val_df = df[df['spatial_split'] == val_fold_id]
-        train_df = df[(df['spatial_split'] != test_fold_id) & (df['spatial_split'] != val_fold_id)]
+        train_df = df[df['spatial_split'] != test_fold_id]
         
-        logging.info(f"Fold {fold_id}: Train plots: {len(train_df):,}, Val plots: {len(val_df):,}, Test plots: {len(test_df):,}")
+        logging.info(f"Fold {fold_id}: Train plots: {len(train_df):,}, Test plots: {len(test_df):,}")
         
         # Generate Training Data
         logging.info(f"Generating training samples for Fold {fold_id}...")
@@ -199,23 +195,12 @@ if __name__ == "__main__":
         )
         save_compiled_data(train_data, output_file_path, f"fold_{fold_id}_train")
         
-        # Generate Validation Data
-        logging.info(f"Generating validation samples for Fold {fold_id}...")
-        val_data = run_sp_unit_compilation(
-            val_df,
-            chelsa_dem_ds, lc_ds,
-            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
-            area_range=CONFIG["area_range"],
-            env_var_names=CONFIG["env_vars"],
-        )
-        save_compiled_data(val_data, output_file_path, f"fold_{fold_id}_val")
-        
         # Generate Test Data
         logging.info(f"Generating test samples for Fold {fold_id}...")
         test_data = run_sp_unit_compilation(
             test_df,
             chelsa_dem_ds, lc_ds,
-            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)), # Smaller test set
+            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)),
             area_range=CONFIG["area_range"],
             env_var_names=CONFIG["env_vars"],
         )

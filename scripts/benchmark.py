@@ -1,8 +1,6 @@
 """
-This script benchmarks the `Deep4PWeibull` model on EVA and GIFT datasets
-using various experimental configurations. It supports parallel execution across
-multiple devices (CPU/GPU/MPS) and evaluates model performance using R2, D2,
-RMSE, and MAPE. Results are saved as a CSV file for further analysis. 
+This script benchmarks the DeepSAR model on SBCV datasets, evaluating both
+Interpolation (on SBCV test set) and Extrapolation (on GIFT dataset).
 """
 
 import logging
@@ -17,6 +15,7 @@ import torch.nn as nn
 from deepsar.utils import symmetric_arch
 from deepsar.benchmarker import BenchmarkConfig, Benchmarker
 from deepsar.deep4pweibull import Deep4PWeibull
+from deepsar.mlp import MLP
 import warnings
 from dataclasses import dataclass, field
 
@@ -45,6 +44,21 @@ class Deep4PWeibullInit():
                              layer_sizes=self.architecture, 
                              **kwargs)
 
+class WrappedMLP(MLP):
+    def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None):
+        super().__init__(input_dim, layer_sizes)
+        self.feature_names = feature_names
+        self.feature_scaler = feature_scaler
+        self.target_scaler = target_scaler
+
+@dataclass
+class MLPInit():
+    feature_names: list
+    architecture: list = field(default_factory=lambda: [128, 64, 32])
+    def __call__(self, **kwargs):
+        # input_dim = len(feature_names) + 1 (for log_observed_area)
+        return WrappedMLP(len(self.feature_names) + 1, self.architecture, **kwargs)
+
 if __name__ == "__main__":
     if torch.cuda.is_available():
         devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
@@ -52,94 +66,100 @@ if __name__ == "__main__":
         devices = ["mps"]
     else:
         devices = ["cpu"]
+        
     root_folder = Path(__file__).parent / Path('results', 'benchmark')
     root_folder.mkdir(parents=True, exist_ok=True)
+    
     config = BenchmarkConfig(devices=devices,
                              hash_data=HASH,
-                            #  n_epochs=1, # for quick testing
                              run_folder = root_folder,
-                             run_name="deep4pweibull_basearch6_" + HASH + "_benchmark")
+                             run_name="benchmark_" + HASH)
     
-    # load EVA
-    eva = gpd.read_parquet(config.path_eva_data)
-    eva = eva[eva["num_plots"] > 2]  # TODO: to change
+    # Inspect one file to get feature names
+    sbcv_path = config.path_sbcv_data
+    try:
+        sample_file = next(sbcv_path.glob("*_train.parquet"))
+        df = gpd.read_parquet(sample_file)
+        
+        # Identify features
+        climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
+        dem_feats = ["elevation", "std_elevation"]
+        lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
+        
+        # Filter to what is actually present
+        climate_feats = [c for c in climate_feats if c in df.columns]
+        dem_feats = [c for c in dem_feats if c in df.columns]
+        
+        all_env_feats = climate_feats + dem_feats + lc_feats
+        logger.info(f"Identified features: {len(all_env_feats)} environmental features.")
+        
+    except StopIteration:
+        logger.error(f"No training files found in {sbcv_path}. Cannot determine features.")
+        sys.exit(1)
 
-    # load GIFT
-    gift = gpd.read_parquet(config.path_gift_data)
-
-    # preprocess data
-    for data in (eva, gift):
-        # replace inf and -inf with NaN, then drop NaN rows
-        data["log_sp_unit_area"] = np.log(data["megaplot_area"])  # TODO: legacy name, to be changed in the future
-        data["log_observed_area"] = np.log(data["observed_area"])
-        data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        data.dropna(inplace=True)
-
-    benchmark = Benchmarker(config, gift=gift, eva=eva)
-
-    # build experiments
-    climate = config.climate_variables
-    std_climate = ["std_" + v for v in climate]
-    climate_feats = climate + std_climate
-
-    exps = []
-    # area only
-    exps.append(
-        ("area", 
-         nn.MSELoss(), 
-         1.0, 
-         Deep4PWeibullInit(feature_names=["log_sp_unit_area"]))
-    )
-    # climate only
-    exps.append(
-        ("climate", 
-         nn.MSELoss(), 
-         1.0, 
-         Deep4PWeibullInit(feature_names=climate_feats))
-    )
-    # area+climate with varying data fractions
-    for frac in np.logspace(np.log10(1e-4), np.log10(1.0), 5):
-        exps.append(
-            ("area+climate",
-             nn.MSELoss(), 
-             frac, 
-             Deep4PWeibullInit(feature_names=["log_sp_unit_area"] + climate_feats))
-        )
-    # vary architecture
-    for n in [0, 2, 4]:
-        exps.append(
-            ("area+climate",
-             nn.MSELoss(),
-             1.0,
-             Deep4PWeibullInit(feature_names=["log_sp_unit_area"] + climate_feats,
-                               architecture=symmetric_arch(n, base=32, factor=4))
-             )
-        )
-
-    rows = []
-    for name, loss_fn, frac, init in exps:
-        logger.info(f"Running {name}, frac={frac:.2f}, model={init}")
-        out = benchmark.run(loss_fn, init, frac)
-        for run_id in range(benchmark.nruns):
-            rows.append(
-                {
-                    "model": name,
-                    "run": run_id,
-                    "train_frac": frac,
-                    "num_params": out["num_params"],
-                    "r2_eva": out["r2_eva"][run_id],
-                    "d2_eva": out["d2_eva"][run_id],
-                    "rmse_eva": out["rmse_eva"][run_id],
-                    "mape_eva": out["mape_eva"][run_id],
-                    "r2_gift": out["r2_gift"][run_id],
-                    "d2_gift": out["d2_gift"][run_id],
-                    "rmse_gift": out["rmse_gift"][run_id],
-                    "mape_gift": out["mape_gift"][run_id],
-                }
-            )
-        logger.info(f"Finished {name}")
-
-    df = pd.DataFrame(rows)
-    out_csv = config.run_folder / f"{config.run_name}.csv"
-    df.to_csv(out_csv, index=False)
-    logger.info(f"Saved to {out_csv}")
+    experiments = []
+    
+    # 1. DeepSAR Area Only
+    experiments.append({
+        "name": "DeepSAR_Area",
+        "model_init": Deep4PWeibullInit(feature_names=["log_sp_unit_area"]),
+        "feature_names": ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+    
+    # 2. DeepSAR All Env
+    experiments.append({
+        "name": "DeepSAR_Env",
+        "model_init": Deep4PWeibullInit(feature_names=all_env_feats),
+        "feature_names": all_env_feats,
+        "train_frac": 1.0
+    })
+    
+    # 3. DeepSAR All Env + Area
+    experiments.append({
+        "name": "DeepSAR_All",
+        "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "feature_names": all_env_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+    
+    # 4. Varying training samples (on All Env + Area)
+    for frac in [0.1, 0.5]:
+        experiments.append({
+            "name": f"DeepSAR_All_frac_{frac}",
+            "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+            "feature_names": all_env_feats + ["log_sp_unit_area"],
+            "train_frac": frac
+        })
+        
+    # 5. Varying architecture (on All Env + Area)
+    # Base 64
+    experiments.append({
+        "name": "DeepSAR_All_Base64",
+        "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
+                                        architecture=symmetric_arch(6, base=64, factor=4)),
+        "feature_names": all_env_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+    
+    # 6. MLP (on All Env + Area)
+    experiments.append({
+        "name": "MLP_All",
+        "model_init": MLPInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "feature_names": all_env_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+    
+    # Run Benchmark
+    logger.info("Running Benchmark (Interpolation & Extrapolation)...")
+    bench = Benchmarker(config)
+    results = []
+    for exp in experiments:
+        logger.info(f"Running experiment: {exp['name']}")
+        res = bench.run(exp["name"], exp["model_init"], exp["feature_names"], exp["train_frac"])
+        results.append(res)
+    
+    df_results = pd.concat(results)
+    df_results.to_csv(root_folder / "benchmark_results.csv", index=False)
+    
+    logger.info("Benchmark completed.")

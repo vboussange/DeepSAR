@@ -6,10 +6,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import root_mean_squared_error, r2_score
 import numpy as np
 import random
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping
 
 from dataclasses import dataclass, field
 from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.trainer import Trainer
+from deepsar.trainer import DeepSARLitModule
 from deepsar.dataset import create_dataloader
 from deepsar.utils import symmetric_arch
 from deepsar.ensemble_model import DeepSAREnsembleModel
@@ -76,9 +78,7 @@ class EnsembleTrainer:
     @staticmethod
     def _single_run(config, df_train_val, df_test, feature_names, ensemble_idx, device):
 
-        torch.manual_seed(config.seed + ensemble_idx)
-        np.random.seed(config.seed + ensemble_idx)
-        random.seed(config.seed + ensemble_idx)
+        pl.seed_everything(config.seed + ensemble_idx)
 
         train_idx, val_idx = train_test_split(
             df_train_val.index,
@@ -94,20 +94,34 @@ class EnsembleTrainer:
         model = Deep4PWeibull(config.layer_sizes, 
                               feature_names=feature_names,
                               feature_scaler=feature_scaler,
-                              target_scaler=target_scaler).to(device)
+                              target_scaler=target_scaler)
 
-        trainer = Trainer(
-            config=config,
-            model=model,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            test_loader=test_loader,
-            compute_loss=nn.MSELoss(),
-            device=device,
+        # Determine accelerator
+        if "cuda" in device:
+            accelerator = "gpu"
+            devices = [int(device.split(":")[1])]
+        elif "mps" in device:
+            accelerator = "mps"
+            devices = 1
+        else:
+            accelerator = "cpu"
+            devices = 1
+
+        lit_model = DeepSARLitModule(model, config, nn.MSELoss())
+        
+        trainer = pl.Trainer(
+            max_epochs=config.n_epochs,
+            accelerator=accelerator,
+            devices=devices,
+            enable_checkpointing=False,
+            logger=False,
+            callbacks=[EarlyStopping(monitor="val_loss", patience=config.lr_scheduler_patience * 2)],
+            enable_progress_bar=False,
         )
-        best_model, log = trainer.run(n_epochs=config.n_epochs, metrics=["root_mean_squared_error", "r2_score"])
-        best_model = best_model.to("cpu")
+        
+        trainer.fit(lit_model, train_loader, val_loader)
+
         return {
-            "model": best_model,
-            "log": log,
+            "model": model.cpu(),
+            "log": {k: v.item() for k, v in trainer.callback_metrics.items()}
         }

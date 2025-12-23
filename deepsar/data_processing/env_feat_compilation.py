@@ -126,7 +126,7 @@ def run_environmental_features_compilation_parallel(
         sp_unit_data: GeoDataFrame with polygon geometries
         env_raster: xarray Dataset with environmental feature variables
         lc_raster: xarray Dataset with landcover data
-        env_var_names: List of environmental feature variable names
+        env_var_names: List of environmental feature variable names. If "landcover" is present, landcover fractions are computed.
         num_workers: Number of parallel workers
         verbose: Whether to show progress
         
@@ -135,28 +135,38 @@ def run_environmental_features_compilation_parallel(
     """
     logging.info("Compiling environmental features in parallel...")
     
+    compute_landcover = "landcover" in env_var_names
+    # Filter out "landcover" from env_var_names for env_raster processing
+    raster_env_vars = [v for v in env_var_names if v != "landcover"]
+    
     # Get landcover class info
-    lc_attrs = lc_raster['landcover'].attrs
-    if 'original_classes' in lc_attrs:
-        lc_classes = eval(lc_attrs['original_classes'])
-        num_lc_classes = len(lc_classes)
+    num_lc_classes = 0
+    lc_cols = []
+    if compute_landcover:
+        lc_attrs = lc_raster['landcover'].attrs
+        if 'original_classes' in lc_attrs:
+            lc_classes = eval(lc_attrs['original_classes'])
+            num_lc_classes = len(lc_classes)
+        lc_cols = [f"lc_frac_{i}" for i in range(num_lc_classes)]
     
     # Generate column names
-    env_feature_cols = env_var_names + [f"std_{v}" for v in env_var_names]
-    lc_cols = [f"lc_frac_{i}" for i in range(num_lc_classes)]
+    env_feature_cols = raster_env_vars + [f"std_{v}" for v in raster_env_vars]
     
     # Pre-allocate arrays for results
     n_units = len(sp_unit_data)
     env_feature_results = np.zeros((n_units, len(env_feature_cols)), dtype=np.float32)
-    lc_results = np.zeros((n_units, num_lc_classes), dtype=np.float32)
+    if compute_landcover:
+        lc_results = np.zeros((n_units, num_lc_classes), dtype=np.float32)
     
     # Extract bounds for all polygons
     bounds_list = [geom.bounds for geom in sp_unit_data.geometry]
     
     def process_polygon(args):
         idx, bounds = args
-        env_feature_stats = compute_polygon_env_feature_stats(bounds, env_raster, env_var_names)
-        lc_stats = compute_polygon_landcover_stats(bounds, lc_raster, num_lc_classes)
+        env_feature_stats = compute_polygon_env_feature_stats(bounds, env_raster, raster_env_vars)
+        lc_stats = None
+        if compute_landcover:
+            lc_stats = compute_polygon_landcover_stats(bounds, lc_raster, num_lc_classes)
         return idx, env_feature_stats, lc_stats
     
     # Process in parallel
@@ -173,13 +183,15 @@ def run_environmental_features_compilation_parallel(
     # Collect results
     for idx, env_feature_stats, lc_stats in results:
         env_feature_results[idx] = env_feature_stats
-        lc_results[idx] = lc_stats
+        if compute_landcover:
+            lc_results[idx] = lc_stats
     
     # Add columns to dataframe
     for i, col in enumerate(env_feature_cols):
         sp_unit_data[col] = env_feature_results[:, i]
-    for i, col in enumerate(lc_cols):
-        sp_unit_data[col] = lc_results[:, i]
+    if compute_landcover:
+        for i, col in enumerate(lc_cols):
+            sp_unit_data[col] = lc_results[:, i]
     
     return sp_unit_data
 
