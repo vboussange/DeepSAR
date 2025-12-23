@@ -21,7 +21,7 @@ class EVADataset:
         self.data_dir = Path(data_dir)
         
         # Cache path for preprocessed arrays
-        self.preprocessed_cache = self.data_dir / "anonymised/preprocessed_cache.npz"
+        self.preprocessed_cache = self.data_dir / "anonymised/preprocessed_cache.parquet"
 
     def read_species_data(self):
         species_dataframe_path = self.data_dir / "anonymised/species_data.parquet"
@@ -64,32 +64,29 @@ class EVADataset:
     
     def load_species_matrix(self, use_cache=True):
         """
-        Converts GeoPandas data and species dict into array formats for deep learning.
+        Converts GeoPandas data and species dict into a single DataFrame for deep learning.
         Optimized for large datasets (500k+ plots, 20k+ species).
         
         Args:
-            plot_gdf: GeoDataFrame with plot data. If None, loads from disk.
-            species_dict: Dictionary mapping plot_id to species lists. If None, loads from disk.
-            use_centroids: If True, use polygon centroids for coordinates (default: True).
             use_cache: Whether to use cached preprocessed data if available (default: True).
         
         Returns:
-            tuple: (coords, obs_areas, species_matrix, species_list) where:
-                - coords: np.array (N_plots, 2) [x, y] coordinates in float32
-                - obs_areas: np.array (N_plots,) observed areas in float32
-                - species_matrix: np.array (N_plots, N_species) bool presence/absence
-                - species_list: list of species names corresponding to matrix columns
+            pd.DataFrame: DataFrame containing:
+                - geometry: Point geometry
+                - area_m2: float32
+                - species_matrix: np.array (N_species,) bool presence/absence per row
+                - species_list: list of species names corresponding to matrix columns (metadata)
         """
         # Check cache first
         if use_cache and self.preprocessed_cache.exists():
             print(f"Loading preprocessed data from cache: {self.preprocessed_cache}")
-            with np.load(self.preprocessed_cache, allow_pickle=True) as data:
-                coords = data['coords']
-                obs_areas = data['obs_areas']
-                species_matrix = data['species_matrix']
-                species_list = data['species_list'].tolist()
-                
-                return coords, obs_areas, species_matrix, species_list
+            df = gpd.read_parquet(self.preprocessed_cache)
+            
+            # Identify species columns (all columns except geometry and area_m2)
+            species_list = [col for col in df.columns if col not in ['geometry', 'area_m2']]
+            df.attrs['species_list'] = species_list
+            
+            return df
         
         print("Loading plot and species data...")
         plot_gdf, species_dict = self.load_species_dict()
@@ -100,10 +97,10 @@ class EVADataset:
             )).astype(np.float32)
         
         # 2. Extract observed areas
-        if 'observed_area' in plot_gdf.columns:
-            obs_areas = plot_gdf['observed_area'].values.astype(np.float32)
+        if 'area_m2' in plot_gdf.columns:
+            obs_areas = plot_gdf['area_m2'].values.astype(np.float32)
         else:
-            raise KeyError("Column 'observed_area' not found in plot data.")
+            raise KeyError("Column 'area_m2' not found in plot data.")
         
         # 3. Vectorize Species Data (One-Hot / Presence-Absence Matrix)
         print("Building species presence-absence matrix...")
@@ -121,13 +118,10 @@ class EVADataset:
         print(f"Dataset size: {n_plots:,} plots × {n_species:,} species")
         
         # Create binary matrix (N_plots x N_species) using bool for memory efficiency
-        # ~1.25 GB for 500k plots x 20k species as bool
         species_matrix = np.zeros((n_plots, n_species), dtype=bool)
         
         # Fill matrix efficiently
-        # Map plot_gdf index to species_dict keys
         if hasattr(plot_gdf, 'index'):
-            # Use plot_id column if available, otherwise use index
             if 'plot_id' in plot_gdf.columns:
                 plot_ids = plot_gdf['plot_id'].tolist()
             else:
@@ -135,33 +129,42 @@ class EVADataset:
         else:
             plot_ids = list(range(len(plot_gdf)))
         
-        # Vectorized filling using list comprehension for speed
-        print("Filling species matrix (this may take a moment for large datasets)...")
+        print("Filling species matrix (this may take a moment)...")
         for row_idx, plot_id in enumerate(tqdm(plot_ids, desc="Processing plots")):
             if plot_id in species_dict:
                 species_list = species_dict[plot_id]
-                # Vectorized index lookup and assignment
                 sp_indices = [species_to_idx[sp] for sp in species_list if sp in species_to_idx]
-                if sp_indices:  # Only assign if we have valid species
+                if sp_indices:
                     species_matrix[row_idx, sp_indices] = True
+        
+        # Construct DataFrame
+        df = pd.DataFrame({
+            'area_m2': obs_areas,
+        })
+        df['geometry'] = gpd.points_from_xy(coords[:, 0], coords[:, 1])
+        df = gpd.GeoDataFrame(df, geometry='geometry')
+        
+        # Add species columns
+        species_df = pd.DataFrame(species_matrix, columns=all_species)
+        df = pd.concat([df, species_df], axis=1)
+        
+        df.attrs['species_list'] = all_species
         
         # Cache the preprocessed data
         if use_cache:
             self.preprocessed_cache.parent.mkdir(parents=True, exist_ok=True)
             print(f"Caching preprocessed data to {self.preprocessed_cache}")
-            np.savez_compressed(
-                self.preprocessed_cache,
-                coords=coords,
-                obs_areas=obs_areas,
-                species_matrix=species_matrix,
-                species_list=np.array(all_species, dtype=object)
-            )
+            df.to_parquet(self.preprocessed_cache, index=False)
             print(f"✓ Cache saved ({self.preprocessed_cache.stat().st_size / 1e6:.1f} MB)")
         
-        return coords, obs_areas, species_matrix, all_species
+        return df
 
 if __name__ == "__main__":
     dataset = EVADataset()
     df_sp = dataset.read_species_data()
     plot_data, species_dict = dataset.load_species_dict()
-    coords, obs_areas, species_matrix, all_species = dataset.load_species_matrix()
+    df = dataset.load_species_matrix()
+    coords = np.column_stack((df.geometry.x, df.geometry.y))
+    obs_areas = df['area_m2'].values
+    species_list = df.attrs['species_list']
+    species_matrix = df[species_list].values
