@@ -191,16 +191,13 @@ if __name__ == "__main__":
     
     logging.info("Running tests for env_feat_compilation module...")
     eva_dataset = EVADataset()
-    coords, obs_areas, species_matrix, all_species = eva_dataset.load_species_matrix()
-    logging.info(f"Loaded {len(coords):,} plots with {species_matrix.shape[1]:,} species")
-    
+    df = eva_dataset.load_species_matrix()
+
     n_test_sp_units = 10000
     area_range = (1e4, 1e8)  # Smaller range for quick test
     
     test_gdf = run_SR_compilation_ckdtree(
-        coords=coords,
-        obs_areas=obs_areas,
-        species_matrix=species_matrix,
+        df=df,
         n_sp_units=n_test_sp_units,
         area_range=area_range,
         crs="EPSG:3035",
@@ -209,17 +206,13 @@ if __name__ == "__main__":
     )
     
     
-    # Load actual environmental data
-    logging.info("Loading environmental datasets...")
     env_features = EnvironmentalFeatureDataset()
     env_ds, lc_ds = env_features.load(use_cache=True)
 
     # Test single polygon stats
-    logging.info("Testing single polygon stats...")
     bounds = test_gdf.geometry.iloc[1].bounds
     env_stats = compute_polygon_env_feature_stats(bounds, env_ds, list(env_ds.data_vars))
-    logging.info(f"Env stats shape: {env_stats.shape}")
-    logging.info(f"Env stats: {env_stats}")
+
     
     num_classes = len(eval(lc_ds["landcover"].attrs["class_mapping"]))
     lc_stats = compute_polygon_landcover_stats(bounds, lc_ds, num_classes)
@@ -229,10 +222,3 @@ if __name__ == "__main__":
     result_gdf = run_environmental_features_compilation_parallel(
         test_gdf, env_ds, lc_ds, list(env_ds.data_vars), num_workers=100
     )
-    
-    logging.info("Result columns:")
-    print(result_gdf.columns)
-    logging.info("First row:")
-    print(result_gdf.iloc[0])
-    
-    logging.info("Tests completed successfully.")

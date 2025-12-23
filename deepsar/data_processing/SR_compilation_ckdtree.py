@@ -13,7 +13,6 @@ from shapely.geometry import box
 from scipy.spatial import cKDTree
 
 from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
 
 # Initialize logging
 logging.basicConfig(
@@ -136,9 +135,7 @@ def compute_single_square_stats_ckdtree(
 
 
 def run_SR_compilation_ckdtree(
-    coords: np.ndarray,
-    obs_areas: np.ndarray,
-    species_matrix: np.ndarray,
+    df: gpd.GeoDataFrame,
     n_sp_units: int,
     area_range: tuple,
     crs: str = CONFIG["crs"],
@@ -152,9 +149,7 @@ def run_SR_compilation_ckdtree(
     without accumulating large intermediate arrays.
     
     Args:
-        coords: Array (N, 2) of plot coordinates [x, y]
-        obs_areas: Array (N,) of observed areas per plot
-        species_matrix: Boolean array (N, M) presence-absence matrix
+        df: GeoDataFrame containing plot data (geometry, observed_area, species columns)
         n_sp_units: Number of spatial units to generate
         area_range: Tuple of (min_area, max_area) for random squares
         crs: Coordinate reference system
@@ -164,6 +159,12 @@ def run_SR_compilation_ckdtree(
     Returns:
         GeoDataFrame with columns: observed_area, sp_unit_area, sr, geometry
     """
+    # Extract arrays from DataFrame
+    coords = np.column_stack((df.geometry.x, df.geometry.y))
+    obs_areas = df['area_m2'].values
+    species_list = df.attrs['species_list']
+    species_matrix = df[species_list].values
+
     logging.info("Building cKDTree for spatial queries...")
     kdtree = cKDTree(coords)
     
@@ -235,35 +236,39 @@ def run_SR_compilation_ckdtree(
 
 
 if __name__ == "__main__":
-    logging.info("Starting test of cKDTree-based species richness computation...")
-    
-    # Load EVA dataset
-    logging.info("Loading EVA data...")
     eva_dataset = EVADataset()
-    coords, obs_areas, species_matrix, all_species = eva_dataset.load_species_matrix()
-    logging.info(f"Loaded {len(coords):,} plots with {species_matrix.shape[1]:,} species")
+    df = eva_dataset.load_species_matrix()
+    coords = np.column_stack((df.geometry.x, df.geometry.y))
+    obs_areas = df['area_m2'].values
+    species_list = df.attrs['species_list']
+    species_matrix = df[species_list].values
+
+    rng = np.random.default_rng(42)
+    kdtree = cKDTree(coords)
     
+    test_center_idx = 0
+    test_half_length = 5000.0  # 5km half-length -> 10km x 10km square
+    
+    # Test 1: Single square computation
+    obs_area, sp_unit_area, sr, geom = compute_single_square_stats_ckdtree(
+        coords[test_center_idx],
+        test_half_length,
+        kdtree,
+        coords,
+        obs_areas,
+        species_matrix,
+        rng,
+    )
+    
+    # Test 2: Small-scale compilation (streaming approach)    
     n_test_sp_units = 100000
     area_range = (1e4, 1e8)  # Smaller range for quick test
     
     test_gdf = run_SR_compilation_ckdtree(
-        coords=coords,
-        obs_areas=obs_areas,
-        species_matrix=species_matrix,
+        df=df,
         n_sp_units=n_test_sp_units,
         area_range=area_range,
         crs=CONFIG["crs"],
         verbose=True,
         random_state=42,
     )
-    
-    logging.info(f"\nCompilation results:")
-    logging.info(f"  Total spatial units generated: {len(test_gdf)}")
-    logging.info(f"  Species richness range: [{test_gdf['sr'].min()}, {test_gdf['sr'].max()}]")
-    logging.info(f"  Mean SR: {test_gdf['sr'].mean():.2f}")
-    logging.info(f"  Median SR: {test_gdf['sr'].median():.2f}")
-    logging.info(f"  Observed area range: [{test_gdf['observed_area'].min():.2e}, {test_gdf['observed_area'].max():.2e}] m²")
-    logging.info(f"  Spatial unit area range: [{test_gdf['sp_unit_area'].min():.2e}, {test_gdf['sp_unit_area'].max():.2e}] m²")
-    
-    logging.info(f"\nFirst few rows of compiled data:")
-    print(test_gdf.head())
