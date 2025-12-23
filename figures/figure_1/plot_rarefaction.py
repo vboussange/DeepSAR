@@ -15,7 +15,7 @@ from sklearn.metrics import mean_squared_error
 from tqdm import tqdm
 import warnings
 
-from deepsar.generate_sar_data_eva import clip_EVA_SR, generate_random_square
+from deepsar.SR_compilation_jax import clip_EVA_SR, generate_random_square
 from deepsar.data_processing.utils_eva import EVADataset
 from deepsar.data_processing.utils_gift import GIFTDataset
 from deepsar.data_processing.utils_features import CHELSADataset

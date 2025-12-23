@@ -20,13 +20,13 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 import logging
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import warnings
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 import json
 
+from equinox import filter_jit
 import jax
 import jax.numpy as jnp
 from jax import jit, vmap
@@ -47,7 +47,7 @@ numba_logger.setLevel(logging.WARNING)
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../data/processed/EVA_CHELSA_compilation/",
+        f"../../data/processed/training_samples/",
     ),
     "env_vars": [
         "bio1",
@@ -59,14 +59,11 @@ CONFIG = {
         "bio15",
     ],
     "block_length": 1e6,  # in meters
-    "area_range_train": (1e4, 1e12),  # in m2
-    "area_range_test": (1e4, 1e10),  # in m2
-    "sp_unit_test_size": 0.005,  # in fraction of total EVA records
-    "sp_unit_train_size": 3,  # in fraction of total EVA train records
+    "area_range": (1e4, 1e12),  # in m2
     "crs": "EPSG:3035",
     "random_state": 2,
     "verbose": True,
-    "batch_size": 1000,  # batch size for JAX operations
+    "batch_size": 100,  # batch size for JAX operations
     "dask_chunks": {"x": 2000, "y": 2000},  # chunk size for dask arrays
     "num_workers": 8,  # number of parallel workers for climate compilation
 }
@@ -75,233 +72,6 @@ CONFIG = {
 # mean_labels = CONFIG["env_vars"]
 # std_labels = [f"std_{var}" for var in CONFIG["env_vars"]]
 # CLIMATE_COL_NAMES = np.hstack((mean_labels, std_labels)).tolist()
-
-
-# =============================================================================
-# JAX-based Species Richness Computation
-# =============================================================================
-
-@partial(jit, static_argnums=(3,))
-def compute_single_square_stats(
-    center_idx: int,
-    half_length: float,
-    key: jax.Array,
-    n_plots: int,
-    coords: jax.Array,
-    obs_areas: jax.Array,
-    species_matrix: jax.Array,
-) -> tuple:
-    """
-    Compute SR, observed_area, sp_unit_area for a single square centered on a plot.
-    
-    The square is centered on the plot at center_idx, guaranteeing at least one plot inside.
-    
-    Args:
-        center_idx: Index of the center plot
-        half_length: Half side length of the square
-        key: JAX random key for subsampling
-        n_plots: Total number of plots (static for JIT)
-        coords: All plot coordinates (N, 2)
-        obs_areas: All observed areas (N,)
-        species_matrix: Presence-absence matrix (N, M)
-        
-    Returns:
-        Tuple of (observed_area, sp_unit_area, sr, num_plots)
-    """
-    # Get center coordinates
-    cx = coords[center_idx, 0]
-    cy = coords[center_idx, 1]
-    
-    # Find all plots within the square using simple boolean masking
-    in_box = (
-        (coords[:, 0] >= cx - half_length) &
-        (coords[:, 0] <= cx + half_length) &
-        (coords[:, 1] >= cy - half_length) &
-        (coords[:, 1] <= cy + half_length)
-    )
-    
-    # Count plots in box
-    num_plots_in_box = jnp.sum(in_box)
-    
-    # Subsample: sample log-uniform number of plots from those in box
-    key1, key2 = jax.random.split(key)
-    log_n = jax.random.uniform(key1) * jnp.log(jnp.maximum(num_plots_in_box, 1).astype(jnp.float32))
-    n_sample = jnp.maximum(1, jnp.floor(jnp.exp(log_n)).astype(jnp.int32))
-    
-    # Random subset selection using uniform noise ranking
-    # Assign random scores to each plot, set out-of-box plots to -inf
-    noise = jax.random.uniform(key2, shape=(n_plots,))
-    scores = jnp.where(in_box, noise, -1.0)
-    
-    # Select top n_sample by finding threshold score
-    # Sort scores descending and get the n_sample-th value as threshold
-    sorted_scores = jnp.sort(scores)[::-1]
-    # Use n_sample-1 because 0-indexed, clamp to valid range
-    threshold_idx = jnp.minimum(n_sample - 1, num_plots_in_box - 1)
-    threshold_idx = jnp.maximum(threshold_idx, 0)
-    threshold = sorted_scores[threshold_idx]
-    
-    # Select plots with score >= threshold (handles ties by including all at threshold)
-    selected_mask = (scores >= threshold) & in_box
-    
-    # Compute species richness: union of species across selected plots
-    masked_species = species_matrix & selected_mask[:, None]
-    species_present = jnp.any(masked_species, axis=0)
-    sr = jnp.sum(species_present)
-    
-    # Compute observed area (sum of areas of selected plots)
-    observed_area = jnp.sum(jnp.where(selected_mask, obs_areas, 0.0))
-    
-    # Compute sp_unit_area (square area)
-    sp_unit_area = (2.0 * half_length) ** 2
-    sp_unit_area = jnp.maximum(sp_unit_area, observed_area)
-    
-    num_selected = jnp.sum(selected_mask)
-    
-    return observed_area, sp_unit_area, sr, num_selected
-
-
-# Vectorized version over batch of squares
-@partial(jit, static_argnums=(3,))
-def compute_batch_stats(
-    center_indices: jax.Array,
-    half_lengths: jax.Array,
-    keys: jax.Array,
-    n_plots: int,
-    coords: jax.Array,
-    obs_areas: jax.Array,
-    species_matrix: jax.Array,
-) -> tuple:
-    """Vectorized computation over a batch of squares using vmap."""
-    return vmap(
-        lambda idx, hl, k: compute_single_square_stats(
-            idx, hl, k, n_plots, coords, obs_areas, species_matrix
-        )
-    )(center_indices, half_lengths, keys)
-
-
-def run_SR_compilation_jax(
-    coords: np.ndarray,
-    obs_areas: np.ndarray,
-    species_matrix: np.ndarray,
-    n_sp_units: int,
-    area_range: tuple,
-    crs: str = CONFIG["crs"],
-    batch_size: int = CONFIG["batch_size"],
-    verbose: bool = CONFIG["verbose"],
-    random_state: int = CONFIG["random_state"],
-) -> gpd.GeoDataFrame:
-    """
-    Compute species richness for random spatial units using JAX acceleration.
-    
-    Generates random squares centered on existing plots (guaranteeing ≥1 plot per square),
-    then computes SR and area statistics using vectorized JAX operations.
-    
-    Args:
-        coords: Array (N, 2) of plot coordinates [x, y]
-        obs_areas: Array (N,) of observed areas per plot
-        species_matrix: Boolean array (N, M) presence-absence matrix
-        n_sp_units: Number of spatial units to generate
-        area_range: Tuple of (min_area, max_area) for random squares
-        crs: Coordinate reference system
-        batch_size: Batch size for processing
-        verbose: Whether to show progress bar
-        random_state: Random seed
-        
-    Returns:
-        GeoDataFrame with columns: observed_area, sp_unit_area, sr, num_plots, geometry
-    """
-    from shapely.geometry import box
-    
-    logging.info("Compiling SR using JAX vectorized operations...")
-    
-    n_plots = len(coords)
-    log_area_min, log_area_max = np.log(area_range[0]), np.log(area_range[1])
-    
-    # Convert to JAX arrays
-    coords_jax = jnp.array(coords, dtype=jnp.float32)
-    obs_areas_jax = jnp.array(obs_areas, dtype=jnp.float32)
-    species_matrix_jax = jnp.array(species_matrix, dtype=bool)
-    
-    # Initialize random key
-    rng_key = jax.random.PRNGKey(random_state)
-    
-    # Pre-allocate results
-    all_observed_areas = []
-    all_sp_unit_areas = []
-    all_srs = []
-    all_num_plots = []
-    all_centers = []
-    all_half_lengths = []
-    
-    # Process in batches
-    n_batches = (n_sp_units + batch_size - 1) // batch_size
-    
-    for batch_idx in tqdm(range(n_batches), desc="Compiling SR (JAX)", disable=not verbose):
-        batch_start = batch_idx * batch_size
-        batch_end = min((batch_idx + 1) * batch_size, n_sp_units)
-        current_batch_size = batch_end - batch_start
-        
-        # Generate random parameters for this batch
-        rng_key, key1, key2, key3 = jax.random.split(rng_key, 4)
-        
-        # Sample center plot indices (uniform over all plots)
-        center_indices = jax.random.randint(key1, (current_batch_size,), 0, n_plots)
-        
-        # Sample areas from log-uniform distribution
-        u = jax.random.uniform(key2, (current_batch_size,))
-        log_areas = log_area_min + u * (log_area_max - log_area_min)
-        half_lengths = jnp.exp(log_areas / 2) / 2  # sqrt(area) / 2
-        
-        # Generate keys for subsampling within each square
-        batch_keys = jax.random.split(key3, current_batch_size)
-        
-        # Compute stats for all squares in batch (vectorized)
-        obs_areas_batch, sp_unit_areas_batch, srs_batch, num_plots_batch = compute_batch_stats(
-            center_indices, half_lengths, batch_keys,
-            n_plots, coords_jax, obs_areas_jax, species_matrix_jax
-        )
-        
-        # Store results
-        all_observed_areas.append(np.array(obs_areas_batch))
-        all_sp_unit_areas.append(np.array(sp_unit_areas_batch))
-        all_srs.append(np.array(srs_batch))
-        all_num_plots.append(np.array(num_plots_batch))
-        all_centers.append(np.array(coords_jax[center_indices]))
-        all_half_lengths.append(np.array(half_lengths))
-    
-    # Concatenate all batches
-    observed_areas = np.concatenate(all_observed_areas)
-    sp_unit_areas = np.concatenate(all_sp_unit_areas)
-    srs = np.concatenate(all_srs)
-    num_plots = np.concatenate(all_num_plots)
-    centers = np.concatenate(all_centers)
-    half_lengths = np.concatenate(all_half_lengths)
-    
-    # Build geometries (this part stays in numpy/shapely)
-    geometries = [
-        box(cx - hl, cy - hl, cx + hl, cy + hl)
-        for (cx, cy), hl in zip(centers, half_lengths)
-    ]
-    
-    # Create GeoDataFrame
-    gdf = gpd.GeoDataFrame(
-        {
-            "observed_area": observed_areas,
-            "sp_unit_area": sp_unit_areas,
-            "sr": srs,
-            "num_plots": num_plots,
-        },
-        geometry=geometries,
-        crs=crs,
-    )
-    
-    # Filter out any squares with sr=0 (shouldn't happen but safety check)
-    gdf = gdf[gdf.sr > 0].reset_index(drop=True)
-    
-    logging.info(f"Generated {len(gdf)} spatial units with SR > 0")
-    return gdf
-
 
 # =============================================================================
 # Dask-parallel Climate Compilation
@@ -608,7 +378,7 @@ if __name__ == "__main__":
     
     # Load EVA data (species matrix format)
     logging.info("Loading EVA data...")
-    coords, obs_areas, species_matrix, species_list = EVADataset().load_species_matrix()
+    coords, obs_areas, species_matrix, _ = EVADataset().load_species_matrix()
     logging.info(f"Loaded {len(coords):,} plots with {species_matrix.shape[1]:,} species")
     
     # Load environmental rasters
@@ -619,37 +389,13 @@ if __name__ == "__main__":
     # Export dataset statistics
     export_dataset_statistics(coords, species_matrix, output_file_path)
     
-    # Compute number of spatial units
-    n_plots = len(coords)
-    n_sp_units_test = int(n_plots * CONFIG["sp_unit_test_size"])
-    n_sp_units_train = int(n_plots * CONFIG["sp_unit_train_size"])
-    
-    logging.info(f"Generating {n_sp_units_train:,} training and {n_sp_units_test:,} test spatial units...")
-    
     # Generate training data
     logging.info("Compiling training data...")
     train_data = run_sp_unit_compilation(
         coords, obs_areas, species_matrix,
         chelsa_dem_ds, lc_ds,
-        n_sp_units=n_sp_units_train,
-        area_range=CONFIG["area_range_train"],
+        n_sp_units=500_000,
+        area_range=CONFIG["area_range"],
     )
     save_compiled_data(train_data, output_file_path, "train")
     
-    # Generate test data
-    logging.info("Compiling test data...")
-    test_data = run_sp_unit_compilation(
-        coords, obs_areas, species_matrix,
-        chelsa_dem_ds, lc_ds,
-        n_sp_units=n_sp_units_test,
-        area_range=CONFIG["area_range_test"],
-    )
-    save_compiled_data(test_data, output_file_path, "test")
-    
-    # Final summary
-    logging.info("=" * 60)
-    logging.info("Compilation complete!")
-    logging.info(f"Training samples: {len(train_data):,}")
-    logging.info(f"Test samples: {len(test_data):,}")
-    logging.info(f"Output directory: {output_file_path}")
-    logging.info("=" * 60)
