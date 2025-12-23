@@ -1,5 +1,5 @@
 """
-Memory-Efficient Species Richness Computation using cKDTree
+Specis richness compilation with numpy.
 Spatial queries optimized for large-scale biodiversity datasets.
 """
 
@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import logging
 from tqdm import tqdm
-from scipy.spatial import cKDTree
 from shapely.geometry import box
 
 from deepsar.data_processing.utils_eva import EVADataset
@@ -28,28 +27,22 @@ CONFIG = {
     "area_range": (1e4, 1e12),  # in m2
 }
 
-# =============================================================================
-# cKDTree-based Species Richness Computation
-# =============================================================================
-
-def compute_single_square_stats_ckdtree(
+def compute_single_square_stats_numpy(
     center_coords: np.ndarray,
     half_length: float,
-    kdtree: cKDTree,
     coords: np.ndarray,
     obs_areas: np.ndarray,
     species_matrix: np.ndarray,
     rng: np.random.Generator,
 ) -> tuple:
     """
-    Compute SR, observed_area, sp_unit_area for a single square using cKDTree.
+    Compute SR, observed_area, sp_unit_area for a single square.
     
     Memory-efficient implementation using spatial indexing.
     
     Args:
         center_coords: Center coordinates [x, y]
         half_length: Half side length of the square
-        kdtree: Pre-built cKDTree for spatial queries
         coords: All plot coordinates (N, 2)
         obs_areas: All observed areas (N,)
         species_matrix: Presence-absence matrix (N, M) - sparse or dense boolean
@@ -64,7 +57,6 @@ def compute_single_square_stats_ckdtree(
     minx, miny = cx - half_length, cy - half_length
     maxx, maxy = cx + half_length, cy + half_length
     
-    # Find all plots within the square using cKDTree
     # Query using rectangle bounds
     in_box = (
         (coords[:, 0] >= minx) &
@@ -122,7 +114,7 @@ def compute_single_square_stats_ckdtree(
     return observed_area, sp_unit_area, sr, geom
 
 
-def run_SR_compilation_ckdtree(
+def run_SR_compilation_numpy(
     coords: np.ndarray,
     obs_areas: np.ndarray,
     species_matrix: np.ndarray,
@@ -133,7 +125,7 @@ def run_SR_compilation_ckdtree(
     random_state: int = CONFIG["random_state"],
 ) -> gpd.GeoDataFrame:
     """
-    Compute species richness for random spatial units using cKDTree.
+    Compute species richness for random spatial units.
     
     Memory-efficient implementation that processes data in a streaming fashion
     without accumulating large intermediate arrays.
@@ -151,10 +143,6 @@ def run_SR_compilation_ckdtree(
     Returns:
         GeoDataFrame with columns: observed_area, sp_unit_area, sr, geometry
     """
-    logging.info("Building cKDTree for spatial queries...")
-    
-    # Build KD-tree for efficient spatial queries
-    kdtree = cKDTree(coords)
     
     # Initialize random generator
     rng = np.random.default_rng(random_state)
@@ -171,7 +159,7 @@ def run_SR_compilation_ckdtree(
     logging.info(f"Generating {n_sp_units} spatial units...")
     
     # Process each spatial unit one at a time (streaming approach)
-    for i in tqdm(range(n_sp_units), desc="Compiling SR (cKDTree)", disable=not verbose):
+    for i in tqdm(range(n_sp_units), desc="Compiling SR", disable=not verbose):
         # Sample center plot index (uniform over all plots)
         center_idx = rng.integers(0, n_plots)
         center_coords = coords[center_idx]
@@ -183,10 +171,9 @@ def run_SR_compilation_ckdtree(
         half_length = np.sqrt(area) / 2
         
         # Compute stats for this spatial unit
-        obs_area, sp_unit_area, sr, geom = compute_single_square_stats_ckdtree(
+        obs_area, sp_unit_area, sr, geom = compute_single_square_stats_numpy(
             center_coords,
             half_length,
-            kdtree,
             coords,
             obs_areas,
             species_matrix,
@@ -224,12 +211,15 @@ def run_SR_compilation_ckdtree(
 
 
 if __name__ == "__main__":
-    logging.info("Starting test of cKDTree-based species richness computation...")
     
     # Load EVA dataset
     logging.info("Loading EVA data...")
     eva_dataset = EVADataset()
-    coords, obs_areas, species_matrix, all_species = eva_dataset.load_species_matrix()
+    df = eva_dataset.load_species_matrix()
+    coords = np.column_stack((df.geometry.x, df.geometry.y))
+    obs_areas = df['observed_area'].values
+    species_list = df.attrs['species_list']
+    species_matrix = df[species_list].values
     logging.info(f"Loaded {len(coords):,} plots with {species_matrix.shape[1]:,} species")
     
     # Load environmental features (optional, for context)
@@ -241,16 +231,14 @@ if __name__ == "__main__":
     # Test 1: Single square computation
     logging.info("\n=== Test 1: Single square computation ===")
     
-    kdtree = cKDTree(coords)
     rng = np.random.default_rng(42)
     
     test_center_idx = 0
     test_half_length = 5000.0  # 5km half-length -> 10km x 10km square
     
-    obs_area, sp_unit_area, sr, geom = compute_single_square_stats_ckdtree(
+    obs_area, sp_unit_area, sr, geom = compute_single_square_stats_numpy(
         coords[test_center_idx],
         test_half_length,
-        kdtree,
         coords,
         obs_areas,
         species_matrix,
@@ -271,7 +259,7 @@ if __name__ == "__main__":
     n_test_sp_units = 10000
     area_range = (1e4, 1e8)  # Smaller range for quick test
     
-    test_gdf = run_SR_compilation_ckdtree(
+    test_gdf = run_SR_compilation_numpy(
         coords=coords,
         obs_areas=obs_areas,
         species_matrix=species_matrix,
