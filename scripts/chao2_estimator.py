@@ -47,7 +47,7 @@ CONFIG["run_folder"].mkdir(parents=True, exist_ok=True)
 def load_and_preprocess_data():
     logging.info("Loading EVA data...")
     eva_dataset, eva_species_dict = EVADataset().load()
-    eva_dataset = eva_dataset.set_index("plot_id")
+    eva_dataset = eva_dataset.set_index("record_id")
     eva_dataset = eva_dataset.to_crs(CONFIG["crs"])
     
     logging.info("Loading GIFT data...")

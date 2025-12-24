@@ -11,7 +11,7 @@ BASE_DIR = Path(os.getenv('DEEPSAR_DATA_DIR', Path(__file__).parent.parent.paren
 
 # Default paths with environment variable support
 CHELSA_PATH = Path(os.getenv('CHELSA_PATH', BASE_DIR / 'raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio'))
-DEM_PATH = Path(os.getenv('DEM_PATH', BASE_DIR / 'raw/EEA_DEM/eudem_dem_3035_europe_100m.tif'))
+DEM_PATH = Path(os.getenv('DEM_PATH', BASE_DIR / 'raw/EEA_DEM/eudem_dem_3035_europe_1000m.tif'))
 LC_PATH = Path(os.getenv('LC_PATH', BASE_DIR / 'raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif'))
 CACHE_DIR = Path(os.getenv('CACHE_DIR', BASE_DIR / 'processed/environmental_features'))
 
@@ -140,6 +140,7 @@ class EnvironmentalFeatureDataset():
         with rioxarray.open_rasterio(self.dem_path, mask_and_scale=True) as da:
             dem_da = da.sel(band=1, drop=True)
             dem_ds = xr.Dataset({'elevation': dem_da})
+            dem_ds.rio.write_crs(dem_da.rio.crs, inplace=True)
             
             # Optimize encoding: float32 for data and coordinates, with compression
             encoding = self._get_optimized_encoding(dem_ds, dtype='float32')
@@ -176,7 +177,7 @@ class EnvironmentalFeatureDataset():
         
         with rioxarray.open_rasterio(self.lc_path, mask_and_scale=True) as da:
             lc_da = da.sel(band=1, drop=True)
-            lc_da = lc_da.rio.reproject_match(ref_da, resampling=Resampling.nearest).astype(np.int16)
+            lc_da = lc_da.rio.reproject_match(ref_da, resampling=Resampling.mode).astype(np.int16)
             
             # Extract unique landcover classes from the raster
             print("Extracting unique landcover classes from raster...")

@@ -205,14 +205,13 @@ if __name__ == "__main__":
     eva_dataset = EVADataset()
     df = eva_dataset.load_species_matrix()
 
-    n_test_sp_units = 10000
-    area_range = (1e4, 1e8)  # Smaller range for quick test
+    n_test_sp_units = 1000
+    area_range = (100**2, 8e5**2)
     
     test_gdf = run_SR_compilation_ckdtree(
         df=df,
         n_sp_units=n_test_sp_units,
         area_range=area_range,
-        crs="EPSG:3035",
         verbose=True,
         random_state=42,
     )
@@ -230,7 +229,8 @@ if __name__ == "__main__":
     lc_stats = compute_polygon_landcover_stats(bounds, lc_ds, num_classes)
     
     # Test parallel compilation
+    env_features = list(env_ds.data_vars) #+ ["landcover"]
     logging.info("Testing parallel compilation...")
     result_gdf = run_environmental_features_compilation_parallel(
-        test_gdf, env_ds, lc_ds, list(env_ds.data_vars), num_workers=100
+        test_gdf, env_ds, lc_ds, env_features, num_workers=100
     )

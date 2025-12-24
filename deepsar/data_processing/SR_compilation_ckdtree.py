@@ -14,23 +14,6 @@ from scipy.spatial import cKDTree
 
 from deepsar.data_processing.utils_eva import EVADataset
 
-# Initialize logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-# Configuration
-CONFIG = {
-    "crs": "EPSG:3035",
-    "verbose": True,
-    "random_state": 42,
-    "area_range": (1e4, 1e12),  # in m2
-}
-
-# =============================================================================
-# cKDTree-based Species Richness Computation
-# =============================================================================
-
 def compute_single_square_stats_ckdtree(
     center_coords: np.ndarray,
     half_length: float,
@@ -138,9 +121,8 @@ def run_SR_compilation_ckdtree(
     df: gpd.GeoDataFrame,
     n_sp_units: int,
     area_range: tuple,
-    crs: str = CONFIG["crs"],
-    verbose: bool = CONFIG["verbose"],
-    random_state: int = CONFIG["random_state"],
+    verbose: bool = True,
+    random_state: int = 42,
 ) -> gpd.GeoDataFrame:
     """
     Compute species richness for random spatial units using cKDTree.
@@ -152,7 +134,6 @@ def run_SR_compilation_ckdtree(
         df: GeoDataFrame containing plot data (geometry, observed_area, species columns)
         n_sp_units: Number of spatial units to generate
         area_range: Tuple of (min_area, max_area) for random squares
-        crs: Coordinate reference system
         verbose: Whether to show progress bar
         random_state: Random seed
         
@@ -219,7 +200,6 @@ def run_SR_compilation_ckdtree(
             "sr": srs,
         },
         geometry=geometries,
-        crs=crs,
     )
     
     # Filter out any squares with sr=0
@@ -268,7 +248,6 @@ if __name__ == "__main__":
         df=df,
         n_sp_units=n_test_sp_units,
         area_range=area_range,
-        crs=CONFIG["crs"],
         verbose=True,
         random_state=42,
     )

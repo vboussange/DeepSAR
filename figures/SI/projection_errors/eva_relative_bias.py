@@ -11,7 +11,7 @@ from deepsar.plotting import CMAP_GO
 def load_data(config_path):
     """Load and preprocess evaluation and GIFT datasets."""
     eva_dataset = gpd.read_parquet(config_path)
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["megaplot_area"]) #TODO: change, legacy name
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"]) #TODO: change, legacy name
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
 
     return eva_dataset

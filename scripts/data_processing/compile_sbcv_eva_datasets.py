@@ -1,10 +1,10 @@
 """
-Compiles training samples based on EVA and CHELSA data using Spatial Block Cross-Validation.
+Compiles training samples based on EVA and environmental feature data using Spatial Block Cross-Validation.
 
-This script generates training data for species-area relationship models by:
+This script generates training data by:
 1. Loading EVA species data.
 2. Assigning spatial blocks (checkerboard) to each plot.
-3. Splitting data into 5 folds based on spatial blocks.
+3. Splitting data into `n_splits` folds based on spatial blocks.
 4. For each fold:
     - Generating random spatial units (polygons) for training (using training plots).
     - Generating random spatial units (polygons) for testing (using testing plots).
@@ -14,7 +14,6 @@ This script generates training data for species-area relationship models by:
 """
 
 import geopandas as gpd
-import pandas as pd
 from pathlib import Path
 import numpy as np
 import xarray as xr
@@ -51,14 +50,14 @@ CONFIG = {
         "elevation",
         "landcover",
     ],
-    "area_range": (1e4, 1e8),  # in m2
-    "crs": "EPSG:3035",
+    "spunit_area_range_test": (2e3**2, 1e5**2),  # in m2
+    "spunit_area_range_train": (2e3**2, 1e6**2),  # in m2
     "random_state": 2,
     "verbose": True,
-    "num_workers": 100,  # number of parallel workers for climate compilation
-    "n_splits": 5,
-    "block_size": 10_000, # Block size in meters (e.g., 10km)
-    "ratio_samples_plots": 0.01, # ratio of genrated train/val/test samples to raw plots
+    "num_workers": 100,  # number of parallel workers for env feature compilation
+    "n_splits": 5, # number of spatial folds
+    "block_size": 20_000, # Block size in meters (e.g., 20km x 20km)
+    "ratio_samples_plots": 0.1, # ratio of genrated train/val/test samples to raw plots
 }
 
 def assign_checkerboard_folds(gdf, n_splits=5, block_size=10000):
@@ -93,7 +92,6 @@ def run_sp_unit_compilation(
     lc_raster: xr.Dataset,
     n_sp_units: int,
     area_range: tuple,
-    crs: str = CONFIG["crs"],
     verbose: bool = CONFIG["verbose"],
     env_var_names: list = CONFIG["env_vars"],
 ) -> gpd.GeoDataFrame:
@@ -102,7 +100,7 @@ def run_sp_unit_compilation(
     """
     # Step 1: Generate spatial units and compute SR
     sp_unit_data = run_SR_compilation_ckdtree(
-        df, n_sp_units, area_range, crs, verbose=verbose
+        df, n_sp_units, area_range, verbose=verbose
     )
     
     # Step 2: Validate SR
@@ -110,7 +108,7 @@ def run_sp_unit_compilation(
     
     # Step 3: Extract environmental features
     sp_unit_data = run_environmental_features_compilation_parallel(
-        sp_unit_data, env_raster, lc_raster, env_var_names, verbose=verbose
+        sp_unit_data, env_raster, lc_raster, env_var_names, num_workers=CONFIG["num_workers"], verbose=verbose
     )
     
     return sp_unit_data
@@ -135,11 +133,12 @@ def save_compiled_data(
     # Also save a lightweight summary
     summary_path = output_path / f"{filename}_summary.json"
     summary = {
+        "ratio_samples_plots": CONFIG["ratio_samples_plots"],
+        "environmental_variables": CONFIG["env_vars"],
         "n_samples": len(sp_unit_data),
         "columns": list(sp_unit_data.columns),
         "sr_range": [int(sp_unit_data.sr.min()), int(sp_unit_data.sr.max())],
-        "area_range": [float(sp_unit_data.sp_unit_area.min()), float(sp_unit_data.sp_unit_area.max())],
-        "crs": str(sp_unit_data.crs),
+        "spunit_area_range": [float(sp_unit_data.sp_unit_area.min()), float(sp_unit_data.sp_unit_area.max())],
     }
     with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=2)
@@ -194,7 +193,7 @@ if __name__ == "__main__":
             train_df,
             chelsa_dem_ds, lc_ds,
             n_sp_units=int(CONFIG["ratio_samples_plots"] * len(train_df)),
-            area_range=CONFIG["area_range"],
+            area_range=CONFIG["spunit_area_range_train"],
             env_var_names=CONFIG["env_vars"],
         )
         save_compiled_data(train_data, output_file_path, f"fold_{fold_id}_train")
@@ -205,7 +204,7 @@ if __name__ == "__main__":
             val_df,
             chelsa_dem_ds, lc_ds,
             n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
-            area_range=CONFIG["area_range"],
+            area_range=CONFIG["spunit_area_range_train"],
             env_var_names=CONFIG["env_vars"],
         )
         save_compiled_data(val_data, output_file_path, f"fold_{fold_id}_val")
@@ -216,7 +215,7 @@ if __name__ == "__main__":
             test_df,
             chelsa_dem_ds, lc_ds,
             n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)), # Smaller test set
-            area_range=CONFIG["area_range"],
+            area_range=CONFIG["spunit_area_range_test"],
             env_var_names=CONFIG["env_vars"],
         )
         save_compiled_data(test_data, output_file_path, f"fold_{fold_id}_test")

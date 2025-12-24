@@ -45,20 +45,9 @@ class EVADataset:
 
     def read_species_data(self):
         species_dataframe_path = self.data_dir / "anonymised/species_data.parquet"
-        species_dict_path = self.data_dir / "anonymised/species_data.json"
-        if species_dict_path.exists():
-            with open(species_dict_path, 'r') as f:
-                species_dict = {int(k): v for k, v in json.load(f).items()}
-                return species_dict
-        elif species_dataframe_path.exists():
-            species_dict = {}
+        if species_dataframe_path.exists():
             species_df = pd.read_parquet(species_dataframe_path)
-            species_gdf = species_df.groupby("record_id")
-            species_dict = {}
-            for k, v in tqdm(species_gdf, desc="Processing species data"):
-                species_dict[k] = list(v["anonymised_species_name"].unique())
-            json.dump(species_dict, open(species_dict_path, "w"))
-            return species_dict
+            return species_df
         else:
             raise FileNotFoundError(f"Anonymised species data not found in {self.data_dir / 'anonymised'}. Did you download/anonymise the data?")
     
@@ -69,18 +58,6 @@ class EVADataset:
             return plot_data
         else:
             raise FileNotFoundError(f"Plot data not found at {plot_data_file}. Did you download/anonymise the data?")
-
-    def load_species_dict(self):
-        """Load plot and species data.
-        
-        Returns:
-            tuple: (plot_gdf, species_dict) where:
-                - plot_gdf: GeoDataFrame with plot metadata and geometry
-                - species_dict: dict mapping record_id to list of species names
-        """
-        plot_data = self.read_plot_data()
-        species_data = self.read_species_data()
-        return plot_data, species_data
     
     def load_species_matrix(self, use_cache=True):
         """
@@ -109,7 +86,8 @@ class EVADataset:
             return df
         
         print("Loading plot and species data...")
-        plot_gdf, species_dict = self.load_species_dict()
+        plot_gdf = self.read_plot_data()
+        species_df = self.read_species_data()
         
         coords = np.column_stack((
                 plot_gdf.geometry.x.values,
@@ -125,37 +103,31 @@ class EVADataset:
         # 3. Vectorize Species Data (One-Hot / Presence-Absence Matrix)
         print("Building species presence-absence matrix...")
         
-        # Get all unique species across the dataset and sort for reproducibility
-        all_species = sorted(set(
-            species 
-            for species_list in species_dict.values() 
-            for species in species_list
-        ))
+        # Get all unique species (sorted for consistent ordering)
+        all_species = sorted(species_df['anonymised_species_name'].unique().tolist())
         species_to_idx = {sp: i for i, sp in enumerate(all_species)}
         
+        # Get record_id to row index mapping from plot_gdf
+        record_ids = plot_gdf['record_id'].values
+        record_id_to_row = {rid: i for i, rid in enumerate(record_ids)}
+        
+        # Initialize sparse-friendly approach: build COO-style indices
         n_plots = len(plot_gdf)
         n_species = len(all_species)
-        print(f"Dataset size: {n_plots:,} plots × {n_species:,} species")
         
-        # Create binary matrix (N_plots x N_species) using bool for memory efficiency
-        species_matrix = np.zeros((n_plots, n_species), dtype=bool)
+        # Filter species_df to only include records in plot_gdf
+        species_df_filtered = species_df[species_df['record_id'].isin(record_id_to_row)]
         
-        # Fill matrix efficiently
-        if hasattr(plot_gdf, 'index'):
-            if 'record_id' in plot_gdf.columns:
-                plot_ids = plot_gdf['record_id'].tolist()
-            else:
-                plot_ids = plot_gdf.index.tolist()
-        else:
-            plot_ids = list(range(len(plot_gdf)))
+        # Map record_ids and species to indices
+        row_indices = species_df_filtered['record_id'].map(record_id_to_row).values
+        col_indices = species_df_filtered['anonymised_species_name'].map(species_to_idx).values
         
-        print("Filling species matrix (this may take a moment)...")
-        for row_idx, record_id in enumerate(tqdm(plot_ids, desc="Processing plots")):
-            if record_id in species_dict:
-                species_list = species_dict[record_id]
-                sp_indices = [species_to_idx[sp] for sp in species_list if sp in species_to_idx]
-                if sp_indices:
-                    species_matrix[row_idx, sp_indices] = True
+        # Build presence-absence matrix efficiently using numpy advanced indexing
+        species_matrix = np.zeros((n_plots, n_species), dtype=np.bool_)
+        species_matrix[row_indices, col_indices] = True
+        
+        print(f"  Matrix shape: {species_matrix.shape} ({n_plots} plots × {n_species} species)")
+        print(f"  Sparsity: {100 * (1 - species_matrix.sum() / species_matrix.size):.2f}%")
         
         # Construct DataFrame
         df = pd.DataFrame({
@@ -198,9 +170,10 @@ if __name__ == "__main__":
     # test EvaDataset
     dataset = EVADataset()
     df_sp = dataset.read_species_data()
-    plot_data, species_dict = dataset.load_species_dict()
-    df = dataset.load_species_matrix()
+    plot_data = dataset.read_plot_data()
+    df = dataset.load_species_matrix(use_cache=True)
     coords = np.column_stack((df.geometry.x, df.geometry.y))
     obs_areas = df['area_m2'].values
     species_list = df.attrs['species_list']
     species_matrix = df[species_list].values
+    print(f"Loaded {len(df)} plots with {len(species_list)} species")
