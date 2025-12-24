@@ -32,7 +32,6 @@ class BenchmarkConfig:
     climate_variables: list = field(
         default_factory=lambda: []
     )
-    run_name: str = ""
     path_sbcv_data: Path = None
     path_gift_data: Path = None
 
@@ -70,6 +69,7 @@ class Benchmarker:
         # Load GIFT once
         self.gift_df = gpd.read_parquet(self.gift_path)
         self.gift_df["log_observed_area"] = np.log(self.gift_df["observed_area"])
+        self.gift_df["log_sp_unit_area"] = np.log(self.gift_df["sp_unit_area"])
         self.gift_df.dropna(inplace=True)
 
     def _train(self, model, train_loader, val_loader, loss_fn, device):
@@ -156,6 +156,7 @@ class Benchmarker:
             # Preprocess (log area)
             for df in [train_df, val_df, test_df]:
                 df["log_observed_area"] = np.log(df["observed_area"])
+                df["log_sp_unit_area"] = np.log(df["sp_unit_area"])
                 # Ensure feature columns exist and handle NaNs
                 df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
                 
@@ -185,7 +186,7 @@ class Benchmarker:
                 )
                 
                 # Initialize model
-                model = model_init(feature_names=feature_names, feature_scaler=feature_scaler, target_scaler=target_scaler)
+                model = model_init(feature_scaler=feature_scaler, target_scaler=target_scaler)
                 loss_fn = torch.nn.MSELoss() # Default loss
                 
                 # Train

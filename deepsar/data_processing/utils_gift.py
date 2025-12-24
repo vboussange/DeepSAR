@@ -1,53 +1,129 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import pairwise_distances
 from pathlib import Path
-from math import radians
 import geopandas as gpd
 from tqdm import tqdm
-import pickle
-import xarray as xr
-import json
 
-from deepsar.data_processing.utils_landcover import EUNISDataset
-
-GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/preprocessing/unfiltered"
+# Default base paths
+GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/anonymised/"
 
 class GIFTDataset:
+    """
+    Loader and preprocessor for GIFT (Global Inventory of Floras and Traits) vegetation plot data.
+    
+    Handles loading of species occurrence data and plot metadata, with efficient
+    preprocessing for large-scale datasets.
+    """
+    
     def __init__(self, data_dir=GIFT_DATA_DIR):
-        self.data_dir = data_dir
+        self.data_dir = Path(data_dir)
+        
+        # Cache path for preprocessed arrays
+        self.preprocessed_cache = self.data_dir / "preprocessed_cache.parquet"
 
     def read_species_data(self):
+        """Load GIFT species data from parquet file."""
         species_dataframe_path = self.data_dir / "species_data.parquet"
-        species_dict_path = self.data_dir / "species_data.json"
-        if species_dict_path.exists():
-            with open(species_dict_path, 'r') as f:
-                species_dict = {int(k): v for k, v in json.load(f).items()}
-                return species_dict
-        elif species_dataframe_path.exists():
-            species_dict = {}
+        if species_dataframe_path.exists():
             species_df = pd.read_parquet(species_dataframe_path)
-            species_gdf = species_df.groupby("entity_ID")
-            species_dict = {}
-            for k, v in tqdm(species_gdf, desc="Processing species data"):
-                species_dict[k] = list(v["gift_matched_species_name"].unique())
-            json.dump(species_dict, open(species_dict_path, "w"))
-            return species_dict
+            return species_df
         else:
-            raise FileNotFoundError("Anoymised species data not found, did you download/anonymise the data?")
+            raise FileNotFoundError(f"Species data not found at {species_dataframe_path}. Did you preprocess the data?")
     
     def read_plot_data(self):
-        plot_data_file = self.data_dir / "plot_data.gpkg"
+        """Load GIFT plot data from parquet file."""
+        plot_data_file = self.data_dir / "plot_data.parquet"
         if plot_data_file.exists():
-            return gpd.read_file(plot_data_file)
+            plot_data = gpd.read_parquet(plot_data_file)
+            return plot_data
         else:
-            raise FileNotFoundError(f"Plot data at {GIFT_DATA_DIR.resolve()} not found, did you download/anonymise the data?")
+            raise FileNotFoundError(f"Plot data not found at {plot_data_file}. Did you preprocess the data?")
 
-    def load(self):
-            plot_data = self.read_plot_data()
-            species_data = self.read_species_data()
-            return plot_data, species_data
+    def load_species_matrix(self, use_cache=True):
+        """
+        Converts plot data and species data into a single DataFrame with presence-absence matrix.
+        Optimized for large datasets.
+        
+        Args:
+            use_cache: Whether to use cached preprocessed data if available (default: True).
+        
+        Returns:
+            gpd.GeoDataFrame: DataFrame containing:
+                - geometry: Polygon geometry
+                - area_m2: float32
+                - species columns: bool presence/absence for each species
+                - species_list: list of species names (stored in attrs)
+        """
+        # Check cache first
+        if use_cache and self.preprocessed_cache.exists():
+            print(f"Loading preprocessed data from cache: {self.preprocessed_cache}")
+            df = gpd.read_parquet(self.preprocessed_cache)
+            
+            # Identify species columns (all columns except geometry and area_m2)
+            species_list = [col for col in df.columns if col not in ['geometry', 'area_m2']]
+            df.attrs['species_list'] = species_list
+            
+            return df
+        
+        print("Loading plot and species data...")
+        plot_gdf = self.read_plot_data()
+        species_df = self.read_species_data()
+        
+        # Extract metadata
+        if 'area_m2' not in plot_gdf.columns:
+            plot_gdf['area_m2'] = plot_gdf.geometry.area
+        
+        # Build species presence-absence matrix
+        print("Building species presence-absence matrix...")
+        
+        # Get all unique species (sorted for consistent ordering)
+        all_species = sorted(species_df['anonymised_species_name'].unique().tolist())
+        species_to_idx = {sp: i for i, sp in enumerate(all_species)}
+        
+        # Get record_id to row index mapping from plot_gdf
+        record_ids = plot_gdf['record_id'].values
+        record_id_to_row = {pid: i for i, pid in enumerate(record_ids)}
+        
+        # Initialize presence-absence matrix
+        n_plots = len(plot_gdf)
+        n_species = len(all_species)
+        
+        # Filter species_df to only include plots in plot_gdf
+        species_df_filtered = species_df[species_df['record_id'].isin(record_id_to_row)]
+        
+        # Map record_ids and species to indices
+        row_indices = species_df_filtered['record_id'].map(record_id_to_row).values
+        col_indices = species_df_filtered['anonymised_species_name'].map(species_to_idx).values
+        
+        # Build presence-absence matrix efficiently using numpy advanced indexing
+        species_matrix = np.zeros((n_plots, n_species), dtype=np.bool_)
+        species_matrix[row_indices, col_indices] = True
+        
+        print(f"  Matrix shape: {species_matrix.shape} ({n_plots} plots × {n_species} species)")
+        print(f"  Sparsity: {100 * (1 - species_matrix.sum() / species_matrix.size):.2f}%")
+        
+        # Add species columns
+        species_df_matrix = pd.DataFrame(species_matrix, columns=all_species, index=plot_gdf.index)
+        df = pd.concat([plot_gdf, species_df_matrix], axis=1)
+        
+        df.attrs['species_list'] = all_species
+        
+        # Cache the preprocessed data
+        if use_cache:
+            self.preprocessed_cache.parent.mkdir(parents=True, exist_ok=True)
+            print(f"Caching preprocessed data to {self.preprocessed_cache}")
+            df.to_parquet(self.preprocessed_cache, index=False)
+            print(f"✓ Cache saved ({self.preprocessed_cache.stat().st_size / 1e6:.1f} MB)")
+        
+        return df
         
 if __name__ == "__main__":
     dataset = GIFTDataset()
-    dataset.load()
+    plot_data = dataset.read_plot_data()
+    species_data = dataset.read_species_data()
+    df = dataset.load_species_matrix()
+    
+    obs_areas = df['area_m2'].values
+    species_list = df.attrs['species_list']
+    species_matrix = df[species_list].values
+    print(f"Loaded {len(df)} plots with {len(species_list)} species")

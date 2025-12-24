@@ -21,7 +21,9 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
-HASH = "0b85791"
+EXPERIMENT_NAME = "test"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/GIFT_test_samples/384b9c9/compiled_data.parquet"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/5c8274a"
 
 def setup_logger():
     log = logging.getLogger("benchmark")
@@ -71,9 +73,8 @@ if __name__ == "__main__":
     root_folder.mkdir(parents=True, exist_ok=True)
     
     config = BenchmarkConfig(devices=devices,
-                             hash_data=HASH,
-                             run_folder = root_folder,
-                             run_name="benchmark_" + HASH)
+                             path_gift_data= GIFT_SAMPLES_PATH,
+                             path_sbcv_data= SBCV_SAMPLES_PATH,)
     
     # Inspect one file to get feature names
     sbcv_path = config.path_sbcv_data
@@ -95,7 +96,6 @@ if __name__ == "__main__":
         
     except StopIteration:
         logger.error(f"No training files found in {sbcv_path}. Cannot determine features.")
-        sys.exit(1)
 
     experiments = []
     

@@ -17,6 +17,7 @@ dependencies = [
     "pandas>=2.3.1",
     "pathlib>=1.0.1",
     "pyarrow>=20.0.0",
+    "pytorch-lightning>=2.6.0",
     "rioxarray>=0.19.0",
     "scikit-learn>=1.7.0",
     "scipy>=1.16.0",
