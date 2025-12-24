@@ -1,10 +1,16 @@
 Execute files as follows to obtain training datasets:
 
-1. eva_preprocessing.py
-2. gift_preprocessing.py
-3. anonymisation.py
+1. `eva_preprocessing.py`: Preprocess EVA data.
+2. `gift_preprocessing.py`: Preprocess GIFT data.
+3. `anonymise_gift_eva.py`: Anonymize species names in both datasets.
 
-- for spatial block cross-validation EVA datasets:
-    - `compile_sbcv_datasets.py`
-- for GIFT test datasets:
+To generate training/testing datasets:
+
+- For Spatial Block Cross-Validation (SBCV) EVA datasets:
+    - `compile_sbcv_eva_datasets.py`
+
+- For GIFT test datasets (augmented with climate data):
     - `compile_gift_chelsa.py`
+
+- For Simple Cross-Validation (CV) EVA datasets (legacy):
+    - `compile_cv_eva_datasets.py`
