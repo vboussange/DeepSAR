@@ -4,7 +4,6 @@ from pathlib import Path
 import geopandas as gpd
 from tqdm import tqdm
 import json
-import os
 
 # Default base paths with environment variable support
 EVA_DATA_DIR = Path(__file__).parent / "../../data/processed/EVA/"
@@ -29,22 +28,7 @@ def extract_habitat_lev1(ESyhab: str):
             return ESyhab[0]
         else:
             return None
-
-# 🔍 Example usage
-examples = [
-    'R5',       # → 'R'
-    'Sa',       # → None
-    'T',        # → None
-    'S21',      # → 'S'
-    'S21, R23', # → 'S' (both valid, returns first)
-    'Sa, T5',   # → 'T' (only T5 is valid)
-    'ab, Cd',   # → 'C' (Cd is valid)
-    'a',        # → None
-]
-result = [extract_habitat_lev1(x) for x in examples]
-assert result == ['R', None, "T", 'S', 'S', 'T', None, None], f"Unexpected result: {result}"
-
-
+        
 class EVADataset:
     """
     Loader and preprocessor for EVA (European Vegetation Archive) vegetation plot data.
@@ -69,7 +53,7 @@ class EVADataset:
         elif species_dataframe_path.exists():
             species_dict = {}
             species_df = pd.read_parquet(species_dataframe_path)
-            species_gdf = species_df.groupby("plot_id")
+            species_gdf = species_df.groupby("record_id")
             species_dict = {}
             for k, v in tqdm(species_gdf, desc="Processing species data"):
                 species_dict[k] = list(v["anonymised_species_name"].unique())
@@ -92,7 +76,7 @@ class EVADataset:
         Returns:
             tuple: (plot_gdf, species_dict) where:
                 - plot_gdf: GeoDataFrame with plot metadata and geometry
-                - species_dict: dict mapping plot_id to list of species names
+                - species_dict: dict mapping record_id to list of species names
         """
         plot_data = self.read_plot_data()
         species_data = self.read_species_data()
@@ -158,17 +142,17 @@ class EVADataset:
         
         # Fill matrix efficiently
         if hasattr(plot_gdf, 'index'):
-            if 'plot_id' in plot_gdf.columns:
-                plot_ids = plot_gdf['plot_id'].tolist()
+            if 'record_id' in plot_gdf.columns:
+                plot_ids = plot_gdf['record_id'].tolist()
             else:
                 plot_ids = plot_gdf.index.tolist()
         else:
             plot_ids = list(range(len(plot_gdf)))
         
         print("Filling species matrix (this may take a moment)...")
-        for row_idx, plot_id in enumerate(tqdm(plot_ids, desc="Processing plots")):
-            if plot_id in species_dict:
-                species_list = species_dict[plot_id]
+        for row_idx, record_id in enumerate(tqdm(plot_ids, desc="Processing plots")):
+            if record_id in species_dict:
+                species_list = species_dict[record_id]
                 sp_indices = [species_to_idx[sp] for sp in species_list if sp in species_to_idx]
                 if sp_indices:
                     species_matrix[row_idx, sp_indices] = True
@@ -196,6 +180,22 @@ class EVADataset:
         return df
 
 if __name__ == "__main__":
+    # test `extract_habitat_lev1`
+    
+    examples = [
+        'R5',       # → 'R'
+        'Sa',       # → None
+        'T',        # → None
+        'S21',      # → 'S'
+        'S21, R23', # → 'S' (both valid, returns first)
+        'Sa, T5',   # → 'T' (only T5 is valid)
+        'ab, Cd',   # → 'C' (Cd is valid)
+        'a',        # → None
+    ]
+    result = [extract_habitat_lev1(x) for x in examples]
+    assert result == ['R', None, "T", 'S', 'S', 'T', None, None], f"Unexpected result: {result}"
+    
+    # test EvaDataset
     dataset = EVADataset()
     df_sp = dataset.read_species_data()
     plot_data, species_dict = dataset.load_species_dict()

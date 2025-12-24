@@ -45,7 +45,7 @@ class EnvironmentalFeatureDataset():
         self.dem_cache = self.cache_dir / 'dem_cache.nc'
         self.lc_cache = self.cache_dir / 'landcover_cache.nc'        
 
-    def load(self, use_cache=False):
+    def load(self, use_cache=True):
         """
         Loads and combines environmental raster data into a single xarray Dataset.
         

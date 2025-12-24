@@ -14,7 +14,7 @@ from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
-from deepsar.data_processing.utils_eunis import extract_habitat_lev1
+from deepsar.data_processing.utils_eva import extract_habitat_lev1
 
 # Constants
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     eva_species_df, gift_species_df, eva_plot_df = load_data()
     
     # For testing purposes, uncomment
-    eva_species_df = eva_species_df.sample(1000, random_state=12)
+    # eva_species_df = eva_species_df.sample(1000, random_state=12)
     
     # --- Process Plots ---
     eva_plot_df = clean_eva_plots(eva_plot_df)
