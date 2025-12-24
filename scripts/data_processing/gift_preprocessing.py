@@ -41,7 +41,7 @@ if __name__ == "__main__":
     eva_species_df = pd.read_parquet(PROCESSED_EVA_DATA / "species_data.parquet")
     gift_species_df = pd.read_csv(RAW_GIFT_DATA / "species_data.csv")
     gift_plot_df = gpd.read_file(RAW_GIFT_DATA / "plot_data.gpkg")
-    eva_plot_df = gpd.read_file(PROCESSED_EVA_DATA / "plot_data.gpkg")
+    eva_plot_df = gpd.read_parquet(PROCESSED_EVA_DATA / "plot_data.parquet")
     eunis = EUNISDataset()
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)

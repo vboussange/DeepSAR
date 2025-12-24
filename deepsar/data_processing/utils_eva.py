@@ -9,6 +9,42 @@ import os
 # Default base paths with environment variable support
 EVA_DATA_DIR = Path(__file__).parent / "../../data/processed/EVA/"
 
+def extract_habitat_lev1(ESyhab: str):
+    def is_valid(s: str) -> bool:
+        if len(s) >= 2:
+            return s[1].isdigit() and s[0].isupper()
+        elif len(s) == 1:
+            return s.isupper()
+        return False
+
+    if ',' in ESyhab:
+        parts = [part.strip() for part in ESyhab.split(',')]
+        valid_parts = [p for p in parts if is_valid(p)]
+        if valid_parts:
+            return valid_parts[0][0]
+        else:
+            return None
+    else:
+        if is_valid(ESyhab):
+            return ESyhab[0]
+        else:
+            return None
+
+# 🔍 Example usage
+examples = [
+    'R5',       # → 'R'
+    'Sa',       # → None
+    'T',        # → None
+    'S21',      # → 'S'
+    'S21, R23', # → 'S' (both valid, returns first)
+    'Sa, T5',   # → 'T' (only T5 is valid)
+    'ab, Cd',   # → 'C' (Cd is valid)
+    'a',        # → None
+]
+result = [extract_habitat_lev1(x) for x in examples]
+assert result == ['R', None, "T", 'S', 'S', 'T', None, None], f"Unexpected result: {result}"
+
+
 class EVADataset:
     """
     Loader and preprocessor for EVA (European Vegetation Archive) vegetation plot data.

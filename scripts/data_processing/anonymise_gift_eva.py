@@ -75,7 +75,6 @@ if gift_species_df['anonymised_species_name'].isna().any():
     raise ValueError("Some species in GIFT dataset could not be anonymized. Check for missing mappings in spid_dict.")
 
 
-#
 gift_plot_df["area_m2"] = gift_plot_df.geometry.area
 gift_plot_df = gift_plot_df.rename(columns={'entity_ID': 'plot_id'}) # to save: plot_id, area_m2, geometry
 gift_species_df = gift_species_df.rename(columns={'entity_ID': 'plot_id'}) # to save: plot_id, anonymised_species_name

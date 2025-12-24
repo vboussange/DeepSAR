@@ -1,22 +1,7 @@
 """
 Compiles training samples based on EVA and CHELSA data using Simple Cross-Validation (Random Split).
 
-This script generates training data for species-area relationship models by:
-1. Loading EVA species data.
-2. Assigning random folds to each plot.
-3. Splitting data into 5 folds.
-4. For each fold:
-    - Generating random spatial units (polygons) for training (using training plots).
-    - Generating random spatial units (polygons) for testing (using testing plots).
-    - Computing species richness within each polygon.
-    - Extracting environmental feature statistics.
-    - Saving the datasets.
-
-Optimized for large-scale datasets using:
-- JAX for vectorized species richness computations
-- Dask for parallel raster processing  
-- Memory-efficient one-hot encoding for landcover
-- GeoParquet for efficient storage
+NOTE: this script is currently not in use; we prefer spatial block CV (see compile_sbcv_datasets.py)
 """
 
 import geopandas as gpd

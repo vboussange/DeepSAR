@@ -3,4 +3,8 @@ Execute files as follows to obtain training datasets:
 1. eva_preprocessing.py
 2. gift_preprocessing.py
 3. anonymisation.py
-4. compile_XX.py
+
+- for spatial block cross-validation EVA datasets:
+    - `compile_sbcv_datasets.py`
+- for GIFT test datasets:
+    - `compile_gift_chelsa.py`

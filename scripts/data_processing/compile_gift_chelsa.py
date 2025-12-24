@@ -2,13 +2,6 @@
 Compiles GIFT checklists for different habitat types with climate predictors.
 """
 
-# 1. Assign each EVA species a habitat
-# 2. Retrieve GIFT data
-# 3. For each habitat
-#       - filter out species based on EVA species, 
-#       - Calculate SR
-#       - calculate associated climate vars
-
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
@@ -20,11 +13,7 @@ import warnings
 
 from deepsar.data_processing.utils_gift import GIFTDataset
 from deepsar.data_processing.utils_features import CHELSADataset
-from deepsar.data_processing.utils_eunis import EUNISDataset, get_fraction_habitat_landcover
-from deepsar.utils import save_to_pickle
-from deepsar.data_processing.utils_polygons import (
-    partition_polygon_gdf,
-)
+
 import git
 import random
 
@@ -71,7 +60,7 @@ def load_and_preprocess_data():
     Load and preprocess GIFT and climate data.
     Returns processed GIFT and climate datasets.
     """
-    logging.info("Loading EVA data...")
+    logging.info("Loading GIFT data...")
     plot_gdf = gpd.read_file(CONFIG["gift_data_dir"] / "plot_data.gpkg")
     species_df = pd.read_parquet(CONFIG["gift_data_dir"] / "species_data.parquet")
     

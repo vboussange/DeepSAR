@@ -5,12 +5,11 @@ dataframes `species_data` and `plot_data`.
 """
 import pandas as pd
 import re
-import numpy as np
 from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
-from deepsar.data_processing.utils_eunis import extract_habitat_lev1
+from deepsar.data_processing.utils_eva import extract_habitat_lev1
 
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/species_data.csv"
@@ -127,13 +126,20 @@ def clean_eva_plots(plot_gdf):
     print("Filtering for recording date")
     plot_gdf = plot_gdf[
         (plot_gdf.recording_date.isna()) |
-        (plot_gdf.recording_date.dt.year.between(1975, 2025))
+        (plot_gdf.recording_date.dt.year.between(1972, 2025))
     ]
 
     return plot_gdf
     
 def load_data():
     eva_species_df = pd.read_csv(EVA_SPECIES_FILE, sep="\t", engine="python", on_bad_lines='skip')
+    eva_species_df.rename(
+        columns={"PlotObservationID": "plot_id", 
+                 "Matched GIFT name": "gift_matched_species_name", 
+                 "Cleaned name": "eva_species_name", 
+                 "Matched concept" : "eva_original_species_name",
+                 "Exact match": "exact_match"}
+    )
     gift_species_df = pd.read_csv(GIFT_CHECKLIST_FILE)
     eva_plot_df = pd.read_csv(Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_header.csv",
                             header=0,
@@ -159,6 +165,11 @@ def load_data():
                                 "Date of recording": "recording_date"
                             }, inplace=True)
 
+    eva_plot_df["geometry"] = gpd.points_from_xy(
+        eva_plot_df.longitude, eva_plot_df.latitude, crs="EPSG:4326"
+    )
+    eva_plot_df = gpd.GeoDataFrame(eva_plot_df, geometry="geometry", crs="EPSG:4326")
+    eva_plot_df["recording_date"] = pd.to_datetime(eva_plot_df["recording_date"], format="%d.%m.%Y", errors='coerce')
     
     return eva_species_df, gift_species_df, eva_plot_df
     
@@ -167,6 +178,12 @@ if __name__ == "__main__":
     # for testing purposes
     # eva_species_df = eva_species_df.sample(1000, random_state=42)
 
+    # EVA plot processing
+    # Clean eva plots
+    eva_plot_df = clean_eva_plots(eva_plot_df)
+    # filtering species against plots selected
+    eva_species_df = eva_species_df[eva_species_df.plot_id.isin(eva_plot_df.plot_id.unique())]
+    
     # EVA SPECIES PROCESSING
     # Filtering vascular plants
     eva_vascular_df = eva_species_df[eva_species_df["Taxon group"] == "Vascular plant"].copy()
@@ -175,31 +192,31 @@ if __name__ == "__main__":
     print(f"Original dataset species count: {eva_species_df['Matched concept'].nunique()}")
     
     # Create a unique dataset of species entries to process
-    unique_species_df = eva_vascular_df[FIELDS_PRIORITY].drop_duplicates()
-    unique_species_df["Cleaned name"] = unique_species_df["Matched concept"].apply(clean_species_name)
+    eva_backbone = eva_vascular_df[FIELDS_PRIORITY].drop_duplicates()
+    eva_backbone["Cleaned name"] = eva_backbone["Matched concept"].apply(clean_species_name)
     
     # Preparing GIFT species set
     gift_species_set = set(gift_species_df["work_species"].dropna().apply(clean_species_name).unique())
     
     # Filtering out all non resolved species level entries
     gift_species_set = {sp for sp in gift_species_set if "spec." not in sp}
-    unique_species_df = unique_species_df[~unique_species_df["Cleaned name"].str.contains("spec.", regex=False)]
-    print(f"Unique species combinations to process: {len(unique_species_df)}")
+    eva_backbone = eva_backbone[~eva_backbone["Cleaned name"].str.contains("spec.", regex=False)]
+    print(f"Unique species combinations to process: {len(eva_backbone)}")
     
     # Matching with GIFT names on the unique dataset only
     tqdm.pandas(desc="Matching unique species")
     # Apply function and unpack tuple result into separate columns
-    result_tuples = unique_species_df.progress_apply(
+    result_tuples = eva_backbone.progress_apply(
         lambda row: find_best_match(row, gift_species_set), axis=1
     )
     
     # Extract the matched name and exact match flag from the tuples
-    unique_species_df["Matched GIFT name"] = result_tuples.apply(lambda x: x[0])
-    unique_species_df["Exact match"] = result_tuples.apply(lambda x: x[1])
+    eva_backbone["Matched GIFT name"] = result_tuples.apply(lambda x: x[0])
+    eva_backbone["Exact match"] = result_tuples.apply(lambda x: x[1])
     
     # Merge the matched names back to the full dataset
     eva_vascular_df = eva_vascular_df.merge(
-        unique_species_df[FIELDS_PRIORITY + ["Matched GIFT name", "Cleaned name", "Exact match"]], 
+        eva_backbone[FIELDS_PRIORITY + ["Matched GIFT name", "Cleaned name", "Exact match"]], 
         on=FIELDS_PRIORITY, 
         how="left",
     )
@@ -208,45 +225,26 @@ if __name__ == "__main__":
     eva_vascular_df = eva_vascular_df[~eva_vascular_df["Matched GIFT name"].isna()]
     
     # Logging unmatched cases
-    total_eva_species = unique_species_df['Cleaned name'].nunique()
-    print(f"Exact match: {unique_species_df.drop_duplicates(subset=['Cleaned name'])['Exact match'].sum()} / {total_eva_species}")
+    total_eva_species = eva_backbone['Cleaned name'].nunique()
+    print(f"Exact match: {eva_backbone.drop_duplicates(subset=['Cleaned name'])['Exact match'].sum()} / {total_eva_species}")
     
     # Match summary
     # Normally, nunique(Matched GIFT name) should be equal to nunique(Cleaned name)
-    matched_unique_species = unique_species_df[unique_species_df["Matched GIFT name"] != "NA"]["Cleaned name"].nunique()
+    matched_unique_species = eva_backbone[eva_backbone["Matched GIFT name"] != "NA"]["Cleaned name"].nunique()
     print(f"Approximate match: {matched_unique_species} / {total_eva_species}")
     
     # Output DataFrame
-    eva_species_preprocessed = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]].rename(
-        columns={"PlotObservationID": "plot_id", 
-                 "Matched GIFT name": "gift_matched_species_name", 
-                 "Cleaned name": "eva_species_name", 
-                 "Matched concept" : "eva_original_species_name",
-                 "Exact match": "exact_match"}
-    )
+    eva_species_preprocessed = eva_vascular_df[["PlotObservationID", "Matched GIFT name", "Matched concept", "Cleaned name", "Exact match"]]
     # Convert plot_id column to integer type
     eva_species_preprocessed["plot_id"] = eva_species_preprocessed["plot_id"].astype(int)
     
     # ensure that the merged dataframe has the same number of species as the backbone
-    assert eva_species_preprocessed["eva_species_name"].nunique() == unique_species_df["Cleaned name"].nunique()
-    
-    # EVA PLOTS PROCESING
-    # cleaning the EVA plot data
-    eva_plot_df["geometry"] = gpd.points_from_xy(
-        eva_plot_df.longitude, eva_plot_df.latitude, crs="EPSG:4326"
-    )
-    eva_plot_df = gpd.GeoDataFrame(eva_plot_df, geometry="geometry", crs="EPSG:4326")
-    # Convert date strings to datetime objects
-    eva_plot_df["recording_date"] = pd.to_datetime(eva_plot_df["recording_date"], format="%d.%m.%Y", errors='coerce')
-    eva_plot_df = clean_eva_plots(eva_plot_df)
-
-    # filtering species against plots selected
-    eva_species_preprocessed = eva_species_preprocessed[eva_species_preprocessed.plot_id.isin(eva_plot_df.plot_id.unique())]
-    
-    # filtering eva plots against species selected
+    assert eva_species_preprocessed["eva_species_name"].nunique() == eva_backbone["Cleaned name"].nunique()
+        
+    # Removing plots without any matched species
     eva_plot_df = eva_plot_df[eva_plot_df.plot_id.isin(eva_species_preprocessed.plot_id.unique())]
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
     eva_species_preprocessed.to_parquet(OUTPUT_FOLDER / 'species_data.parquet', index=False)
     print(f"\nSaved {len(eva_species_preprocessed)} matched entries to {OUTPUT_FOLDER / 'species_data.parquet'}")
-    eva_plot_df.to_file(OUTPUT_FOLDER / "plot_data.gpkg", driver="GPKG")
+    eva_plot_df.to_parquet(OUTPUT_FOLDER / "plot_data.parquet", index=False)
