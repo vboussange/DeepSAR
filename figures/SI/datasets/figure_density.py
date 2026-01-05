@@ -12,7 +12,7 @@ from scipy.ndimage import gaussian_filter
 
 def load_and_preprocess_data():
     plot_gdf, _ = EVADataset().load()
-    plot_gdf = plot_gdf.set_index("plot_id")
+    plot_gdf = plot_gdf.set_index("record_id")
     plot_gdf = plot_gdf.to_crs("EPSG:3035")
     return plot_gdf
 

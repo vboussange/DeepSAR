@@ -56,7 +56,7 @@ def load_data_and_model():
     checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
     config = checkpoint["config"]
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["megaplot_area"])
+    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
     test_data = eva_dataset[eva_dataset["test"]]

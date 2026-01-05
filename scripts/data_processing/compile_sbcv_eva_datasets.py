@@ -57,7 +57,7 @@ CONFIG = {
     "num_workers": 100,  # number of parallel workers for env feature compilation
     "n_splits": 5, # number of spatial folds
     "block_size": 20_000, # Block size in meters (e.g., 20km x 20km)
-    "ratio_samples_plots": 0.1, # ratio of genrated train/val/test samples to raw plots
+    "ratio_samples_plots": 0.1, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 
 def assign_checkerboard_folds(gdf, n_splits=5, block_size=10000):

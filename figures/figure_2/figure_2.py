@@ -271,7 +271,7 @@ if __name__ == "__main__":
     # Load EVA dataset
     # Load and prepare data
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["sp_unit_area"] = eva_dataset["megaplot_area"] # TODO: legacy name, to change
+    eva_dataset["sp_unit_area"] = eva_dataset["sp_unit_area"] # TODO: legacy name, to change
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     
@@ -310,7 +310,7 @@ if __name__ == "__main__":
     
     # Load GIFT dataset
     gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
-    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["megaplot_area"]) # TODO: legacy name, to change
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"]) # TODO: legacy name, to change
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
