@@ -50,14 +50,14 @@ CONFIG = {
         "elevation",
         "landcover",
     ],
-    "spunit_area_range_test": (2e3**2, 1e5**2),  # in m2
+    "spunit_area_range_test": (2e3**2, 2e4**2),  # in m2
     "spunit_area_range_train": (2e3**2, 1e6**2),  # in m2
     "random_state": 2,
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
-    "n_splits": 5, # number of spatial folds
+    "n_splits": 5, # number of spatial folds, should be >=3
     "block_size": 20_000, # Block size in meters (e.g., 20km x 20km)
-    "ratio_samples_plots": 0.1, # ratio of genrated train/val/test samples to raw plots, should be ~1
+    "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 
 def assign_checkerboard_folds(gdf, n_splits=5, block_size=10000):
