@@ -137,6 +137,7 @@ class Benchmarker:
         for fold_id in range(5):
             # Load data
             train_path = self.sbcv_path / f"fold_{fold_id}_train.parquet"
+            val_path = self.sbcv_path / f"fold_{fold_id}_val.parquet"
             test_path = self.sbcv_path / f"fold_{fold_id}_test.parquet"
             
             if not train_path.exists() or not test_path.exists():
@@ -144,14 +145,12 @@ class Benchmarker:
                 continue
                 
             train_df = gpd.read_parquet(train_path)
+            val_df = gpd.read_parquet(val_path)
             test_df = gpd.read_parquet(test_path)
             
             # Subsample training data if needed
             if train_frac < 1.0:
                 train_df = train_df.sample(frac=train_frac, random_state=self.config.seed)
-            
-            # Split train into train/val
-            train_df, val_df = train_test_split(train_df, test_size=self.config.val_size, random_state=self.config.seed)
             
             # Preprocess (log area)
             for df in [train_df, val_df, test_df]:
@@ -164,58 +163,54 @@ class Benchmarker:
             gift_df = self.gift_df.copy()
             gift_df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
 
-            # Run multiple runs for this fold
-            for run_id in range(self.nruns):
-                device = self.devices[run_id % len(self.devices)]
-                
-                # Create dataloaders
-                train_loader, feature_scaler, target_scaler = create_dataloader(
-                    train_df, feature_names, self.config.batch_size, self.config.num_workers
-                )
-                val_loader, _, _ = create_dataloader(
-                    val_df, feature_names, self.config.batch_size, self.config.num_workers, 
-                    feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
-                )
-                test_loader_interp, _, _ = create_dataloader(
-                    test_df, feature_names, self.config.batch_size, self.config.num_workers,
-                    feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
-                )
-                test_loader_extrap, _, _ = create_dataloader(
-                    gift_df, feature_names, self.config.batch_size, self.config.num_workers,
-                    feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
-                )
-                
-                # Initialize model
-                model = model_init(feature_scaler=feature_scaler, target_scaler=target_scaler)
-                loss_fn = torch.nn.MSELoss() # Default loss
-                
-                # Train
-                lit_model = self._train(model, train_loader, val_loader, loss_fn, device)
-                
-                # Evaluate (Interpolation)
-                y_true_interp, y_pred_interp = self._evaluate(lit_model, test_loader_interp, device)
-                
-                # Evaluate (Extrapolation)
-                y_true_extrap, y_pred_extrap = self._evaluate(lit_model, test_loader_extrap, device)
-                
-                # Metrics
-                metrics_interp = self._compute_metrics(y_true_interp, y_pred_interp)
-                metrics_extrap = self._compute_metrics(y_true_extrap, y_pred_extrap)
-                
-                # Combine results
-                combined_metrics = {
-                    "experiment": experiment_name,
-                    "fold": fold_id,
-                    "run": run_id,
-                    "train_frac": train_frac,
-                    "n_train_samples": len(train_df)
-                }
-                
-                for k, v in metrics_interp.items():
-                    combined_metrics[f"interp_{k}"] = v
-                for k, v in metrics_extrap.items():
-                    combined_metrics[f"extrap_{k}"] = v
-                    
-                results.append(combined_metrics)
+            device = self.devices[fold_id % len(self.devices)]
+            
+            # Create dataloaders
+            train_loader, feature_scaler, target_scaler = create_dataloader(
+                train_df, feature_names, self.config.batch_size, self.config.num_workers
+            )
+            val_loader, _, _ = create_dataloader(
+                val_df, feature_names, self.config.batch_size, self.config.num_workers, 
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+            )
+            test_loader_interp, _, _ = create_dataloader(
+                test_df, feature_names, self.config.batch_size, self.config.num_workers,
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+            )
+            test_loader_extrap, _, _ = create_dataloader(
+                gift_df, feature_names, self.config.batch_size, self.config.num_workers,
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+            )
+            
+            # Initialize model
+            model = model_init(feature_scaler=feature_scaler, target_scaler=target_scaler)
+            loss_fn = torch.nn.MSELoss() # Default loss
+            
+            # Train
+            lit_model = self._train(model, train_loader, val_loader, loss_fn, device)
+            
+            # Evaluate (Interpolation)
+            y_true_interp, y_pred_interp = self._evaluate(lit_model, test_loader_interp, device)
+            
+            # Evaluate (Extrapolation)
+            y_true_extrap, y_pred_extrap = self._evaluate(lit_model, test_loader_extrap, device)
+            
+            # Metrics
+            metrics_interp = self._compute_metrics(y_true_interp, y_pred_interp)
+            metrics_extrap = self._compute_metrics(y_true_extrap, y_pred_extrap)
+            
+            # Combine results
+            combined_metrics = {
+                "experiment": experiment_name,
+                "fold": fold_id,
+                "train_frac": train_frac,
+                "n_train_samples": len(train_df)
+            }
+            
+            for k, v in metrics_interp.items():
+                combined_metrics[f"interp_{k}"] = v
+            for k, v in metrics_extrap.items():
+                combined_metrics[f"extrap_{k}"] = v
+            results.append(combined_metrics)    
                 
         return pd.DataFrame(results)

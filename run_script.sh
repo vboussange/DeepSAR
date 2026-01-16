@@ -19,5 +19,5 @@ echo "Launching script for $namesim"
 chmod +x $file
 # source /home/boussang/miniforge3/bin/activate /home/boussang/SAR_modelling/.env-torch
 
-nohup python $file > "stdout/${namesim}.out" 2>&1 &
+nohup uv run python $file > "stdout/${namesim}.out" 2>&1 &
 echo $! > "stdout/${namesim}_save_pid.txt"

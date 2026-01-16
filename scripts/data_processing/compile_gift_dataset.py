@@ -29,7 +29,7 @@ numba_logger = logging.getLogger("numba")
 numba_logger.setLevel(logging.WARNING)
 
 CONFIG = {
-    "output_base_dir": Path(__file__).parent / "../../data/processed/GIFT_test_samples/",
+    "output_base_dir": Path(__file__).parent / "../../data/processed/test_samples_GIFT/",
     "env_vars": [
         "bio1",
         "pet_penman_mean",

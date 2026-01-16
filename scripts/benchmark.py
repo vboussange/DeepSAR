@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 EXPERIMENT_NAME = "test"
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/GIFT_test_samples/384b9c9/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/5c8274a"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/606e055/compiled_data.parquet"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
 
 def setup_logger():
     log = logging.getLogger("benchmark")
@@ -74,7 +74,9 @@ if __name__ == "__main__":
     
     config = BenchmarkConfig(devices=devices,
                              path_gift_data= GIFT_SAMPLES_PATH,
-                             path_sbcv_data= SBCV_SAMPLES_PATH,)
+                             path_sbcv_data= SBCV_SAMPLES_PATH,
+                             n_epochs=1, # todo: change back to 100
+                             )
     
     # Inspect one file to get feature names
     sbcv_path = config.path_sbcv_data

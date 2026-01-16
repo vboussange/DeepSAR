@@ -21,14 +21,14 @@ from deepsar.utils import symmetric_arch
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-HASH = "0b85791"
+HASH = "606e055"
 
 def train_fold(config, fold_id, feature_names):
     logger.info(f"Training Fold {fold_id}...")
     pl.seed_everything(config.seed + fold_id)
     
     train_path = config.cv_data_path / f"fold_{fold_id}_train.parquet"
-    val_path = config.cv_data_path / f"fold_{fold_id}_test.parquet"
+    val_path = config.cv_data_path / f"fold_{fold_id}_val.parquet"
     
     if not train_path.exists() or not val_path.exists():
         logger.warning(f"Fold {fold_id} data not found. Skipping.")
