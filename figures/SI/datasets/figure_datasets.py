@@ -1,63 +1,56 @@
 """Plotting species richness against area and coverage for EVA and GIFT datasets."""
 
-import torch
 from pathlib import Path
-import seaborn as sns
 import matplotlib.pyplot as plt
-import pandas as pd
 import geopandas as gpd
 import numpy as np
 
 from deepsar.plotting import CMAP_BR
 
-# Assuming load_preprocessed_data is already defined
-MODEL_NAME = "deep4pweibull_basearch6_0b85791"
+SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "606e055"
+GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "606e055" / "compiled_data.parquet"
+
+FOLD_ID = 0
 
 def load_data():
-    
-    # Load model and data for EVA predictions
-    path_results = Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
-        
-    # Load model results
-    result_modelling = torch.load(path_results, map_location="cpu")
-    config = result_modelling["config"]
+    root = Path(__file__).parents[3]
 
-    # Load EVA dataset
-    eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
-    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_dataset["coverage"] = eva_dataset["log_observed_area"] / eva_dataset["log_sp_unit_area"]
-    eva_dataset = eva_dataset.sample(n=5000, random_state=42)  # Sample 1000 points for visualization
-    gift_data_dir = Path("../../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
+    # Load train dataset from SBCV fold
+    train_path = SBCV_PATH / f"fold_{FOLD_ID}_train.parquet"
+    train_dataset = gpd.read_parquet(train_path)
+    train_dataset["log_sp_unit_area"] = np.log(train_dataset["sp_unit_area"])
+    train_dataset["log_observed_area"] = np.log(train_dataset["observed_area"])
+    train_dataset["coverage"] = train_dataset["log_observed_area"] / train_dataset["log_sp_unit_area"]
+    train_dataset = train_dataset.sample(n=5000, random_state=42)  # Sample 1000 points for visualization
     
     # Load GIFT dataset
-    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+    gift_dataset = gpd.read_parquet(GIFT_PATH)
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
     
     # Calculate log-transformed species richness (log_sr) for both datasets
-    eva_dataset["log_sr"] = np.log(eva_dataset["sr"])
+    train_dataset["log_sr"] = np.log(train_dataset["sr"])
     gift_dataset["log_sr"] = np.log(gift_dataset["sr"])
     
-    return eva_dataset, gift_dataset
+    return train_dataset, gift_dataset
 
 
 if __name__ == "__main__":
-    eva_dataset, gift_dataset = load_data()
+    train_dataset, gift_dataset = load_data()
     colors = ["#f72585","#4cc9f0"]
     
     fig, ax = plt.subplots(figsize=(6, 4))
 
-    # Plot EVA dataset
+    # Plot train dataset
     scatter = ax.scatter(
-        np.exp(eva_dataset["log_sp_unit_area"]) / 1e6,
-        np.exp(eva_dataset["log_sr"]),
-        c=eva_dataset["coverage"],
+        np.exp(train_dataset["log_sp_unit_area"]) / 1e6,
+        np.exp(train_dataset["log_sr"]),
+        c=train_dataset["coverage"],
         cmap=CMAP_BR,
         alpha=0.6,
         vmax = 1,
-        label="EVA Dataset",
+        label="Train Dataset",
         s=10
     )
     # Add a colorbar to indicate log_observed_area

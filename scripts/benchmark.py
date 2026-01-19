@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 EXPERIMENT_NAME = "test"
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/606e055/compiled_data.parquet"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
 
 def setup_logger():
@@ -62,43 +62,32 @@ class MLPInit():
         return WrappedMLP(len(self.feature_names) + 1, self.architecture, **kwargs)
 
 if __name__ == "__main__":
-    if torch.cuda.is_available():
-        devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-    elif torch.backends.mps.is_available():
-        devices = ["mps"]
-    else:
-        devices = ["cpu"]
-        
     root_folder = Path(__file__).parent / Path('results', 'benchmark')
     root_folder.mkdir(parents=True, exist_ok=True)
     
-    config = BenchmarkConfig(devices=devices,
-                             path_gift_data= GIFT_SAMPLES_PATH,
+    config = BenchmarkConfig(path_gift_data= GIFT_SAMPLES_PATH,
                              path_sbcv_data= SBCV_SAMPLES_PATH,
-                            #  n_epochs=1, # todo: change back to 100
+                             n_epochs=1, # todo: change back to 100
                              )
     
     # Inspect one file to get feature names
-    sbcv_path = config.path_sbcv_data
-    try:
-        sample_file = next(sbcv_path.glob("*_train.parquet"))
-        df = gpd.read_parquet(sample_file)
+    sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
+    df = gpd.read_parquet(sample_file)
+    
+    # Identify features
+    climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
+    dem_feats = ["elevation", "std_elevation"]
+    lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
+    
+    # Filter to what is actually present
+    climate_feats = [c for c in climate_feats if c in df.columns]
+    dem_feats = [c for c in dem_feats if c in df.columns]
+    
+    climate_dem_feats = climate_feats + dem_feats
+    landcover_feats = lc_feats
+    all_env_feats = climate_dem_feats + landcover_feats
+    logger.info(f"Identified features: {len(all_env_feats)} environmental features.")
         
-        # Identify features
-        climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
-        dem_feats = ["elevation", "std_elevation"]
-        lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
-        
-        # Filter to what is actually present
-        climate_feats = [c for c in climate_feats if c in df.columns]
-        dem_feats = [c for c in dem_feats if c in df.columns]
-        
-        all_env_feats = climate_feats + dem_feats + lc_feats
-        logger.info(f"Identified features: {len(all_env_feats)} environmental features.")
-        
-    except StopIteration:
-        logger.error(f"No training files found in {sbcv_path}. Cannot determine features.")
-
     experiments = []
     
     # 1. DeepSAR Area Only
@@ -109,7 +98,23 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 2. DeepSAR All Env
+    # 2. DeepSAR Climate+DEM
+    experiments.append({
+        "name": "DeepSAR_ClimateDEM",
+        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats),
+        "feature_names": climate_dem_feats,
+        "train_frac": 1.0
+    })
+
+    # 3. DeepSAR Landcover only
+    experiments.append({
+        "name": "DeepSAR_Landcover",
+        "model_init": Deep4PWeibullInit(feature_names=landcover_feats),
+        "feature_names": landcover_feats,
+        "train_frac": 1.0
+    })
+
+    # 4. DeepSAR All Env
     experiments.append({
         "name": "DeepSAR_Env",
         "model_init": Deep4PWeibullInit(feature_names=all_env_feats),
@@ -117,7 +122,23 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 3. DeepSAR All Env + Area
+    # 5. DeepSAR Climate+DEM + Area
+    experiments.append({
+        "name": "DeepSAR_ClimateDEM_Area",
+        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "feature_names": climate_dem_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+
+    # 6. DeepSAR Landcover + Area
+    experiments.append({
+        "name": "DeepSAR_Landcover_Area",
+        "model_init": Deep4PWeibullInit(feature_names=landcover_feats + ["log_sp_unit_area"]),
+        "feature_names": landcover_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+
+    # 7. DeepSAR All Env + Area
     experiments.append({
         "name": "DeepSAR_All",
         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
@@ -125,7 +146,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 4. Varying training samples (on All Env + Area)
+    # 8. Varying training samples (on All Env + Area)
     for frac in [0.1, 0.5]:
         experiments.append({
             "name": f"DeepSAR_All_frac_{frac}",
@@ -134,7 +155,7 @@ if __name__ == "__main__":
             "train_frac": frac
         })
         
-    # 5. Varying architecture (on All Env + Area)
+    # 9. Varying architecture (on All Env + Area)
     # Base 64
     experiments.append({
         "name": "DeepSAR_All_Base64",
@@ -144,7 +165,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 6. MLP (on All Env + Area)
+    # 10. MLP (on All Env + Area)
     experiments.append({
         "name": "MLP_All",
         "model_init": MLPInit(feature_names=all_env_feats + ["log_sp_unit_area"]),

@@ -18,8 +18,8 @@ from deepsar.dataset import create_dataloader
 from deepsar.deep4pweibull import Deep4PWeibull
 
 # Debug configuration (edit if needed)
-RUN_DIR = Path("6b92846")
-GIFT_PATH = Path(__file__).parent / "../../../data/processed/test_samples_GIFT/606e055/compiled_data.parquet"
+RUN_DIR = Path("6dcd90c")
+GIFT_PATH = Path(__file__).parent / "../../../data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 def _load_checkpoint(path: Path, device: str) -> dict:
@@ -102,9 +102,6 @@ def _plot_scatter(ax, y_true, y_pred, title: str):
 if __name__ == "__main__":
 
     checkpoint_paths = sorted(RUN_DIR.glob("fold_*.pth"))
-    if not checkpoint_paths:
-        raise FileNotFoundError(f"No fold_*.pth files found in {RUN_DIR}")
-
     out_dir = RUN_DIR / "debug_plots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -127,6 +124,7 @@ if __name__ == "__main__":
         val_df = _prepare_df(val_df, feature_names)
         test_df = _prepare_df(test_df, feature_names)
         gift_df = _prepare_df(gift_df, feature_names)
+        gift_df["log_observed_area"] = 1e2
 
         train_loader = _build_loader(
             train_df,

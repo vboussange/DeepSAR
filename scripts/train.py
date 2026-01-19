@@ -61,7 +61,7 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     # Determine accelerator
     if torch.cuda.is_available():
         accelerator = "gpu"
-        devices = 1 # torch.cuda.device_count()
+        devices = 1 # TODO: you could set this to torch.cuda.device_count()
     elif torch.backends.mps.is_available():
         accelerator = "mps"
         devices = 1
@@ -96,7 +96,7 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
 
 if __name__ == "__main__":
     config = TrainConfig(sbcv_path=SBCV_SAMPLES_PATH,
-                         num_workers=4,)
+                         num_workers=4)
     
     sample_file = next(config.sbcv_path.glob("*_train.parquet"))
     df = gpd.read_parquet(sample_file)

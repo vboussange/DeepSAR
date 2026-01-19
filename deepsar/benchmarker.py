@@ -20,12 +20,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 class BenchmarkConfig:
     devices: list = field(default_factory=lambda: [])
     seed: int = 1
-    nruns: int = 5
-    hash_data: str = ""
     batch_size: int = 1024
     num_workers: int = 0
     n_epochs: int = 100
-    val_size: float = 0.1
     lr: float = 3e-4
     weight_decay: float = 1e-4
     lr_scheduler_factor: float = 0.5
@@ -37,25 +34,13 @@ class BenchmarkConfig:
     path_gift_data: Path = None
 
     def __post_init__(self):
-        root = Path(__file__).parent
-        if self.path_sbcv_data is None:
-            self.path_sbcv_data = (
-                root
-                / "../data"
-                / "processed"
-                / "training_samples"
-                / "sbcv"
-                / self.hash_data
-            )
-        if self.path_gift_data is None:
-            self.path_gift_data = (
-                root
-                / "../data"
-                / "processed"
-                / "GIFT_CHELSA_compilation"
-                / "6c2d61d" # TODO: make this configurable or dynamic
-                / "sp_unit_data.parquet"
-            )
+        if not self.devices:
+            if torch.cuda.is_available():
+                self.devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
+            elif torch.backends.mps.is_available():
+                self.devices = ["mps"]
+            else:
+                self.devices = ["cpu"]
 
 
 class Benchmarker:
@@ -63,7 +48,6 @@ class Benchmarker:
         self.config = config
         pl.seed_everything(config.seed)
         self.devices = config.devices
-        self.nruns = config.nruns
         self.sbcv_path = config.path_sbcv_data
         self.gift_path = config.path_gift_data
         

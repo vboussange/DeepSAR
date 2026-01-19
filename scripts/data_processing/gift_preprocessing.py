@@ -52,6 +52,9 @@ if __name__ == "__main__":
     species_eva = set(eva_species_df.species_name.unique())
     species_gift = set(gift_species_df['species_name'].unique())
     assert species_eva.issubset(species_gift), "Not all EVA species are present in GIFT dataset"
+    # Filter GIFT to only EVA species
+    gift_species_df = gift_species_df[gift_species_df["species_name"].isin(species_eva)]
+    print(f"Filtered GIFT species to only those present in EVA: {len(gift_species_df['species_name'].unique())} species remaining.")
 
     # Crop plots to extent
     print("Cropping plot_gdf to the extent of climate_raster...")
