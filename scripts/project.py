@@ -144,7 +144,7 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     lc_ds = lc_ds.rio.write_crs("EPSG:3035")
 
     countries_gdf = gpd.read_file(COUNTRY_DATA)
-    eva_countries_gdf = countries_gdf[countries_gdf["SOVEREIGNT"].isin(COUNTRY_LIST)]
+    eva_countries_gdf = countries_gdf[countries_gdf["NAME_EN"].isin(COUNTRY_LIST)]
     if eva_countries_gdf.crs != "EPSG:3035":
         eva_countries_gdf = eva_countries_gdf.to_crs("EPSG:3035")
 

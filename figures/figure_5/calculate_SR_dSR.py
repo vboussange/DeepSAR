@@ -1,21 +1,21 @@
 """
-Projecting spatially MLP and saving to geotiff files.
+Projecting spatially the predictions of an ensembled `Deep4PWeibull` model,
+and saving SR, std_SR, dSR/dlogA and std_dSR/dlogA to geotiffs.
 """
 import torch
 import numpy as np
 import xarray as xr
-
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.colors import LinearSegmentedColormap
-
 from pathlib import Path
-from deepsar.data_processing.utils_features import CHELSADataset
-from deepsar.deep4pweibull import Deep4PWeibull
 import pandas as pd
 from tqdm import tqdm
+import geopandas as gpd
 
-from deepsar.ensemble_trainer import EnsembleConfig
+from deepsar.deep4pweibull import Deep4PWeibull
+from deepsar.ensemble_model import DeepSAREnsembleModel
+from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
+from deepsar.plotting import CMAP_BR
+
+from data_processing.eva_preprocessing import COUNTRY_DATA, COUNTRY_LIST
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -43,26 +43,43 @@ def plot_raster(rast, label, ax, cmap, vmin=None, vmax=None):
         ax.set_ylabel("")
         
         
-def coarsen_climate_data(climate_dataset, ncells):
-    """Coarsen climate data to specified resolution."""
-    coarse = climate_dataset.coarsen(x=ncells, y=ncells, boundary="trim")
+def create_features(model, env_dataset, lc_dataset, res):
+    # see: https://docs.xarray.dev/en/stable/generated/xarray.DataArray.coarsen.html
+    resolution = abs(env_dataset.rio.resolution()[0])
+    ncells = max(1, int(res / resolution))
+
+    # determine which environmental variables are needed
+    env_vars = [
+        v for v in env_dataset.data_vars
+        if (v in model.feature_names) or (f"std_{v}" in model.feature_names)
+    ]
+    env_subset = env_dataset[env_vars]
+    coarse = env_subset.coarsen(x=ncells, y=ncells, boundary="trim")
+
     coarse_mean = coarse.mean().rio.write_crs("EPSG:3035")
     coarse_std = coarse.std().rio.write_crs("EPSG:3035")
-    return coarse_mean, coarse_std
-
-def create_features(predictor_labels, coarse_mean, coarse_std, res):
-    """Create features dataframe from coarsened climate data."""
-    
     df_mean = coarse_mean.to_dataframe()
     df_std = coarse_std.to_dataframe()
     df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
-    X_map = pd.concat([df_mean, df_std], axis=1)
-    
+
+    mean_cols = [c for c in df_mean.columns if c in model.feature_names]
+    std_cols = [c for c in df_std.columns if c in model.feature_names]
+    X_map = pd.concat([df_mean[mean_cols], df_std[std_cols]], axis=1)
+
+    # landcover fractions
+    lc_frac_cols = [c for c in model.feature_names if c.startswith("lc_frac_")]
+    if lc_frac_cols:
+        lc_da = lc_dataset["landcover"].where(lc_dataset["landcover"] >= 0)
+        for col in sorted(lc_frac_cols, key=lambda c: int(c.split("_")[-1])):
+            idx = int(col.split("_")[-1])
+            frac = (lc_da == idx).coarsen(x=ncells, y=ncells, boundary="trim").mean()
+            X_map[col] = frac.to_dataframe(name=col)[col]
+
     X_map = X_map.assign(log_sp_unit_area=np.log(res**2))
-    return X_map[predictor_labels]
+    return X_map[model.feature_names]
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_dSR_stats(model, climate_dataset, res0, batch_size=2**15):
+def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     """
     Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
     dataset at a specified resolution. dSR is obtained as a gradient of SR with
@@ -70,19 +87,13 @@ def get_SR_dSR_stats(model, climate_dataset, res0, batch_size=2**15):
     features with area.
     """
     
-    resolution = abs(climate_dataset.rio.resolution()[0])
+    resolution = abs(env_dataset.rio.resolution()[0])
     ncells0 = max(1, int(res0 / resolution))
     ncells1 = ncells0 + 1
     res1 = ncells1 * resolution
-    
-    coarse_mean0, coarse_std0 = coarsen_climate_data(climate_dataset, ncells0)
-    coarse_mean1, coarse_std1 = coarsen_climate_data(climate_dataset, ncells1)
-    # see https://github.com/corteva/rioxarray/issues/298
-    coarse_mean1 = coarse_mean1.rio.reproject_match(coarse_mean0).assign_coords(x=coarse_mean0.x, y=coarse_mean0.y)
-    coarse_std1 = coarse_std1.rio.reproject_match(coarse_std0).assign_coords(x=coarse_std0.x, y=coarse_std0.y)
 
-    features0 = create_features(model.feature_names, coarse_mean0, coarse_std0, res0)
-    features1 = create_features(model.feature_names, coarse_mean1, coarse_std1, res1)
+    features0 = create_features(model, env_dataset, lc_dataset, res0)
+    features1 = create_features(model, env_dataset, lc_dataset, res1)
 
     total_length = len(features0)
 
@@ -109,56 +120,97 @@ def get_SR_dSR_stats(model, climate_dataset, res0, batch_size=2**15):
     return features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
 
 
-def load_chelsa_and_reproject(model):
-    climate_dataset = xr.open_dataset(CHELSADataset().cache_path)
-    climate_dataset = climate_dataset[[v for v in climate_dataset.data_vars if v in model.feature_names]]
-    climate_dataset = climate_dataset.rio.reproject("EPSG:3035")
-    return climate_dataset
+def load_ensemble_from_folds(run_dir: Path, device: str = "cpu") -> DeepSAREnsembleModel:
+    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
+    if not ckpt_paths:
+        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
+
+    models = []
+    feature_names_ref = None
+    for ckpt_path in ckpt_paths:
+        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+        feature_names = checkpoint["feature_names"]
+        if feature_names_ref is None:
+            feature_names_ref = feature_names
+        else:
+            assert feature_names_ref == feature_names, "Feature names differ across folds"
+
+        config = checkpoint["config"]
+        model = Deep4PWeibull(
+            config.layer_sizes,
+            feature_names=feature_names,
+            feature_scaler=checkpoint["feature_scaler"],
+            target_scaler=checkpoint["target_scaler"],
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(device)
+        model.eval()
+        models.append(model)
+
+    ensemble = DeepSAREnsembleModel(models)
+    ensemble.eval()
+    return ensemble
+
+
+def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
+    env_features = EnvironmentalFeatureDataset()
+    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_ds = env_ds.rio.write_crs("EPSG:3035")
+    lc_ds = lc_ds.rio.write_crs("EPSG:3035")
+
+    countries_gdf = gpd.read_file(COUNTRY_DATA)
+    eva_countries_gdf = countries_gdf[countries_gdf["NAME_EN"].isin(COUNTRY_LIST)]
+    if eva_countries_gdf.crs != "EPSG:3035":
+        eva_countries_gdf = eva_countries_gdf.to_crs("EPSG:3035")
+
+    env_ds = env_ds.rio.clip(eva_countries_gdf.geometry, drop=True)
+    lc_ds = lc_ds.rio.clip(eva_countries_gdf.geometry, drop=True)
+    return env_ds, lc_ds
 
 if __name__ == "__main__":
     seed = 1
-    MODEL_NAME = "deep4pweibull_basearch6_0b85791"
     plotting = True
-    
-    projection_path = Path(__file__).parent / Path(f"projections/")
+    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "6dcd90c"
+
+    model_name = run_dir.name
+
+    projection_path = Path(__file__).parents[2] / Path(f"data/processed/projections/{model_name}")
     projection_path.mkdir(parents=True, exist_ok=True)
-    
-    path_results = Path(__file__).parent / Path(f"../../scripts/results/train/checkpoint_{MODEL_NAME}.pth")
-    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
-    
-    model = Deep4PWeibull.initialize_ensemble(checkpoint, "cuda")
-    
-    climate_dataset = load_chelsa_and_reproject(model)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = load_ensemble_from_folds(run_dir, device=device)
+    env_dataset, lc_dataset = load_environmental_features()
 
     for res in [50000, 1000]:
-    # for res in [2000]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
 
-        features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(model, climate_dataset, res)
+        features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(
+            model, env_dataset, lc_dataset, res
+        )
 
-        # Create and save rasters
         raster_configs = [
             ("SR", mean_SR, "SR"),
             ("std_SR", std_SR, "Standard Deviation of SR"),
             ("dSR_dlogA", mean_dSR_dlogA, "dSR/dlogA"),
-            ("std_dSR_dlogA", std_dSR_dlogA, "Standard Deviation of dSR/dlogA")
+            ("std_dSR_dlogA", std_dSR_dlogA, "Standard Deviation of dSR/dlogA"),
         ]
-        
+
         for raster_name, data, plot_title in raster_configs:
-            # Create and save raster
             rast = create_raster(features0, data)
-            rast.rio.to_raster(projection_path / f"{raster_name}_raster_{res:.0f}m.tif")
-                        
-            fig, ax = plt.subplots(figsize=(8, 6))
-            colors = ["#f72585","#b5179e","#7209b7","#560bad","#480ca8","#3a0ca3","#3f37c9","#4361ee","#4895ef","#4cc9f0"]
-            custom_cmap = LinearSegmentedColormap.from_list("species_richness", colors[::-1])
-            
-            rast_renamed = rast.rename(plot_title)
-            rast_renamed.plot(ax=ax, cmap=custom_cmap, vmin=rast.quantile(0.01), vmax=rast.quantile(0.99))
-            ax.set_title(f"{plot_title} - Res: {res}m")
-            
-            fig.savefig(projection_path / f"{raster_name}_raster_{MODEL_NAME}_{res:.0f}m.png", 
-                   dpi=300, bbox_inches='tight')
-            plt.close(fig)
-        
+            rast.rio.to_raster(projection_path / f"{raster_name}_raster_{model_name}_{res:.0f}m.tif")
+
+            if plotting:
+                import matplotlib.pyplot as plt
+
+                fig, ax = plt.subplots(figsize=(8, 6))
+                rast_renamed = rast.rename(plot_title)
+                rast_renamed.plot(ax=ax, cmap=CMAP_BR, vmin=rast.quantile(0.01), vmax=rast.quantile(0.99))
+                ax.set_title(f"{plot_title} - Res: {res}m")
+                fig.savefig(
+                    projection_path / f"{raster_name}_raster_{model_name}_{res:.0f}m.png",
+                    dpi=300,
+                    bbox_inches="tight",
+                )
+                plt.close(fig)
+
         print(f"Saved rasters in {projection_path}")

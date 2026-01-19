@@ -40,7 +40,7 @@ logger = setup_logger()
 @dataclass
 class Deep4PWeibullInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
+    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=128, factor=4))
     def __call__(self, **kwargs):
         return Deep4PWeibull(feature_names=self.feature_names, 
                              layer_sizes=self.architecture, 
@@ -56,7 +56,7 @@ class WrappedMLP(MLP):
 @dataclass
 class MLPInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: [128, 64, 32])
+    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=64, factor=4))
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)
         return WrappedMLP(len(self.feature_names) + 1, self.architecture, **kwargs)
@@ -67,7 +67,6 @@ if __name__ == "__main__":
     
     config = BenchmarkConfig(path_gift_data= GIFT_SAMPLES_PATH,
                              path_sbcv_data= SBCV_SAMPLES_PATH,
-                             n_epochs=1, # todo: change back to 100
                              )
     
     # Inspect one file to get feature names
@@ -90,7 +89,7 @@ if __name__ == "__main__":
         
     experiments = []
     
-    # 1. DeepSAR Area Only
+    # DeepSAR Area Only
     experiments.append({
         "name": "DeepSAR_Area",
         "model_init": Deep4PWeibullInit(feature_names=["log_sp_unit_area"]),
@@ -98,7 +97,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 2. DeepSAR Climate+DEM
+    # DeepSAR Climate+DEM
     experiments.append({
         "name": "DeepSAR_ClimateDEM",
         "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats),
@@ -106,7 +105,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
 
-    # 3. DeepSAR Landcover only
+    # DeepSAR Landcover only
     experiments.append({
         "name": "DeepSAR_Landcover",
         "model_init": Deep4PWeibullInit(feature_names=landcover_feats),
@@ -114,15 +113,23 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
 
-    # 4. DeepSAR All Env
+    # DeepSAR All Env
     experiments.append({
         "name": "DeepSAR_Env",
         "model_init": Deep4PWeibullInit(feature_names=all_env_feats),
         "feature_names": all_env_feats,
         "train_frac": 1.0
     })
+
+    # DeepSAR Climate+DEM + Landcover
+    experiments.append({
+        "name": "DeepSAR_ClimateDEM_Landcover",
+        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + landcover_feats),
+        "feature_names": climate_dem_feats + landcover_feats,
+        "train_frac": 1.0
+    })
     
-    # 5. DeepSAR Climate+DEM + Area
+    # DeepSAR Climate+DEM + Area
     experiments.append({
         "name": "DeepSAR_ClimateDEM_Area",
         "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
@@ -130,7 +137,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
 
-    # 6. DeepSAR Landcover + Area
+    # DeepSAR Landcover + Area
     experiments.append({
         "name": "DeepSAR_Landcover_Area",
         "model_init": Deep4PWeibullInit(feature_names=landcover_feats + ["log_sp_unit_area"]),
@@ -138,7 +145,7 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
 
-    # 7. DeepSAR All Env + Area
+    # DeepSAR All Env + Area
     experiments.append({
         "name": "DeepSAR_All",
         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
@@ -146,8 +153,8 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
     
-    # 8. Varying training samples (on All Env + Area)
-    for frac in [0.1, 0.5]:
+    # Varying training samples (on All Env + Area)
+    for frac in [0.01, 0.1]:
         experiments.append({
             "name": f"DeepSAR_All_frac_{frac}",
             "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
@@ -155,17 +162,17 @@ if __name__ == "__main__":
             "train_frac": frac
         })
         
-    # 9. Varying architecture (on All Env + Area)
-    # Base 64
-    experiments.append({
-        "name": "DeepSAR_All_Base64",
-        "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
-                                        architecture=symmetric_arch(6, base=64, factor=4)),
-        "feature_names": all_env_feats + ["log_sp_unit_area"],
-        "train_frac": 1.0
-    })
+    # # Varying architecture (on All Env + Area)
+    # # Base 64
+    # experiments.append({
+    #     "name": "DeepSAR_All_Base64",
+    #     "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
+    #                                     architecture=symmetric_arch(6, base=64, factor=4)),
+    #     "feature_names": all_env_feats + ["log_sp_unit_area"],
+    #     "train_frac": 1.0
+    # })
     
-    # 10. MLP (on All Env + Area)
+    # MLP (on All Env + Area)
     experiments.append({
         "name": "MLP_All",
         "model_init": MLPInit(feature_names=all_env_feats + ["log_sp_unit_area"]),

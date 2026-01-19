@@ -25,13 +25,12 @@ FIELDS_PRIORITY = ["turboveg2_concept", "matched_concept", "original_taxon_conce
 COUNTRY_DATA = Path(__file__).parent / "../../data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
 COUNTRY_LIST = [
     "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
-    "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", 
-    "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", 
+    "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Kosovo", "Latvia", 
     "Liechtenstein", "Lithuania", "Luxembourg", "North Macedonia", "Malta", 
     "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", 
-    "Portugal", "Romania", "San Marino", "Republic of Serbia", 
+    "Portugal", "Romania", "San Marino", "Serbia", 
     "Slovakia", "Slovenia", "Spain", "Sweden", 
-    "Switzerland", "Turkey", "Ukraine", "United Kingdom"
+    "Switzerland", "Ukraine", "United Kingdom", "Iceland"
 ]
 
 def clean_species_name(name):

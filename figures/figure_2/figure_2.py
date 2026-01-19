@@ -1,11 +1,11 @@
 """
-Plotting figure 2 'prediction power of climate, area, and both on SR'
-TODO: change color scheme for plotting.CMAP_BR blue and reds
+Plotting figure 2 'prediction power of climate, area, and both on SR'.
+Keeps the original experiments and correlation plots.
 """
-import torch
+import numpy as np
 import pandas as pd
 import geopandas as gpd
-import numpy as np
+import torch
 from pathlib import Path
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -15,8 +15,13 @@ from scipy.stats import ttest_ind
 from statsmodels.stats.multicomp import MultiComparison
 
 from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.benchmarker import BenchmarkConfig
+from deepsar.ensemble_model import DeepSAREnsembleModel
 from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+
+ROOT = Path(__file__).parents[2]
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results.csv"
+CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
@@ -35,7 +40,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
     output_file : str
         Path to output text file for results
     """
-    datasets = ['eva', 'gift']
+    datasets = ["interp", "extrap"]
     
     with open(output_file, "w") as file:
         print("Relative bias calculated as (predicted - observed) / observed", file=file)
@@ -80,7 +85,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
         print("=" * 60, file=file)
         
         for dataset in datasets:
-            metric_col = f"{metric}_{dataset}"
+            metric_col = f"{dataset}_{metric}"
             
             # Get available models for this dataset
             available_models = []
@@ -97,7 +102,8 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             if not available_models:
                 continue
                 
-            print(f"\n{dataset.upper()} Dataset", file=file)
+            label = "Interpolation" if dataset == "interp" else "Extrapolation"
+            print(f"\n{label} Dataset", file=file)
             print("=" * 50, file=file)
             
             # Performance summary table
@@ -117,7 +123,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             print(summary_table.to_string(index=False), file=file)
             
             # Statistical significance tests (pairwise comparisons)
-            print(f"\nPairwise Statistical Significance Tests ({dataset.upper()})", file=file)
+            print(f"\nPairwise Statistical Significance Tests ({label})", file=file)
             print("-" * 50, file=file)
             
             # Create significance matrix
@@ -150,136 +156,182 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
 
     print(f"Model performance and bias analysis saved to '{output_file}'")
 
-if __name__ == "__main__":
 
-    path_neural_weibull_results = Path(f"../../scripts/results/benchmark/deep4pweibull_basearch6_0b85791_benchmark.csv")    
-    path_chao2_results = Path(f"../../scripts/results/benchmark/chao2_estimator_benchmark.csv")    
+def load_ensemble_from_folds(run_dir: Path, device: str = "cpu") -> tuple[DeepSAREnsembleModel, object]:
+    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
+    if not ckpt_paths:
+        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
 
-    
-    # Read the data
-    df_nw = pd.read_csv(path_neural_weibull_results)
-    df_chao2 = pd.read_csv(path_chao2_results)
-    
-    # Create combined figure
+    models = []
+    feature_names_ref = None
+    config_ref = None
+    for ckpt_path in ckpt_paths:
+        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+        feature_names = checkpoint["feature_names"]
+        if feature_names_ref is None:
+            feature_names_ref = feature_names
+            config_ref = checkpoint.get("config")
+        else:
+            assert feature_names_ref == feature_names, "Feature names differ across folds"
 
-    # First two plots: boxplots for EVA and GIFT datasets
-    df_plot = pd.concat([df_nw[(df_nw.train_frac == 1.) & (df_nw.num_params > 4e5)], # TODO: to fix
-                         df_chao2], 
-                        ignore_index=True)
-    # Replace "climate" with "environment" in the model column
-    df_plot['model'] = df_plot['model'].str.replace('climate', 'environment')
-    metric = "rmse"
+        config = checkpoint["config"]
+        model = Deep4PWeibull(
+            config.layer_sizes,
+            feature_names=feature_names,
+            feature_scaler=checkpoint["feature_scaler"],
+            target_scaler=checkpoint["target_scaler"],
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(device)
+        model.eval()
+        models.append(model)
 
+    ensemble = DeepSAREnsembleModel(models)
+    ensemble.eval()
+    return ensemble, config_ref
+
+
+def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
+    df_nw = pd.read_csv(BENCHMARK_RESULTS)
+    df_chao2 = pd.read_csv(CHAO2_RESULTS)
+    return df_nw, df_chao2
+
+
+def add_performance_panels(df_deepsar: pd.DataFrame, df_chao2: pd.DataFrame, metric: str) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
-   
-    datasets = ['eva', 'gift']
-    colors = ["#f72585","#4cc9f0"]
-    
+
+    datasets = ["interp", "extrap"]
+    titles = ["Interpolation (SBCV test)", "Extrapolation (GIFT)"]
+    colors = ["#f72585", "#4cc9f0"]
     axes = [ax1, ax2]
-    
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
-        # Define models based on dataset
-        if dataset == 'eva':
-            models = ["area", "environment", "area+environment"]  # Exclude chao2_estimator for eva
+        if dataset == "interp":
+            experiments = ["area", "environment", "area+environment", "area+environment,\nnaive MLP"]
+            df_plot = df_deepsar
         else:
-            models = ["chao2_estimator", "area", "environment", "area+environment"]
-        
+            experiments = ["chao2_estimator", "area", "environment", "area+environment", "area+environment,\nnaive MLP"]
+            df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
+
         box_data = []
-        
-        for i, model in enumerate(models):
-            model_data = df_plot[df_plot['model'] == model]
-            metric_col = f"{metric}_{dataset}"
-            data = model_data[metric_col].values
+        for experiment in experiments:
+            exp_data = df_plot[df_plot["model"] == experiment]
+            metric_col = f"{dataset}_{metric}"
+            data = exp_data[metric_col].values
             box_data.append(data)
 
-        # Create box plots
         bplot = ax.boxplot(box_data, patch_artist=True, widths=0.6, showfliers=False)
-        
-        # Add individual data points
+
         color = colors[j]
         for i, data in enumerate(box_data):
-            x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
+            x = np.random.normal(i + 1, 0.06, size=len(data))
             ax.scatter(x, data, alpha=0.6, s=10, color=color, zorder=3)
 
-        # Color the boxes
-        for patch in bplot['boxes']:
-            patch.set_facecolor('none')
+        for patch in bplot["boxes"]:
+            patch.set_facecolor("none")
             patch.set_edgecolor("none")
-        for item in ['caps', 'whiskers']:
+        for item in ["caps", "whiskers"]:
             for element in bplot[item]:
                 element.set_color("none")
         for element in bplot["medians"]:
             element.set_color("black")
 
-        # Set labels and formatting
-        ax.set_xticks(range(1, len(models) + 1))
-        ax.set_xticklabels(models, rotation=45, ha='right', fontsize=10)
-        ax.set_ylabel(f'{metric.upper()}') if j == 0 else None
-        ax.set_title(f'{dataset.upper()} test dataset')
-        # Increase y-axis limits by 10%
+        ax.set_xticks(range(1, len(experiments) + 1))
+        ax.set_xticklabels(experiments, rotation=45, ha="right", fontsize=10)
+        ax.set_ylabel(f"{metric.upper()}") if j == 0 else None
+        ax.set_title(titles[j])
+
         y_min, y_max = ax.get_ylim()
         y_range = y_max - y_min
         ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
-        
-        # Statistical significance annotations
-        
+
         alpha = 0.05
-        spread = 0.6
-        
-        # Flatten data and create groups for statistical comparison
         flat_data = []
         group_labels = []
         for i, data in enumerate(box_data):
             flat_data.extend(data)
-            group_labels.extend([models[i]] * len(data))
-        
-        if len(set(group_labels)) > 1:  # Only if we have multiple groups
+            group_labels.extend([experiments[i]] * len(data))
+
+        if len(set(group_labels)) > 1:
             mc = MultiComparison(flat_data, group_labels)
             test_results = mc.allpairtest(stats.ttest_ind, alpha=alpha)
-            
+
             comp_matrix = create_comp_matrix_allpair_t_test(test_results)
             letters = multcomp_letters(comp_matrix < alpha)
-            
-            # Add letter annotations above boxplots
-            for i, model in enumerate(models):
-                if model in letters:
-                    # Calculate whisker position for annotation placement
+
+            for i, experiment in enumerate(experiments):
+                if experiment in letters:
                     data_vals = box_data[i]
                     q75 = np.percentile(data_vals, 75)
                     iqr = np.percentile(data_vals, 75) - np.percentile(data_vals, 25)
                     whisker_top = q75 + 1.5 * iqr
                     ypos = min(whisker_top, max(data_vals)) + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.02
-                    
-                    # Get median position
+
                     median_val = np.median(data_vals)
-                    ax.text(i + 0.7, median_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01, 
-                            letters[model], ha='left', va='bottom', 
-                            fontsize=10, color='black')
+                    ax.text(
+                        i + 0.7,
+                        median_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01,
+                        letters[experiment],
+                        ha="left",
+                        va="bottom",
+                        fontsize=10,
+                        color="black",
+                    )
 
-    # Third plot: observed vs predicted for area+environment model on EVA dataset
-    ax3 = inset_axes(ax1, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.05, 0, 1, 1), bbox_transform=ax1.transAxes)
-    # Load model and data for EVA predictions
-    eva_data_dir = Path("../../data/processed/EVA/6c2d61d/")
-    path_results = Path(f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth")
-    
-    # Load model results
-    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
-    config = checkpoint["config"]
-    model = Deep4PWeibull.initialize_ensemble(checkpoint, "cpu")
+    return fig, ax1, ax2
 
-    # Load EVA dataset
-    # Load and prepare data
+
+def prepare_eva_test_data(config, model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
     eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["sp_unit_area"] = eva_dataset["sp_unit_area"] # TODO: legacy name, to change
+    eva_dataset["sp_unit_area"] = eva_dataset["sp_unit_area"]
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    
-    # Filter test data
-    eva_test_data = eva_dataset[eva_dataset["test"]]#.sample(n=400)
-    
+    eva_test_data = eva_dataset[eva_dataset["test"]]
     eva_test_data["predicted_sr"] = model.predict_mean_sr(eva_test_data)
-    # eva_test_data["predicted_sr"] = model.models[4].predict_sr(eva_test_data)
+    return eva_test_data
+
+
+def prepare_gift_data(gift_data_dir: Path, model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
+    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
+    gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
+    gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
+    gift_dataset["predicted_sr"] = model.predict_mean_sr_tot(gift_dataset)
+    return gift_dataset
+
+if __name__ == "__main__":
+    df_deepsar, df_chao2 = load_benchmark_results()
+
+    model_map = {
+        "DeepSAR_Area": "area",
+        "DeepSAR_Env": "environment", # TODO: change to have climateDEM+landcover
+        "DeepSAR_All": "area+environment",
+        "MLP_All": "area+environment,\nnaive MLP",
+    }
+
+    df_deepsar = df_deepsar[df_deepsar["experiment"].isin(model_map)].copy()
+    df_deepsar["model"] = df_deepsar["experiment"].map(model_map)
+
+    df_chao2 = df_chao2.copy()
+    df_chao2["model"] = "chao2_estimator"
+
+    metric = "mape"
+    fig, ax1, ax2 = add_performance_panels(df_deepsar, df_chao2, metric)
+
+    # Third plot: observed vs predicted for area+environment model on EVA dataset
+    ax3 = inset_axes(
+        ax1,
+        width="40%",
+        height="40%",
+        loc="upper right",
+        bbox_to_anchor=(-0.05, 0, 1, 1),
+        bbox_transform=ax1.transAxes,
+    )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, config = load_ensemble_from_folds(RUN_DIR, device=device)
+
+    eva_test_data = prepare_eva_test_data(config, model)
 
     # Plot predictions vs observations for EVA
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
@@ -305,18 +357,8 @@ if __name__ == "__main__":
     ax3.set_xscale('log')
 
     # Fourth plot: model predictions vs GIFT observations
-    # Load model and data for prediction comparison
-    gift_data_dir = Path("../../data/processed/GIFT_CHELSA_compilation/6c2d61d/")
-    
-    # Load GIFT dataset
-    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
-    gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"]) # TODO: legacy name, to change
-    gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
-    gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
-    
-    # Make predictions for GIFT
-    gift_dataset["predicted_sr"] = model.predict_mean_sr_tot(gift_dataset)
-    # gift_dataset["predicted_sr"] = model.models[4].predict_sr(gift_dataset)
+    gift_data_dir = ROOT / "data" / "processed" / "GIFT_CHELSA_compilation" / "6c2d61d"
+    gift_dataset = prepare_gift_data(gift_data_dir, model)
 
     # Create inset axes in ax2
     ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)
@@ -357,5 +399,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
     fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
-    
-    report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric)
+
+    report_model_performance_and_bias(df_deepsar, eva_test_data, gift_dataset, metric)
