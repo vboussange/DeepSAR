@@ -13,22 +13,22 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.trainer import DeepSARLitModule
+from deepsar.trainer import DeepSARLitModule, TrainConfig
 from deepsar.dataset import create_dataloader
 from deepsar.utils import symmetric_arch
+
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-HASH = "606e055"
-
-def train_fold(config, fold_id, feature_names):
+def train_fold(config: TrainConfig, fold_id, feature_names):
     logger.info(f"Training Fold {fold_id}...")
     pl.seed_everything(config.seed + fold_id)
     
-    train_path = config.cv_data_path / f"fold_{fold_id}_train.parquet"
-    val_path = config.cv_data_path / f"fold_{fold_id}_val.parquet"
+    train_path = config.sbcv_path / f"fold_{fold_id}_train.parquet"
+    val_path = config.sbcv_path / f"fold_{fold_id}_val.parquet"
     
     if not train_path.exists() or not val_path.exists():
         logger.warning(f"Fold {fold_id} data not found. Skipping.")
@@ -40,6 +40,7 @@ def train_fold(config, fold_id, feature_names):
     # Preprocess
     for df in [train_df, val_df]:
         df["log_observed_area"] = np.log(df["observed_area"])
+        df["log_sp_unit_area"] = np.log(df["sp_unit_area"])
         df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
         
     # Create dataloaders
@@ -58,11 +59,10 @@ def train_fold(config, fold_id, feature_names):
                           target_scaler=target_scaler)
     
     # Determine accelerator
-    device = config.devices[fold_id % len(config.devices)]
-    if "cuda" in device:
+    if torch.cuda.is_available():
         accelerator = "gpu"
-        devices = [int(device.split(":")[1])]
-    elif "mps" in device:
+        devices = 1 # torch.cuda.device_count()
+    elif torch.backends.mps.is_available():
         accelerator = "mps"
         devices = 1
     else:
@@ -95,34 +95,22 @@ def train_fold(config, fold_id, feature_names):
     }, save_path)
 
 if __name__ == "__main__":
-    if torch.cuda.is_available():
-        devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-    elif torch.backends.mps.is_available():
-        devices = ["mps"]
-    else:
-        devices = ["cpu"]
-        
-    config = TrainConfig(devices=devices, hash_data=HASH)
+    config = TrainConfig(sbcv_path=SBCV_SAMPLES_PATH,
+                         num_workers=4,)
     
-    # Identify features from first fold
-    try:
-        sample_file = next(config.cv_data_path.glob("*_train.parquet"))
-        df = gpd.read_parquet(sample_file)
-        
-        climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
-        dem_feats = ["elevation", "std_elevation"]
-        lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
-        
-        climate_feats = [c for c in climate_feats if c in df.columns]
-        dem_feats = [c for c in dem_feats if c in df.columns]
-        
-        all_env_feats = climate_feats + dem_feats + lc_feats
-        feature_names = all_env_feats + ["log_sp_unit_area"]
-        logger.info(f"Training with features: {feature_names}")
-        
-    except StopIteration:
-        logger.error(f"No training files found in {config.cv_data_path}.")
-        exit(1)
+    sample_file = next(config.sbcv_path.glob("*_train.parquet"))
+    df = gpd.read_parquet(sample_file)
+    
+    climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
+    dem_feats = ["elevation", "std_elevation"]
+    lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
+    
+    climate_feats = [c for c in climate_feats if c in df.columns]
+    dem_feats = [c for c in dem_feats if c in df.columns]
+    
+    all_env_feats = climate_feats + dem_feats + lc_feats
+    feature_names = all_env_feats + ["log_sp_unit_area"]
+    logger.info(f"Training with features: {feature_names}")
         
     for fold_id in range(5):
         train_fold(config, fold_id, feature_names)

@@ -75,7 +75,7 @@ if __name__ == "__main__":
     config = BenchmarkConfig(devices=devices,
                              path_gift_data= GIFT_SAMPLES_PATH,
                              path_sbcv_data= SBCV_SAMPLES_PATH,
-                             n_epochs=1, # todo: change back to 100
+                            #  n_epochs=1, # todo: change back to 100
                              )
     
     # Inspect one file to get feature names

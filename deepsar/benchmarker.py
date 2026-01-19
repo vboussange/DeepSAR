@@ -14,6 +14,7 @@ from deepsar.dataset import create_dataloader
 from deepsar.trainer import DeepSARLitModule
 import torch.multiprocessing as mp
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 @dataclass
 class BenchmarkConfig:
@@ -130,11 +131,12 @@ class Benchmarker:
             "mape": mean_absolute_percentage_error(y_true, y_pred),
         }
 
-    def run(self, experiment_name, model_init, feature_names, train_frac=1.0):
-        results = []
-        
-        # Iterate over folds (assuming 5 folds as per compilation scripts)
-        for fold_id in range(5):
+    def _train_fold(self, fold_id, device, experiment_name, model_init, feature_names, train_frac):
+        """Train and evaluate a single fold on a specific device."""
+        try:
+            # Set seed for reproducibility
+            pl.seed_everything(self.config.seed + fold_id)
+            
             # Load data
             train_path = self.sbcv_path / f"fold_{fold_id}_train.parquet"
             val_path = self.sbcv_path / f"fold_{fold_id}_val.parquet"
@@ -142,7 +144,7 @@ class Benchmarker:
             
             if not train_path.exists() or not test_path.exists():
                 logging.warning(f"Fold {fold_id} data not found at {self.sbcv_path}. Skipping.")
-                continue
+                return None
                 
             train_df = gpd.read_parquet(train_path)
             val_df = gpd.read_parquet(val_path)
@@ -162,8 +164,6 @@ class Benchmarker:
             # Ensure GIFT has features
             gift_df = self.gift_df.copy()
             gift_df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
-
-            device = self.devices[fold_id % len(self.devices)]
             
             # Create dataloaders
             train_loader, feature_scaler, target_scaler = create_dataloader(
@@ -211,6 +211,60 @@ class Benchmarker:
                 combined_metrics[f"interp_{k}"] = v
             for k, v in metrics_extrap.items():
                 combined_metrics[f"extrap_{k}"] = v
-            results.append(combined_metrics)    
+            
+            logging.info(f"Completed fold {fold_id} on device {device}")
+            return combined_metrics
+            
+        except Exception as e:
+            logging.error(f"Error processing fold {fold_id} on device {device}: {e}")
+            return None
+
+    def run(self, experiment_name, model_init, feature_names, train_frac=1.0):
+        """Run benchmark across all folds, utilizing multiple GPUs in parallel."""
+        results = []
+        
+        # Prepare fold configurations
+        fold_configs = []
+        for fold_id in range(5):
+            device = self.devices[fold_id % len(self.devices)]
+            fold_configs.append((fold_id, device))
+        
+        # If only one device or sequential execution requested, run sequentially
+        if len(self.devices) == 1:
+            logging.info("Single device detected. Running folds sequentially.")
+            for fold_id, device in fold_configs:
+                result = self._train_fold(fold_id, device, experiment_name, model_init, feature_names, train_frac)
+                if result is not None:
+                    results.append(result)
+        else:
+            # Parallel execution across multiple GPUs
+            logging.info(f"Multiple devices detected ({len(self.devices)}). Running folds in parallel.")
+            
+            # Use ProcessPoolExecutor to train folds in parallel
+            max_workers = min(len(self.devices), 5)  # Max 5 workers for 5 folds
+            with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp.get_context('spawn')) as executor:
+                # Submit all fold training jobs
+                future_to_fold = {
+                    executor.submit(
+                        self._train_fold, 
+                        fold_id, 
+                        device, 
+                        experiment_name, 
+                        model_init, 
+                        feature_names, 
+                        train_frac
+                    ): fold_id
+                    for fold_id, device in fold_configs
+                }
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_fold):
+                    fold_id = future_to_fold[future]
+                    try:
+                        result = future.result()
+                        if result is not None:
+                            results.append(result)
+                    except Exception as e:
+                        logging.error(f"Fold {fold_id} generated an exception: {e}")
                 
         return pd.DataFrame(results)

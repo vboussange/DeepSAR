@@ -22,7 +22,7 @@ class TrainConfig:
     climate_variables: list = field(default_factory=lambda: ["bio1", "pet_penman_mean", "sfcWind_mean", "bio4", "rsds_1981-2010_range_V.2.1", "bio12", "bio15"])
     layer_sizes: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     run_folder: Path = None
-    cv_data_path: Path = None
+    sbcv_path: Path = None
 
     def __post_init__(self):
         root = Path(__file__).parent
@@ -35,8 +35,8 @@ class TrainConfig:
             except git.InvalidGitRepositoryError:
                 raise ValueError("Could not determine git hash and none was provided")
         
-        # if self.cv_data_path is None:
-        #     self.cv_data_path = (
+        # if self.sbcv_path is None:
+        #     self.sbcv_path = (
         #         root
         #         / "../data"
         #         / "processed"
@@ -46,7 +46,7 @@ class TrainConfig:
         #     )
         
         if self.run_folder is None:
-            self.run_folder = root / "results" / "train" / self.hash
+            self.run_folder = root / ".." / "scripts"/ "results" / "train" / self.hash
             self.run_folder.mkdir(parents=True, exist_ok=True)
             
 class DeepSARLitModule(pl.LightningModule):
