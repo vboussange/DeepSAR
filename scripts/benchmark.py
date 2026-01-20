@@ -12,7 +12,7 @@ import pandas as pd
 import geopandas as gpd
 import torch
 import torch.nn as nn
-from deepsar.utils import symmetric_arch
+from deepsar.utils import symmetric_arch, get_git_hash
 from deepsar.benchmarker import BenchmarkConfig, Benchmarker
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.mlp import MLP
@@ -190,6 +190,7 @@ if __name__ == "__main__":
         results.append(res)
     
     df_results = pd.concat(results)
-    df_results.to_csv(root_folder / "benchmark_results.csv", index=False)
+    output_file = root_folder / f"benchmark_results_{get_git_hash()}.csv"
+    df_results.to_csv(output_file, index=False)
     
-    logger.info("Benchmark completed.")
+    logger.info(f"Benchmark completed, output saved at {output_file}.")

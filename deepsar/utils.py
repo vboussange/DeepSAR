@@ -3,6 +3,7 @@ import pickle
 import logging
 import torch
 import torch.nn as nn
+import git
 
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
@@ -35,3 +36,12 @@ def symmetric_arch(n, base=32, factor=2):
     front = [base * factor**i for i in range(half)]
     mirror = front[:-1] if n % 2 else front
     return front + mirror[::-1]
+
+
+def get_git_hash(short=True, fallback="unknown"):
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        return repo.git.rev_parse(repo.head, short=short)
+    except git.InvalidGitRepositoryError:
+        logging.warning("Could not determine git hash; using '%s'.", fallback)
+        return fallback

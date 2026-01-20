@@ -20,8 +20,6 @@ from deepsar.data_processing.utils_eva import EVADataset
 from deepsar.data_processing.utils_gift import GIFTDataset
 from deepsar.data_processing.utils_features import CHELSADataset
 from deepsar.utils import save_to_pickle
-
-import git
 import random
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score, d2_absolute_error_score

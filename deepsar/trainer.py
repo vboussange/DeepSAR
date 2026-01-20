@@ -4,8 +4,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from dataclasses import dataclass, field
 from pathlib import Path
-import git
-from deepsar.utils import symmetric_arch
+from deepsar.utils import symmetric_arch, get_git_hash
 
 @dataclass
 class TrainConfig:
@@ -29,10 +28,8 @@ class TrainConfig:
         
         # Set hash from git if not provided
         if self.hash is None:
-            try:
-                repo = git.Repo(search_parent_directories=True)
-                self.hash = repo.git.rev_parse(repo.head, short=True)
-            except git.InvalidGitRepositoryError:
+            self.hash = get_git_hash()
+            if self.hash == "unknown":
                 raise ValueError("Could not determine git hash and none was provided")
         
         # if self.sbcv_path is None:

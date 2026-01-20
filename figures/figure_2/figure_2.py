@@ -22,6 +22,7 @@ ROOT = Path(__file__).parents[2]
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
+GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
@@ -91,13 +92,13 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             available_models = []
             model_data_dict = {}
             
-            for model in df_plot['model'].unique():
-                model_data = df_plot[df_plot['model'] == model]
+            for experiment in df_plot['experiment'].unique():
+                model_data = df_plot[df_plot['experiment'] == experiment]
                 if not model_data.empty and metric_col in model_data.columns:
                     performance = model_data[metric_col].dropna().values
                     if len(performance) > 0:
-                        available_models.append(model)
-                        model_data_dict[model] = performance
+                        available_models.append(experiment)
+                        model_data_dict[experiment] = performance
             
             if not available_models:
                 continue
@@ -108,10 +109,10 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             
             # Performance summary table
             dataset_results = []
-            for model in available_models:
-                performance = model_data_dict[model]
+            for experiment in available_models:
+                performance = model_data_dict[experiment]
                 dataset_results.append({
-                    'Model': model,
+                    'Experiment': experiment,
                     'RMSE_mean': np.mean(performance),
                     'RMSE_std': np.std(performance),
                     'N': len(performance)
@@ -119,7 +120,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             
             results_df = pd.DataFrame(dataset_results)
             results_df['RMSE'] = results_df.apply(lambda x: f"{x['RMSE_mean']:.4f} ± {x['RMSE_std']:.4f}", axis=1)
-            summary_table = results_df[['Model', 'RMSE', 'N']]
+            summary_table = results_df[['Experiment', 'RMSE', 'N']]
             print(summary_table.to_string(index=False), file=file)
             
             # Statistical significance tests (pairwise comparisons)
@@ -127,11 +128,11 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             print("-" * 50, file=file)
             
             # Create significance matrix
-            n_models = len(available_models)
-            for i in range(n_models):
-                for j in range(i+1, n_models):
-                    model1, model2 = available_models[i], available_models[j]
-                    data1, data2 = model_data_dict[model1], model_data_dict[model2]
+            n_experiments = len(available_models)
+            for i in range(n_experiments):
+                for j in range(i+1, n_experiments):
+                    experiment1, experiment2 = available_models[i], available_models[j]
+                    data1, data2 = model_data_dict[experiment1], model_data_dict[experiment2]
                     
                     # Calculate means for relative difference
                     median1, median2 = np.median(data1), np.median(data2)
@@ -150,7 +151,7 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
                     else:
                         sig_level = "ns"
                     
-                    print(f"{model1} vs {model2}: t={statistic:.3f}, p={p_value:.4f} {sig_level}, rel_diff={rel_diff:+.1f}%", file=file)
+                    print(f"{experiment1} vs {experiment2}: t={statistic:.3f}, p={p_value:.4f} {sig_level}, rel_diff={rel_diff:+.1f}%", file=file)
             
             print(f"\nSignificance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant", file=file)
 
@@ -197,25 +198,43 @@ def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
     return df_nw, df_chao2
 
 
-def add_performance_panels(df_deepsar: pd.DataFrame, df_chao2: pd.DataFrame, metric: str) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
+def add_performance_panels(
+    df_deepsar: pd.DataFrame,
+    df_chao2: pd.DataFrame,
+    metric: str,
+    label_map: dict[str, str] | None = None,
+) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
     datasets = ["interp", "extrap"]
-    titles = ["Interpolation (SBCV test)", "Extrapolation (GIFT)"]
+    titles_main = [
+        "Interpolation performance",
+        "Extrapolation performance",
+    ]
+    titles_sub = [
+        "(Spatial block cross evaluation with EVA dataset)",
+        "(independent evaluation with GIFT dataset)",
+    ]
     colors = ["#f72585", "#4cc9f0"]
     axes = [ax1, ax2]
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
         if dataset == "interp":
-            experiments = ["area", "environment", "area+environment", "area+environment,\nnaive MLP"]
+            experiments = ["MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_All"]
             df_plot = df_deepsar
         else:
-            experiments = ["chao2_estimator", "area", "environment", "area+environment", "area+environment,\nnaive MLP"]
+            experiments = [
+                "MLP_All",
+                "chao2_estimator",
+                "DeepSAR_Area",
+                "DeepSAR_ClimateDEM_Landcover",
+                "DeepSAR_All",
+            ]
             df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
 
         box_data = []
         for experiment in experiments:
-            exp_data = df_plot[df_plot["model"] == experiment]
+            exp_data = df_plot[df_plot["experiment"] == experiment]
             metric_col = f"{dataset}_{metric}"
             data = exp_data[metric_col].values
             box_data.append(data)
@@ -237,13 +256,23 @@ def add_performance_panels(df_deepsar: pd.DataFrame, df_chao2: pd.DataFrame, met
             element.set_color("black")
 
         ax.set_xticks(range(1, len(experiments) + 1))
-        ax.set_xticklabels(experiments, rotation=45, ha="right", fontsize=10)
+        display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
+        ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=10)
         ax.set_ylabel(f"{metric.upper()}") if j == 0 else None
-        ax.set_title(titles[j])
+        ax.set_title(titles_main[j], fontsize=12, fontweight="bold", pad=18)
+        ax.text(
+            0.5,
+            1.02,
+            titles_sub[j],
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
 
         y_min, y_max = ax.get_ylim()
         y_range = y_max - y_min
-        ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+        ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.3 * y_range)
 
         alpha = 0.05
         flat_data = []
@@ -282,17 +311,15 @@ def add_performance_panels(df_deepsar: pd.DataFrame, df_chao2: pd.DataFrame, met
 
 
 def prepare_eva_test_data(config, model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
-    eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["sp_unit_area"] = eva_dataset["sp_unit_area"]
+    eva_dataset = gpd.read_parquet(config.sbcv_path / "fold_0_test.parquet")
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_test_data = eva_dataset[eva_dataset["test"]]
-    eva_test_data["predicted_sr"] = model.predict_mean_sr(eva_test_data)
-    return eva_test_data
+    eva_dataset["predicted_sr"] = model.predict_mean_sr(eva_dataset)
+    return eva_dataset.sample(frac=0.1, random_state=42)
 
 
-def prepare_gift_data(gift_data_dir: Path, model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
-    gift_dataset = gpd.read_parquet(gift_data_dir / "sp_unit_data.parquet")
+def prepare_gift_data(model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
+    gift_dataset = gpd.read_parquet(GIFT_SAMPLES_PATH)
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
@@ -302,21 +329,18 @@ def prepare_gift_data(gift_data_dir: Path, model: DeepSAREnsembleModel) -> gpd.G
 if __name__ == "__main__":
     df_deepsar, df_chao2 = load_benchmark_results()
 
-    model_map = {
-        "DeepSAR_Area": "area",
-        "DeepSAR_Env": "environment", # TODO: change to have climateDEM+landcover
-        "DeepSAR_All": "area+environment",
-        "MLP_All": "area+environment,\nnaive MLP",
+    label_map = {
+        "DeepSAR_Area": "DeepSAR\n(area only)",
+        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(environment\nonly)",
+        "DeepSAR_All": "DeepSAR",
+        "MLP_All": "MLP",
+        "chao2_estimator": "Chao2 estimator",
     }
 
-    df_deepsar = df_deepsar[df_deepsar["experiment"].isin(model_map)].copy()
-    df_deepsar["model"] = df_deepsar["experiment"].map(model_map)
+    df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
 
-    df_chao2 = df_chao2.copy()
-    df_chao2["model"] = "chao2_estimator"
-
-    metric = "mape"
-    fig, ax1, ax2 = add_performance_panels(df_deepsar, df_chao2, metric)
+    metric = "rmse"
+    fig, ax1, ax2 = add_performance_panels(df_deepsar, df_chao2, metric, label_map=label_map)
 
     # Third plot: observed vs predicted for area+environment model on EVA dataset
     ax3 = inset_axes(
@@ -357,8 +381,7 @@ if __name__ == "__main__":
     ax3.set_xscale('log')
 
     # Fourth plot: model predictions vs GIFT observations
-    gift_data_dir = ROOT / "data" / "processed" / "GIFT_CHELSA_compilation" / "6c2d61d"
-    gift_dataset = prepare_gift_data(gift_data_dir, model)
+    gift_dataset = prepare_gift_data(model)
 
     # Create inset axes in ax2
     ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)

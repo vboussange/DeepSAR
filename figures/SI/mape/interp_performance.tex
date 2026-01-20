@@ -1,0 +1,17 @@
+\begin{table}
+\caption{Interpolation performance (mean ± std across folds).}
+\label{tab:interp_performance}
+\begin{tabular}{l l c c c c}
+\toprule
+model & Predictors & rmse & mape & r2 & d2 \\
+\midrule
+MLP & Area + Environment & 57.342 ± 1.480 & 1.036 ± 0.106 & 0.590 ± 0.064 & 0.306 ± 0.061 \\
+DeepSAR
+(area only) & Area & 60.825 ± 4.062 & 1.372 ± 0.473 & 0.534 ± 0.095 & 0.226 ± 0.139 \\
+DeepSAR
+(environment
+only) & Environment & 56.618 ± 6.330 & 1.101 ± 0.387 & 0.595 ± 0.117 & 0.304 ± 0.129 \\
+DeepSAR & Area + Environment & \textbf{51.929 ± 2.247} & \textbf{0.775 ± 0.160} & \textbf{0.666 ± 0.035} & \textbf{0.386 ± 0.042} \\
+\bottomrule
+\end{tabular}
+\end{table}

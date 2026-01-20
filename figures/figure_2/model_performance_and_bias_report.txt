@@ -5,56 +5,60 @@ RELATIVE BIAS ANALYSIS
 ==================================================
 EVA Dataset
 --------------------
-Mean relative bias: 0.7166
-Median relative bias: 0.1945
-Std relative bias: 1.8241
-Min relative bias: -2.3055
-Max relative bias: 44.2900
-N observations: 1718
+Mean relative bias: 0.5034
+Median relative bias: 0.0709
+Std relative bias: 1.6522
+Min relative bias: -2.9486
+Max relative bias: 38.1805
+N observations: 7370
 
 GIFT Dataset
 --------------------
-Mean relative bias: -0.0540
-Median relative bias: -0.2260
-Std relative bias: 0.9043
-Min relative bias: -0.6575
-Max relative bias: 9.2535
-N observations: 125
+Mean relative bias: 0.5000
+Median relative bias: 0.2148
+Std relative bias: 1.2116
+Min relative bias: -0.5307
+Max relative bias: 14.7997
+N observations: 181
 
 
 MODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE
 ============================================================
 
-EVA Dataset
+Interpolation Dataset
 ==================================================
-           Model             RMSE  N
-            area 95.9536 ± 0.4684  5
-     environment 54.4275 ± 0.9337  5
-area+environment 54.3433 ± 1.1345  5
+                  Experiment            RMSE  N
+                DeepSAR_Area 1.3725 ± 0.4734  5
+DeepSAR_ClimateDEM_Landcover 1.1013 ± 0.3871  5
+                 DeepSAR_All 0.7747 ± 0.1602  5
+                     MLP_All 1.0358 ± 0.1060  5
 
-Pairwise Statistical Significance Tests (EVA)
+Pairwise Statistical Significance Tests (Interpolation)
 --------------------------------------------------
-area vs environment: t=79.506, p=0.0000 ***, rel_diff=-43.3%
-area vs area+environment: t=67.805, p=0.0000 ***, rel_diff=-43.3%
-environment vs area+environment: t=0.115, p=0.9116 ns, rel_diff=+0.1%
+DeepSAR_Area vs DeepSAR_ClimateDEM_Landcover: t=0.887, p=0.4010 ns, rel_diff=-29.2%
+DeepSAR_Area vs DeepSAR_All: t=2.392, p=0.0437 *, rel_diff=-47.6%
+DeepSAR_Area vs MLP_All: t=1.388, p=0.2026 ns, rel_diff=-25.0%
+DeepSAR_ClimateDEM_Landcover vs DeepSAR_All: t=1.559, p=0.1576 ns, rel_diff=-26.0%
+DeepSAR_ClimateDEM_Landcover vs MLP_All: t=0.327, p=0.7524 ns, rel_diff=+6.0%
+DeepSAR_All vs MLP_All: t=-2.718, p=0.0263 *, rel_diff=+43.2%
 
 Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
 
-GIFT Dataset
+Extrapolation Dataset
 ==================================================
-           Model                 RMSE  N
-            area 1352.5392 ± 252.1778  5
-     environment  1049.3234 ± 64.4442  5
-area+environment   938.4585 ± 52.4454  5
- chao2_estimator   1229.5648 ± 2.6665  5
+                  Experiment            RMSE  N
+                DeepSAR_Area 0.5413 ± 0.0997  5
+DeepSAR_ClimateDEM_Landcover 0.7662 ± 0.2325  5
+                 DeepSAR_All 0.5568 ± 0.1182  5
+                     MLP_All 1.0408 ± 0.1632  5
 
-Pairwise Statistical Significance Tests (GIFT)
+Pairwise Statistical Significance Tests (Extrapolation)
 --------------------------------------------------
-area vs environment: t=2.330, p=0.0482 *, rel_diff=-16.6%
-area vs area+environment: t=3.215, p=0.0123 *, rel_diff=-22.0%
-area vs chao2_estimator: t=0.975, p=0.3580 ns, rel_diff=-0.9%
-environment vs area+environment: t=2.669, p=0.0284 *, rel_diff=-6.5%
-environment vs chao2_estimator: t=-5.589, p=0.0005 ***, rel_diff=+18.7%
-area+environment vs chao2_estimator: t=-11.087, p=0.0000 ***, rel_diff=+27.0%
+DeepSAR_Area vs DeepSAR_ClimateDEM_Landcover: t=-1.778, p=0.1133 ns, rel_diff=+66.2%
+DeepSAR_Area vs DeepSAR_All: t=-0.201, p=0.8461 ns, rel_diff=+18.5%
+DeepSAR_Area vs MLP_All: t=-5.223, p=0.0008 ***, rel_diff=+118.6%
+DeepSAR_ClimateDEM_Landcover vs DeepSAR_All: t=1.606, p=0.1470 ns, rel_diff=-28.7%
+DeepSAR_ClimateDEM_Landcover vs MLP_All: t=-1.934, p=0.0892 ns, rel_diff=+31.5%
+DeepSAR_All vs MLP_All: t=-4.805, p=0.0013 **, rel_diff=+84.5%
 
 Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant

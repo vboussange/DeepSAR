@@ -1,0 +1,18 @@
+\begin{table}
+\caption{Extrapolation performance (mean ± std across folds).}
+\label{tab:extrap_performance}
+\begin{tabular}{l l c c c c}
+\toprule
+model & Predictors & rmse & mape & r2 & d2 \\
+\midrule
+MLP & Area + Environment & 1383.623 ± 265.875 & 1.041 ± 0.163 & -1.515 ± 0.857 & -0.565 ± 0.325 \\
+Chao2 estimator & Incidence (Chao2) & 1258.533 ± 11.719 & 0.610 ± 0.010 & -1.174 ± 0.196 & -0.654 ± 0.096 \\
+DeepSAR
+(area only) & Area & 729.285 ± 41.432 & \textbf{0.541 ± 0.100} & 0.324 ± 0.078 & 0.190 ± 0.055 \\
+DeepSAR
+(environment
+only) & Environment & 758.574 ± 201.685 & 0.766 ± 0.232 & 0.220 ± 0.401 & 0.103 ± 0.292 \\
+DeepSAR & Area + Environment & \textbf{563.911 ± 70.239} & 0.557 ± 0.118 & \textbf{0.591 ± 0.099} & \textbf{0.366 ± 0.094} \\
+\bottomrule
+\end{tabular}
+\end{table}

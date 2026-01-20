@@ -14,12 +14,12 @@ import numpy as np
 import xarray as xr
 import logging
 import json
-import git
 import random
 
 from deepsar.data_processing.utils_gift import GIFTDataset
 from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
 from deepsar.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
+from deepsar.utils import get_git_hash
 
 # Initialize logging
 logging.basicConfig(
@@ -99,12 +99,7 @@ def save_compiled_data(df: gpd.GeoDataFrame, output_path: Path) -> None:
 
 if __name__ == "__main__":
     # Setup output directory with git hash
-    try:
-        repo = git.Repo(search_parent_directories=True)
-        sha = repo.git.rev_parse(repo.head, short=True)
-    except git.InvalidGitRepositoryError:
-        sha = "unknown_commit"
-        logging.warning("Not a git repository. Using 'unknown_commit' for output directory.")
+    sha = get_git_hash(fallback="unknown_commit")
     
     output_dir = CONFIG["output_base_dir"] / sha
     output_dir.mkdir(parents=True, exist_ok=True)
