@@ -14,8 +14,8 @@ import scipy.stats as stats
 from scipy.stats import ttest_ind
 from statsmodels.stats.multicomp import MultiComparison
 
-from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.ensemble_model import DeepSAREnsembleModel
+from deepsar.utils import load_ensemble_from_folds
 from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 ROOT = Path(__file__).parents[2]
@@ -156,40 +156,6 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
             print(f"\nSignificance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant", file=file)
 
     print(f"Model performance and bias analysis saved to '{output_file}'")
-
-
-def load_ensemble_from_folds(run_dir: Path, device: str = "cpu") -> tuple[DeepSAREnsembleModel, object]:
-    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
-    if not ckpt_paths:
-        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
-
-    models = []
-    feature_names_ref = None
-    config_ref = None
-    for ckpt_path in ckpt_paths:
-        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
-        feature_names = checkpoint["feature_names"]
-        if feature_names_ref is None:
-            feature_names_ref = feature_names
-            config_ref = checkpoint.get("config")
-        else:
-            assert feature_names_ref == feature_names, "Feature names differ across folds"
-
-        config = checkpoint["config"]
-        model = Deep4PWeibull(
-            config.layer_sizes,
-            feature_names=feature_names,
-            feature_scaler=checkpoint["feature_scaler"],
-            target_scaler=checkpoint["target_scaler"],
-        )
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.to(device)
-        model.eval()
-        models.append(model)
-
-    ensemble = DeepSAREnsembleModel(models)
-    ensemble.eval()
-    return ensemble, config_ref
 
 
 def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -353,7 +319,7 @@ if __name__ == "__main__":
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, config = load_ensemble_from_folds(RUN_DIR, device=device)
+    model, config = load_ensemble_from_folds(RUN_DIR, device=device, return_config=True)
 
     eva_test_data = prepare_eva_test_data(config, model)
 

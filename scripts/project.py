@@ -6,8 +6,7 @@ import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.ensemble_model import DeepSAREnsembleModel
+from deepsar.utils import load_ensemble_from_folds
 from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
 from deepsar.plotting import CMAP_BR
 import pandas as pd
@@ -105,38 +104,6 @@ def batch_predict(model, env_dataset, lc_dataset, res, batch_size=4096):
     std_SR = np.concatenate(std_SR_list, axis=0)
     return features, mean_SR, std_SR
         
-def load_ensemble_from_folds(run_dir: Path, device: str = "cpu") -> DeepSAREnsembleModel:
-    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
-    if not ckpt_paths:
-        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
-
-    models = []
-    feature_names_ref = None
-    for ckpt_path in ckpt_paths:
-        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
-        feature_names = checkpoint["feature_names"]
-        if feature_names_ref is None:
-            feature_names_ref = feature_names
-        else:
-            assert feature_names_ref == feature_names, "Feature names differ across folds"
-
-        config = checkpoint["config"]
-        model = Deep4PWeibull(
-            config.layer_sizes,
-            feature_names=feature_names,
-            feature_scaler=checkpoint["feature_scaler"],
-            target_scaler=checkpoint["target_scaler"],
-        )
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.to(device)
-        model.eval()
-        models.append(model)
-
-    ensemble = DeepSAREnsembleModel(models)
-    ensemble.eval()
-    return ensemble
-
-
 def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     env_features = EnvironmentalFeatureDataset()
     env_ds, lc_ds = env_features.load(use_cache=True)

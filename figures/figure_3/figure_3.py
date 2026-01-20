@@ -9,31 +9,40 @@ from pathlib import Path
 import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.ensemble_trainer import EnsembleConfig
+from deepsar.utils import load_ensemble_from_folds
+
+ROOT = Path(__file__).parents[2]
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
 
 # Configuration
-PLOT_CONFIG = [("Area", "#f72585"), ("Environmental heterogeneity", "#4cc9f0"), ("Mean environmental conditions", "#3a0ca3")]
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+PLOT_CONFIG = [
+    ("Area", "#f72585", "o", "-"),
+    ("Environmental heterogeneity", "#4cc9f0", "s", "-"),
+    ("Mean environmental conditions", "#3a0ca3", "^", "-"),
+    ("Landcover", "#3f37c9", "D", "-"),
+]
+SAMPLES_PER_BIN = np.inf
 
-def sample_data_by_area(gdf, n_bins=100, samples_per_bin=np.inf):
+def sample_data_by_area(gdf, n_bins=100):
     """Sample data stratified by log area bins."""
-    gdf = gdf.copy()
     gdf['log_area_bins'] = pd.cut(gdf['log_sp_unit_area'], bins=n_bins, labels=False)
-    return gdf.groupby('log_area_bins', group_keys=False).apply(
-        lambda x: x.sample(min(samples_per_bin, len(x)))
-    )
+    return gdf.groupby('log_area_bins', group_keys=False)
 
 class ShapleyAnalyzer:
     """Handles Shapley value computation and analysis."""
     
     def __init__(self, model):
         model.eval()
-        self.model = model.models[0] # we only use the first model of the ensemble
+        self.model = model.models[0]  # use the first model of the ensemble
     
     def compute_shapley_values(self, gdf):
         """Compute Shapley values for given dataframe."""
         gdf_sampled = sample_data_by_area(gdf)
-        features = torch.tensor(gdf_sampled[["log_observed_area"] + model.feature_names].values, dtype=torch.float32)
+        features = torch.tensor(
+            gdf_sampled[["log_observed_area"] + self.model.feature_names].values,
+            dtype=torch.float32,
+        )
         feature_scaler = self.model.feature_scaler
         X = torch.tensor(feature_scaler.transform(features), dtype=torch.float32).to(next(self.model.parameters()).device)
         X = X[:, 1:]  # Exclude the first column (log_observed_area)
@@ -43,7 +52,7 @@ class ShapleyAnalyzer:
                 return self.model._predict_sr_tot(X).flatten()
 
         explainer = ShapleyValueSampling(forward_fn)
-        shap_values = explainer.attribute(X, n_samples=400).cpu().numpy()
+        shap_values = explainer.attribute(X, n_samples=SAMPLES_PER_BIN).cpu().numpy()
         
         df_shap = pd.DataFrame(shap_values, columns=self.model.feature_names)
         df_shap["log_sp_unit_area_values"] = gdf_sampled["log_sp_unit_area"].values
@@ -52,29 +61,47 @@ class ShapleyAnalyzer:
 
 def load_data_and_model():
     """Load model and data."""
-    path_results = Path(__file__).parent / f"../../scripts/results/train/checkpoint_deep4pweibull_basearch6_0b85791.pth"
-    checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
-    config = checkpoint["config"]
-    eva_dataset = gpd.read_parquet(config.path_eva_data)
+    model, config = load_ensemble_from_folds(RUN_DIR, device=DEVICE, return_config=True)
+    eva_dataset = gpd.read_parquet(config.sbcv_path / "fold_0_test.parquet")
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    
-    test_data = eva_dataset[eva_dataset["test"]]
-    
-    model = Deep4PWeibull.initialize_ensemble(checkpoint)
+    return model, config, eva_dataset
 
-    return model, config, test_data
-
-def aggregate_shapley_features(df_shap, config):
+def aggregate_shapley_features(df_shap):
     """Aggregate Shapley values by feature groups."""
-    std_features = [f"std_{var}" for var in config.predictors]
-    mean_features = config.predictors
+    feature_names = df_shap.columns.tolist()
+    landcover_features = [f for f in feature_names if f.startswith("lc_frac_")]
+    std_features = [f for f in feature_names if f.startswith("std_")]
+    mean_features = [
+        f
+        for f in feature_names
+        if f not in std_features
+        and f not in landcover_features
+        and f != "log_sp_unit_area"
+        and f != "log_sp_unit_area_values"
+    ]
 
-    df_shap["Environmental heterogeneity"] = np.abs(df_shap[std_features]).sum(axis=1)
-    df_shap["Mean environmental conditions"] = np.abs(df_shap[mean_features]).sum(axis=1)
-    df_shap["Area"] = np.abs(df_shap[["log_sp_unit_area"]]).sum(axis=1)
-    
-    feature_cols = ["Area", "Environmental heterogeneity", "Mean environmental conditions"]
+    df_shap["Environmental heterogeneity"] = (
+        np.abs(df_shap[std_features]).sum(axis=1) if std_features else 0.0
+    )
+    df_shap["Mean environmental conditions"] = (
+        np.abs(df_shap[mean_features]).sum(axis=1) if mean_features else 0.0
+    )
+    df_shap["Landcover"] = (
+        np.abs(df_shap[landcover_features]).sum(axis=1) if landcover_features else 0.0
+    )
+    df_shap["Area"] = (
+        np.abs(df_shap[["log_sp_unit_area"]]).sum(axis=1)
+        if "log_sp_unit_area" in df_shap.columns
+        else 0.0
+    )
+
+    feature_cols = [
+        "Area",
+        "Environmental heterogeneity",
+        "Mean environmental conditions",
+        "Landcover",
+    ]
     total_importance = df_shap[feature_cols].sum(axis=1)
     df_shap[feature_cols] = df_shap[feature_cols].div(total_importance, axis=0)
     
@@ -82,14 +109,23 @@ def aggregate_shapley_features(df_shap, config):
 
 def plot_shapley_values(df_shap, ax, config_plot):
     """Plot Shapley values vs area."""
-    for var_name, color in config_plot:
+    for var_name, color, marker, linestyle in config_plot:
         df_shap['area_bins'] = pd.cut(df_shap['log_sp_unit_area_values'], bins=20, labels=False)
         grouped = df_shap.groupby('area_bins')
         mean_vals = grouped[var_name].mean()
         std_vals = grouped[var_name].std()
         mean_areas = np.exp(grouped['log_sp_unit_area_values'].mean()) / 1e6 
         
-        ax.plot(mean_areas, mean_vals, 'o-', color=color, label=var_name, alpha=0.7)
+        ax.plot(
+            mean_areas,
+            mean_vals,
+            marker=marker,
+            markersize=4,
+            linestyle=linestyle,
+            color=color,
+            label=var_name,
+            alpha=0.8,
+        )
         ci_lower = mean_vals - std_vals 
         ci_upper = mean_vals + std_vals 
         ax.fill_between(mean_areas, ci_lower, ci_upper, alpha=0.2, color=color)    
@@ -103,13 +139,13 @@ if __name__ == "__main__":
     model, config, test_data = load_data_and_model()
     shapley_analyzer = ShapleyAnalyzer(model)
     df_shap = shapley_analyzer.compute_shapley_values(test_data)
-    df_shap = aggregate_shapley_features(df_shap, config)
+    df_shap = aggregate_shapley_features(df_shap)
     
     fig, ax = plt.subplots(figsize=(4, 4))
     plot_shapley_values(df_shap, ax, PLOT_CONFIG)
     
     ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc='center')
-    ax.set_ylim(1e-2, 1.5)
+    # ax.set_ylim(1e-2, 1.5)
     fig.supxlabel("Area (km²)")
     fig.tight_layout()
     ax.grid(True, alpha=0.3)
