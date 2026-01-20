@@ -12,9 +12,9 @@ import geopandas as gpd
 
 from deepsar.utils import load_ensemble_from_folds
 from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
+from deepsar.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from deepsar.plotting import CMAP_BR
 
-from data_processing.eva_preprocessing import COUNTRY_DATA, COUNTRY_LIST
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -76,6 +76,20 @@ def create_features(model, env_dataset, lc_dataset, res):
 
     X_map = X_map.assign(log_sp_unit_area=np.log(res**2))
     return X_map[model.feature_names]
+
+
+def align_features_to_reference(features_ref: pd.DataFrame, features_other: pd.DataFrame) -> pd.DataFrame:
+    ref_index_names = list(features_ref.index.names)
+    if not {"x", "y"}.issubset(ref_index_names):
+        return features_other.reindex(features_ref.index)
+
+    ref_x = features_ref.index.get_level_values("x").unique().sort_values()
+    ref_y = features_ref.index.get_level_values("y").unique().sort_values()
+
+    other_ds = features_other.to_xarray()
+    other_ds = other_ds.reindex(x=ref_x, y=ref_y, method="nearest")
+    aligned = other_ds.to_dataframe()
+    return aligned.reindex(features_ref.index)
         
 # we use batches, otherwise model and data may not fit in memory
 def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
@@ -94,17 +108,24 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     features0 = create_features(model, env_dataset, lc_dataset, res0)
     features1 = create_features(model, env_dataset, lc_dataset, res1)
 
+    # Align features to a common grid for dSR/dlogA computation
+    features1 = align_features_to_reference(features0, features1)
+    features0.dropna(how="all", inplace=True)
+    features1 = features1.reindex_like(features0)
     total_length = len(features0)
+    
 
     percent_step = max(1, total_length // batch_size // 100)
     
     SR01_list = []
     for features in [features0, features1]:
         SR_list = []
-        for i in tqdm(range(0, total_length, batch_size), desc = "Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
+        for i in tqdm(range(0, total_length, batch_size), desc="Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
             with torch.no_grad():
                 current_batch_size = min(batch_size, total_length - i)
                 X = features.iloc[i:i+current_batch_size,:]
+                if X.empty:
+                    continue
                 SRs = [m.predict_sr_tot(X) for m in model.models]
                 SR_list.append(np.concatenate(SRs, axis=1))
         SR01_list.append(np.concatenate(SR_list, axis=0))
@@ -148,12 +169,15 @@ if __name__ == "__main__":
     model = load_ensemble_from_folds(run_dir, device=device)
     env_dataset, lc_dataset = load_environmental_features()
 
-    for res in [50000, 1000]:
+    for res in [5e3, 1e4, 5e4, 1e5, 5e5]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
 
         features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(
             model, env_dataset, lc_dataset, res
         )
+        if len(features0) == 0:
+            print(f"No features for resolution {res}m; skipping.")
+            continue
 
         raster_configs = [
             ("SR", mean_SR, "SR"),

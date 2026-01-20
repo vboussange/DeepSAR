@@ -6,7 +6,17 @@ from tqdm import tqdm
 import json
 
 # Default base paths with environment variable support
-EVA_DATA_DIR = Path(__file__).parent / "../../data/processed/EVA/"
+EVA_DATA_DIR = Path(__file__).parents[2] / "data/processed/EVA/"
+COUNTRY_DATA = Path(__file__).parents[2] / "data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
+COUNTRY_LIST = [
+    "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
+    "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Kosovo", "Latvia", 
+    "Liechtenstein", "Lithuania", "Luxembourg", "North Macedonia", "Malta", 
+    "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", 
+    "Portugal", "Romania", "San Marino", "Serbia", 
+    "Slovakia", "Slovenia", "Spain", "Sweden", 
+    "Switzerland", "Ukraine", "United Kingdom", "Iceland"
+]
 
 def extract_habitat_lev1(ESyhab: str):
     def is_valid(s: str) -> bool:

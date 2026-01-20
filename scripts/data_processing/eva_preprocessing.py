@@ -14,24 +14,13 @@ from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
-from deepsar.data_processing.utils_eva import extract_habitat_lev1
+from deepsar.data_processing.utils_eva import extract_habitat_lev1, COUNTRY_DATA, COUNTRY_LIST
 
 # Constants
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"
 GIFT_CHECKLIST_FILE = Path(__file__).parent / "../../data/raw/GIFT/species_data.csv"
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/EVA/preprocessing"
 FIELDS_PRIORITY = ["turboveg2_concept", "matched_concept", "original_taxon_concept"]
-
-COUNTRY_DATA = Path(__file__).parent / "../../data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
-COUNTRY_LIST = [
-    "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
-    "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Kosovo", "Latvia", 
-    "Liechtenstein", "Lithuania", "Luxembourg", "North Macedonia", "Malta", 
-    "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", 
-    "Portugal", "Romania", "San Marino", "Serbia", 
-    "Slovakia", "Slovenia", "Spain", "Sweden", 
-    "Switzerland", "Ukraine", "United Kingdom", "Iceland"
-]
 
 def clean_species_name(name):
     """

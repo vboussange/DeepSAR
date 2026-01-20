@@ -1,0 +1,146 @@
+"""
+Predicts SAR from an ensembled DeepSAR model at specified locations.
+
+Using Ensemble model.
+"""
+import numpy as np
+import pandas as pd
+from deepsar.utils import save_to_pickle, load_ensemble_from_folds
+from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
+import matplotlib.pyplot as plt
+
+from pathlib import Path
+from pyproj import Transformer
+
+
+def load_environmental_features(model):
+    env_features = EnvironmentalFeatureDataset()
+    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_ds = env_ds.rio.write_crs("EPSG:3035")
+    lc_ds = lc_ds.rio.write_crs("EPSG:3035")
+
+    env_vars = [
+        v for v in env_ds.data_vars
+        if (v in model.feature_names) or (f"std_{v}" in model.feature_names)
+    ]
+    env_ds = env_ds[env_vars]
+    res_env_pixel = abs(env_ds.rio.resolution()[0])
+    return env_ds, lc_ds, res_env_pixel
+
+
+def build_features_for_window(model, env_ds, lc_ds, x, y, window_size, res_env_pixel):
+    if window_size < res_env_pixel:
+        reduced_env = env_ds.sel(x=x, y=y, method="nearest")
+    else:
+        reduced_env = env_ds.sel(
+            x=slice(x, x + window_size),
+            y=slice(y, y - window_size),
+        )
+
+    feature_values = {}
+    for var in reduced_env.data_vars:
+        feature_values[var] = reduced_env[var].mean().item()
+        feature_values[f"std_{var}"] = reduced_env[var].std().item()
+
+    lc_frac_cols = [c for c in model.feature_names if c.startswith("lc_frac_")]
+    if lc_frac_cols:
+        lc_da = lc_ds["landcover"].where(lc_ds["landcover"] >= 0)
+        if window_size < res_env_pixel:
+            lc_sel = lc_da.sel(x=x, y=y, method="nearest")
+            for col in lc_frac_cols:
+                idx = int(col.split("_")[-1])
+                feature_values[col] = float(lc_sel == idx)
+        else:
+            lc_window = lc_da.sel(
+                x=slice(x, x + window_size),
+                y=slice(y, y - window_size),
+            )
+            for col in lc_frac_cols:
+                idx = int(col.split("_")[-1])
+                feature_values[col] = (lc_window == idx).mean().item()
+
+    if "log_sp_unit_area" in model.feature_names:
+        feature_values["log_sp_unit_area"] = np.log(window_size**2)
+
+    missing = [name for name in model.feature_names if name not in feature_values]
+    if missing:
+        raise ValueError(f"Missing features for prediction: {missing}")
+
+    return pd.DataFrame([{name: feature_values[name] for name in model.feature_names}])
+
+    
+if __name__ == "__main__":
+    # creating X_maps for different resolutions
+    seed = 1
+    output_dir = Path("SARs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
+    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "6dcd90c"
+    model = load_ensemble_from_folds(run_dir, device="cpu")
+
+    env_ds, lc_ds, res_env_pixel = load_environmental_features(model)
+
+    
+    dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long
+                       "SRs": [],},
+              "loc2": {"coords": (53, 8.4),
+                       "SRs": [],},
+            "loc3": {"coords": (42.1, -5),
+                       "SRs": [],}
+            }
+    
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3035")
+    window_sizes = np.logspace(np.log10(2e3), np.log10(1e6), 100)
+    for loc in dict_SAR:
+        print(loc)
+        y, x = transformer.transform(*dict_SAR[loc]["coords"])
+        dict_SAR[loc]["coords_epsg_3035"] = (x, y)
+        for window_size in window_sizes:
+            # predictor compilation
+            features = build_features_for_window(
+                model,
+                env_ds,
+                lc_ds,
+                x,
+                y,
+                window_size,
+                res_env_pixel,
+            )
+
+            # predictions
+            SRs = np.concatenate([m.predict_sr_tot(features) for m in model.models], axis=1)
+            dict_SAR[loc]["SRs"].append(SRs)
+            
+            ## predictions FIXME: legacy code
+            # feature_scaler = checkpoint["feature_scalers"][0]
+            # target_scaler = checkpoint["target_scalers"][0]
+            # X = features[["log_observed_area"] + model.feature_names].values
+            # X = feature_scaler.transform(X)
+            # with torch.no_grad():
+            #     X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
+            #     ys = np.concatenate([m._predict_sr_tot(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
+            #     SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
+            # dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
+        
+        # Convert to numpy array with shape (len(window_sizes), len(model.models))
+        dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
+        # dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"]) # FIXME: legacy code
+            
+    dict_SAR["log_area"] = np.log(window_sizes**2)
+    
+    fig, ax = plt.subplots()
+    dict_plot = {"loc1": {"c":"tab:blue"}, "loc2": {"c":"tab:red"}, "loc3": {"c":"tab:purple"}}
+    for loc in dict_plot:
+        d = dict_SAR[loc]
+        arg_plot = dict_plot[loc]
+        ax.plot(np.exp(dict_SAR["log_area"]), d["SRs"], c=arg_plot["c"])
+        # ax.fill_between(np.exp(dict_SAR["log_area"]), 
+        #     np.array(d["SR"]) - np.array(d["std_SR"]), 
+        #     np.array(d["SR"]) + np.array(d["std_SR"]), 
+        #     color=arg_plot["c"],
+        #     alpha=0.4)
+    ax.set_xscale("log")
+    # ax.set_yscale("log")
+    fig.savefig(output_dir / "SARs.pdf", dpi=300, bbox_inches="tight")
+    save_to_pickle(output_dir / "SARs.pkl", dict_SAR=dict_SAR)
