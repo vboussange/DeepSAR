@@ -7,10 +7,8 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 import numpy as np
-import pandas as pd
 import geopandas as gpd
 from pathlib import Path
-from dataclasses import dataclass, field
 
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.trainer import DeepSARLitModule, TrainConfig
@@ -96,7 +94,8 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
 
 if __name__ == "__main__":
     config = TrainConfig(sbcv_path=SBCV_SAMPLES_PATH,
-                         num_workers=4)
+                         num_workers=4,
+                         layer_sizes=symmetric_arch(6, base=128, factor=4))
     
     sample_file = next(config.sbcv_path.glob("*_train.parquet"))
     df = gpd.read_parquet(sample_file)

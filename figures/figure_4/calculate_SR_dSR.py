@@ -57,13 +57,12 @@ def create_features(model, env_dataset, lc_dataset, res):
 
     coarse_mean = coarse.mean().rio.write_crs("EPSG:3035")
     coarse_std = coarse.std().rio.write_crs("EPSG:3035")
-    df_mean = coarse_mean.to_dataframe()
-    df_std = coarse_std.to_dataframe()
-    df_std = df_std.rename({col: "std_" + col for col in df_std.columns}, axis=1)
 
-    mean_cols = [c for c in df_mean.columns if c in model.feature_names]
-    std_cols = [c for c in df_std.columns if c in model.feature_names]
-    X_map = pd.concat([df_mean[mean_cols], df_std[std_cols]], axis=1)
+    mean_cols = [c for c in coarse_mean.data_vars if c in model.feature_names]
+    std_cols = [c for c in coarse_std.data_vars if f"std_{c}" in model.feature_names]
+    mean_ds = coarse_mean[mean_cols]
+    std_ds = coarse_std[std_cols].rename({c: f"std_{c}" for c in std_cols})
+    X_map = xr.merge([mean_ds, std_ds])
 
     # landcover fractions
     lc_frac_cols = [c for c in model.feature_names if c.startswith("lc_frac_")]
@@ -72,24 +71,18 @@ def create_features(model, env_dataset, lc_dataset, res):
         for col in sorted(lc_frac_cols, key=lambda c: int(c.split("_")[-1])):
             idx = int(col.split("_")[-1])
             frac = (lc_da == idx).coarsen(x=ncells, y=ncells, boundary="trim").mean()
-            X_map[col] = frac.to_dataframe(name=col)[col]
+            X_map[col] = frac
 
     X_map = X_map.assign(log_sp_unit_area=np.log(res**2))
     return X_map[model.feature_names]
 
 
-def align_features_to_reference(features_ref: pd.DataFrame, features_other: pd.DataFrame) -> pd.DataFrame:
-    ref_index_names = list(features_ref.index.names)
-    if not {"x", "y"}.issubset(ref_index_names):
-        return features_other.reindex(features_ref.index)
-
-    ref_x = features_ref.index.get_level_values("x").unique().sort_values()
-    ref_y = features_ref.index.get_level_values("y").unique().sort_values()
-
-    other_ds = features_other.to_xarray()
-    other_ds = other_ds.reindex(x=ref_x, y=ref_y, method="nearest")
-    aligned = other_ds.to_dataframe()
-    return aligned.reindex(features_ref.index)
+def align_features_to_reference(features_ref: xr.Dataset, features_other: xr.Dataset) -> xr.Dataset:
+    if features_ref.rio.crs is None:
+        features_ref = features_ref.rio.write_crs("EPSG:3035")
+    if features_other.rio.crs is None:
+        features_other = features_other.rio.write_crs(features_ref.rio.crs)
+    return features_other.rio.reproject_match(features_ref).assign_coords(x=features_ref.x, y=features_ref.y)
         
 # we use batches, otherwise model and data may not fit in memory
 def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
@@ -102,23 +95,29 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     
     resolution = abs(env_dataset.rio.resolution()[0])
     ncells0 = max(1, int(res0 / resolution))
-    ncells1 = ncells0 + 1
+    ncells1 = 2*ncells0
     res1 = ncells1 * resolution
 
+    print(f"Creating features for res0: {res0}m")
     features0 = create_features(model, env_dataset, lc_dataset, res0)
+    print(f"Creating features for res1: {res1}m")
     features1 = create_features(model, env_dataset, lc_dataset, res1)
 
     # Align features to a common grid for dSR/dlogA computation
     features1 = align_features_to_reference(features0, features1)
-    features0.dropna(how="all", inplace=True)
-    features1 = features1.reindex_like(features0)
-    total_length = len(features0)
+
+    features0_df = features0.to_dataframe()
+    features1_df = features1.to_dataframe()
+
+    features0_df = features0_df.dropna(how="all")
+    features1_df = features1_df.reindex_like(features0_df)
+    total_length = len(features0_df)
     
 
     percent_step = max(1, total_length // batch_size // 100)
     
     SR01_list = []
-    for features in [features0, features1]:
+    for features in [features0_df, features1_df]:
         SR_list = []
         for i in tqdm(range(0, total_length, batch_size), desc="Calculating SR and stdSR", miniters=percent_step, maxinterval=float("inf")):
             with torch.no_grad():
@@ -137,7 +136,7 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
     mean_dSR_dlogA = np.nanmean(dSR_dlogA, axis=1)
     std_dSR_dlogA = np.std(dSR_dlogA, axis=1)
-    return features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
+    return features0_df, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
 
 
 def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
@@ -158,7 +157,7 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
 if __name__ == "__main__":
     seed = 1
     plotting = True
-    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "6dcd90c"
+    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "37b69ea"
 
     model_name = run_dir.name
 
@@ -169,7 +168,7 @@ if __name__ == "__main__":
     model = load_ensemble_from_folds(run_dir, device=device)
     env_dataset, lc_dataset = load_environmental_features()
 
-    for res in [5e3, 1e4, 5e4, 1e5, 5e5]:
+    for res in [5e3, 5e4]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
 
         features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(
