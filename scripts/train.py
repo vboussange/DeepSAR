@@ -93,11 +93,11 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     }, save_path)
 
 if __name__ == "__main__":
-    config = TrainConfig(sbcv_path=SBCV_SAMPLES_PATH,
+    config = TrainConfig(path_sbcv_data=SBCV_SAMPLES_PATH,
                          num_workers=4,
                          layer_sizes=symmetric_arch(6, base=128, factor=4))
     
-    sample_file = next(config.sbcv_path.glob("*_train.parquet"))
+    sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
     df = gpd.read_parquet(sample_file)
     
     climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]

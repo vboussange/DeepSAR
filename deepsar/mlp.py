@@ -40,7 +40,7 @@ class MLP(nn.Module):
 
     def forward(self, preds):
         x = self.nn(preds)
-        return x
+        return torch.exp(x)
 
 def load_model_checkpoint(model_state, predictors, layer_sizes):
         """Load the model and scalers from the saved checkpoint."""

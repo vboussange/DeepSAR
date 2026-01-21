@@ -23,7 +23,7 @@ class BenchmarkConfig:
     batch_size: int = 1024
     num_workers: int = 0
     n_epochs: int = 100
-    lr: float = 3e-4
+    lr: float = 1e-3
     weight_decay: float = 1e-4
     lr_scheduler_factor: float = 0.5
     lr_scheduler_patience: int = 5

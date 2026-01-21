@@ -18,6 +18,7 @@ from sklearn.metrics import (
 )
 
 from deepsar.data_processing.utils_eva import EVADataset
+from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
 # Initialize logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -40,21 +41,6 @@ CONFIG = {
 }
 
 CONFIG["run_folder"].mkdir(parents=True, exist_ok=True)
-
-
-def assign_checkerboard_folds(gdf: gpd.GeoDataFrame, n_splits: int, block_size: int) -> gpd.GeoDataFrame:
-    """
-    Assigns spatial folds using a checkerboard pattern (same logic as
-    scripts/data_processing/compile_sbcv_eva_datasets.py).
-    """
-    minx, miny, maxx, maxy = gdf.total_bounds
-    grid_x = np.floor((gdf.geometry.x - minx) / block_size).astype(int)
-    grid_y = np.floor((gdf.geometry.y - miny) / block_size).astype(int)
-    gdf = gdf.copy()
-    gdf["grid_x"] = grid_x
-    gdf["grid_y"] = grid_y
-    gdf["spatial_split"] = (gdf["grid_x"] + gdf["grid_y"]) % n_splits
-    return gdf
 
 
 def load_and_preprocess_data():

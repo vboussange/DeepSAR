@@ -14,12 +14,11 @@ import scipy.stats as stats
 from scipy.stats import ttest_ind
 from statsmodels.stats.multicomp import MultiComparison
 
-from deepsar.ensemble_model import DeepSAREnsembleModel
-from deepsar.utils import load_ensemble_from_folds
+from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 ROOT = Path(__file__).parents[2]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_606e055.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
@@ -178,7 +177,7 @@ def add_performance_panels(
         "Extrapolation performance",
     ]
     titles_sub = [
-        "(Spatial block cross evaluation with EVA dataset)",
+        "(spatial block cross evaluation with EVA dataset)",
         "(independent evaluation with GIFT dataset)",
     ]
     colors = ["#f72585", "#4cc9f0"]
@@ -186,15 +185,15 @@ def add_performance_panels(
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
         if dataset == "interp":
-            experiments = ["MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_All"]
+            experiments = ["MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_ClimateDEM_Area"]
             df_plot = df_deepsar
         else:
             experiments = [
                 "MLP_All",
                 "chao2_estimator",
                 "DeepSAR_Area",
-                "DeepSAR_ClimateDEM_Landcover",
-                "DeepSAR_All",
+                "DeepSAR_ClimateDEM",
+                "DeepSAR_ClimateDEM_Area",
             ]
             df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
 
@@ -205,7 +204,16 @@ def add_performance_panels(
             data = exp_data[metric_col].values
             box_data.append(data)
 
-        bplot = ax.boxplot(box_data, patch_artist=True, widths=0.6, showfliers=False)
+        bplot = ax.boxplot(
+            box_data,
+            patch_artist=True,
+            widths=0.6,
+            showfliers=False,
+            showmeans=True,
+            meanline=True,
+            meanprops={"color": "black", "linewidth": 1.2},
+            medianprops={"color": "none"},
+        )
 
         color = colors[j]
         for i, data in enumerate(box_data):
@@ -218,8 +226,6 @@ def add_performance_panels(
         for item in ["caps", "whiskers"]:
             for element in bplot[item]:
                 element.set_color("none")
-        for element in bplot["medians"]:
-            element.set_color("black")
 
         ax.set_xticks(range(1, len(experiments) + 1))
         display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
@@ -262,10 +268,10 @@ def add_performance_panels(
                     whisker_top = q75 + 1.5 * iqr
                     ypos = min(whisker_top, max(data_vals)) + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.02
 
-                    median_val = np.median(data_vals)
+                    mean_val = np.mean(data_vals)
                     ax.text(
                         i + 0.7,
-                        median_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01,
+                        mean_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01,
                         letters[experiment],
                         ha="left",
                         va="bottom",
@@ -276,20 +282,75 @@ def add_performance_panels(
     return fig, ax1, ax2
 
 
-def prepare_eva_test_data(config, model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
-    eva_dataset = gpd.read_parquet(config.sbcv_path / "fold_0_test.parquet")
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
-    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    eva_dataset["predicted_sr"] = model.predict_mean_sr(eva_dataset)
-    return eva_dataset.sample(frac=0.1, random_state=42)
+def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object]:
+    checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+    config = checkpoint["config"]
+    model = Deep4PWeibull(
+        config.layer_sizes,
+        feature_names=checkpoint["feature_names"],
+        feature_scaler=checkpoint["feature_scaler"],
+        target_scaler=checkpoint["target_scaler"],
+    )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(device)
+    model.eval()
+    return model, config
 
 
-def prepare_gift_data(model: DeepSAREnsembleModel) -> gpd.GeoDataFrame:
+def compute_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    y_true = np.asarray(y_true).reshape(-1)
+    y_pred = np.asarray(y_pred).reshape(-1)
+    return float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
+
+
+def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, gpd.GeoDataFrame, int]:
+    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
+    if not ckpt_paths:
+        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
+
+    best_rmse = np.inf
+    best_model = None
+    best_test_df = None
+    best_fold = -1
+
+    for ckpt_path in ckpt_paths:
+        fold_id = int(ckpt_path.stem.split("_")[-1])
+        model, config = load_fold_model(ckpt_path, device)
+        test_path = Path(config.path_sbcv_data) / f"fold_{fold_id}_test.parquet"
+        if not test_path.exists():
+            raise FileNotFoundError(f"Test file for fold {fold_id} not found at {test_path}")
+
+        test_df = gpd.read_parquet(test_path)
+        test_df["log_sp_unit_area"] = np.log(test_df["sp_unit_area"])
+        test_df["log_observed_area"] = np.log(test_df["observed_area"])
+        test_df = test_df.replace([np.inf, -np.inf], np.nan).dropna()
+        y_pred = model.predict_sr(test_df)
+        y_true = test_df["sr"].values
+        rmse = compute_rmse(y_true, y_pred)
+        if rmse < best_rmse:
+            best_rmse = rmse
+            best_model = model
+            best_test_df = test_df
+            best_fold = fold_id
+
+    if best_model is None or best_test_df is None:
+        raise FileNotFoundError("Could not select a best fold model; check fold test files.")
+
+    return best_model, best_test_df, best_fold
+
+
+def prepare_eva_test_data(test_df: gpd.GeoDataFrame, model: Deep4PWeibull, sample_frac: float = 0.1) -> gpd.GeoDataFrame:
+    test_df = test_df.copy()
+    test_df["predicted_sr"] = model.predict_sr(test_df)
+    return test_df.sample(frac=sample_frac, random_state=42)
+
+
+def prepare_gift_data(model: Deep4PWeibull) -> gpd.GeoDataFrame:
     gift_dataset = gpd.read_parquet(GIFT_SAMPLES_PATH)
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
-    gift_dataset["predicted_sr"] = model.predict_mean_sr_tot(gift_dataset)
+    gift_dataset["predicted_sr"] = model.predict_sr_tot(gift_dataset)
     return gift_dataset
 
 if __name__ == "__main__":
@@ -297,8 +358,8 @@ if __name__ == "__main__":
 
     label_map = {
         "DeepSAR_Area": "DeepSAR\n(area only)",
-        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(environment\nonly)",
-        "DeepSAR_All": "DeepSAR",
+        "DeepSAR_ClimateDEM": "DeepSAR\n(environment\nonly)",
+        "DeepSAR_ClimateDEM_Area": "DeepSAR",
         "MLP_All": "MLP",
         "chao2_estimator": "Chao2 estimator",
     }
@@ -319,9 +380,9 @@ if __name__ == "__main__":
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, config = load_ensemble_from_folds(RUN_DIR, device=device, return_config=True)
+    best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
 
-    eva_test_data = prepare_eva_test_data(config, model)
+    eva_test_data = prepare_eva_test_data(best_test_df, best_model)
 
     # Plot predictions vs observations for EVA
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
@@ -347,7 +408,7 @@ if __name__ == "__main__":
     ax3.set_xscale('log')
 
     # Fourth plot: model predictions vs GIFT observations
-    gift_dataset = prepare_gift_data(model)
+    gift_dataset = prepare_gift_data(best_model)
 
     # Create inset axes in ax2
     ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)

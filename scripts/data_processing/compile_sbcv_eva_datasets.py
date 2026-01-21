@@ -22,6 +22,7 @@ import json
 import random
 
 from deepsar.data_processing.utils_eva import EVADataset
+from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
 from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
 from deepsar.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
 from deepsar.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
@@ -50,7 +51,7 @@ CONFIG = {
         "elevation",
         "landcover",
     ],
-    "spunit_area_range_test": (2e3**2, 2e4**2),  # in m2
+    "spunit_area_range_test": (2e3**2, 1e5**2),  # in m2
     "spunit_area_range_train": (2e3**2, 1e6**2),  # in m2
     "random_state": 2,
     "verbose": True,
@@ -59,32 +60,6 @@ CONFIG = {
     "block_size": 20_000, # Block size in meters (e.g., 20km x 20km)
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
-
-def assign_checkerboard_folds(gdf, n_splits=5, block_size=10000):
-    """
-    Assigns spatial folds to a GeoDataFrame using a checkerboard pattern.
-    
-    Args:
-        gdf: GeoDataFrame with plot data
-        n_splits: Number of folds
-        block_size: Size of the checkerboard blocks in meters (assuming projected CRS)
-    """
-    # Calculate bounds
-    minx, miny, maxx, maxy = gdf.total_bounds
-    
-    # Assign grid indices
-    # Use floor to get grid index
-    grid_x = np.floor((gdf.geometry.x - minx) / block_size).astype(int)
-    grid_y = np.floor((gdf.geometry.y - miny) / block_size).astype(int)
-    
-    gdf['grid_x'] = grid_x
-    gdf['grid_y'] = grid_y
-    
-    # Assign folds (checkerboard pattern)
-    # (x + y) % n_splits creates diagonal stripes
-    gdf['spatial_split'] = (gdf['grid_x'] + gdf['grid_y']) % n_splits
-    
-    return gdf
 
 def run_sp_unit_compilation(
     df: gpd.GeoDataFrame,
