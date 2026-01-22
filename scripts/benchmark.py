@@ -12,7 +12,7 @@ import pandas as pd
 import geopandas as gpd
 import torch
 import torch.nn as nn
-from deepsar.utils import symmetric_arch, get_git_hash
+from deepsar.utils import symmetric_arch
 from deepsar.benchmarker import BenchmarkConfig, Benchmarker
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.mlp import MLP
@@ -21,9 +21,8 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
-EXPERIMENT_NAME = "test"
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/d5eb0a5"
 
 def setup_logger():
     log = logging.getLogger("benchmark")
@@ -113,14 +112,6 @@ if __name__ == "__main__":
         "train_frac": 1.0
     })
 
-    # DeepSAR All Env
-    experiments.append({
-        "name": "DeepSAR_Env",
-        "model_init": Deep4PWeibullInit(feature_names=all_env_feats),
-        "feature_names": all_env_feats,
-        "train_frac": 1.0
-    })
-
     # DeepSAR Climate+DEM + Landcover
     experiments.append({
         "name": "DeepSAR_ClimateDEM_Landcover",
@@ -190,7 +181,7 @@ if __name__ == "__main__":
         results.append(res)
     
     df_results = pd.concat(results)
-    output_file = root_folder / f"benchmark_results_{get_git_hash()}.csv"
+    output_file = root_folder / f"benchmark_results_{SBCV_SAMPLES_PATH.name}.csv"
     df_results.to_csv(output_file, index=False)
     
     logger.info(f"Benchmark completed, output saved at {output_file}.")

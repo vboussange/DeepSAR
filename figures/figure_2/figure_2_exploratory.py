@@ -8,7 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    benchmark_path = Path(__file__).parents[2] / "scripts" / "results" / "benchmark" / "benchmark_results.csv"
+    benchmark_path = Path(__file__).parents[2] / "scripts" / "results" / "benchmark" / "benchmark_results_d5eb0a5.csv"
     chao2_path = Path(__file__).parents[2] / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 
     df_bench = pd.read_csv(benchmark_path)

@@ -131,7 +131,7 @@ def plot_shapley_values(df_shap, ax, config_plot):
         ax.fill_between(mean_areas, ci_lower, ci_upper, alpha=0.2, color=color)    
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_ylabel("Relative absolute\nShapley values")
+    ax.set_ylabel("Normalized absolute\nShapley values")
 
 if __name__ == "__main__":
     np.random.seed(42)

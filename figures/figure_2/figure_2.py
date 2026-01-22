@@ -21,7 +21,7 @@ ROOT = Path(__file__).parents[2]
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_606e055.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
-GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
+GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
@@ -185,15 +185,15 @@ def add_performance_panels(
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
         if dataset == "interp":
-            experiments = ["MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_ClimateDEM_Area"]
+            experiments = ["DeepSAR_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_All", "MLP_All"]
             df_plot = df_deepsar
         else:
             experiments = [
                 "MLP_All",
                 "chao2_estimator",
                 "DeepSAR_Area",
-                "DeepSAR_ClimateDEM",
-                "DeepSAR_ClimateDEM_Area",
+                "DeepSAR_ClimateDEM_Landcover",
+                "DeepSAR_All",
             ]
             df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
 
@@ -316,7 +316,7 @@ def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, g
     for ckpt_path in ckpt_paths:
         fold_id = int(ckpt_path.stem.split("_")[-1])
         model, config = load_fold_model(ckpt_path, device)
-        test_path = Path(config.path_sbcv_data) / f"fold_{fold_id}_test.parquet"
+        test_path = config.path_sbcv_data / f"fold_{fold_id}_test.parquet"
         if not test_path.exists():
             raise FileNotFoundError(f"Test file for fold {fold_id} not found at {test_path}")
 
@@ -358,8 +358,8 @@ if __name__ == "__main__":
 
     label_map = {
         "DeepSAR_Area": "DeepSAR\n(area only)",
-        "DeepSAR_ClimateDEM": "DeepSAR\n(environment\nonly)",
-        "DeepSAR_ClimateDEM_Area": "DeepSAR",
+        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(environment\nonly)",
+        "DeepSAR_All": "DeepSAR",
         "MLP_All": "MLP",
         "chao2_estimator": "Chao2 estimator",
     }

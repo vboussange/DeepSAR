@@ -57,7 +57,7 @@ CONFIG = {
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
     "n_splits": 5, # number of spatial folds, should be >=3
-    "block_size": 20_000, # Block size in meters (e.g., 20km x 20km)
+    "block_size": 10_000, # Block size in meters (e.g., 20km x 20km)
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 
@@ -194,4 +194,6 @@ if __name__ == "__main__":
         )
         save_compiled_data(test_data, output_file_path, f"fold_{fold_id}_test")
 
+    with open(output_file_path / "config_used.json", 'w') as f:
+        json.dump({k: str(v) if isinstance(v, Path) else v for k, v in CONFIG.items()}, f, indent=2)
     logging.info("Done!")
