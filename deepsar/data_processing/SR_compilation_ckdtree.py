@@ -164,7 +164,12 @@ def run_SR_compilation_ckdtree(
     logging.info(f"Generating {n_sp_units} spatial units...")
     
     # Process each spatial unit one at a time (streaming approach)
-    for i in tqdm(range(n_sp_units), desc="Compiling SR (cKDTree)", disable=not verbose):
+    for i in tqdm(
+        range(n_sp_units),
+        desc="Compiling SR (cKDTree)",
+        disable=not verbose,
+        miniters=max(n_sp_units // 100, 1),
+    ):
         # Sample center plot index (uniform over all plots)
         center_idx = rng.integers(0, n_plots)
         center_coords = coords[center_idx]

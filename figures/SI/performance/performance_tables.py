@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).parents[3]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_606e055.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 
 

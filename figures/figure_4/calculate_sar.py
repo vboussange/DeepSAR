@@ -68,6 +68,72 @@ def build_features_for_window(model, env_ds, lc_ds, x, y, window_size, res_env_p
 
     return pd.DataFrame([{name: feature_values[name] for name in model.feature_names}])
 
+
+def format_mean_std(mean: float, std: float) -> str:
+    return f"{mean:.3f} ± {std:.3f}"
+
+
+def nearest_index(values: np.ndarray, target: float) -> int:
+    return int(np.argmin(np.abs(values - target)))
+
+
+def export_sar_table(locations, window_sizes, output_path: Path) -> None:
+    area_km2 = (window_sizes ** 2) / 1e6
+    area_targets = np.array([5e3**2 / 1e6, 5e4**2 / 1e6])
+    idx_low = nearest_index(area_km2, area_targets[0])
+    idx_high = nearest_index(area_km2, area_targets[1])
+
+    rows = []
+    label_map = {"loc1": "A", "loc2": "B", "loc3": "C"}
+    for name in label_map.keys():
+        data = locations[name]
+        lat, lon = data["coords"]
+        srs = data["SRs"]
+        sr_low = srs[idx_low]
+        sr_high = srs[idx_high]
+
+        slope_low = (np.log(srs[idx_low + 1]) - np.log(srs[idx_low])) / (np.log(area_km2[idx_low + 1]) - np.log(area_km2[idx_low]))
+        slope_high = (np.log(srs[idx_high + 1]) - np.log(srs[idx_high])) / (np.log(area_km2[idx_high + 1]) - np.log(area_km2[idx_high]))
+
+        rows.append(
+            {
+                "Location": label_map.get(name, name),
+                "Lat": lat,
+                "Lon": lon,
+                "SR_low": format_mean_std(float(np.mean(sr_low)), float(np.std(sr_low))),
+                "SR_high": format_mean_std(float(np.mean(sr_high)), float(np.std(sr_high))),
+                "Slope_low": format_mean_std(float(np.mean(slope_low)), float(np.std(slope_low))),
+                "Slope_high": format_mean_std(float(np.mean(slope_high)), float(np.std(slope_high))),
+            }
+        )
+
+    header = (
+        "\\begin{table}\n"
+        "    \\centering\n"
+        "    \\small\n"
+        "    \\setlength{\\tabcolsep}{5pt}\n"
+        "    \\begin{tabularx}{\\textwidth}{l r r >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
+        "    \\toprule\n"
+        "    Location & Lat & Lon & SR at $A_{low}$ & SR at $A_{high}$ & Slope at $A_{low}$ & Slope at $A_{high}$ \\\\\n"
+        "    \\midrule\n"
+    )
+
+    body = ""
+    for row in rows:
+            body += (
+                f"    {row['Location']} & {row['Lat']:.2f} & {row['Lon']:.2f} & {row['SR_low']} & {row['SR_high']} & {row['Slope_low']} & {row['Slope_high']} \\\\\n"
+        )
+
+    footer = (
+        "    \\bottomrule\n"
+        "    \\end{tabularx}\n"
+        "    \\caption{SAR summary for $A_{low}=5\\times10^3\\,\\mathrm{m}$ and $A_{high}=5\\times10^4\\,\\mathrm{m}$ (areas in km$^2$). Values are mean ± SD across ensemble members.}\n"
+        "    \\label{tab:sar_summary}\n"
+        "\\end{table}\n"
+    )
+
+    output_path.write_text(header + body + footer)
+
     
 if __name__ == "__main__":
     # creating X_maps for different resolutions
@@ -144,3 +210,4 @@ if __name__ == "__main__":
     # ax.set_yscale("log")
     fig.savefig(output_dir / "SARs.pdf", dpi=300, bbox_inches="tight")
     save_to_pickle(output_dir / "SARs.pkl", dict_SAR=dict_SAR)
+    export_sar_table(dict_SAR, window_sizes, output_dir / "SARs_table.tex")

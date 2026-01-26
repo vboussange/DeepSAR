@@ -21,8 +21,8 @@ from deepsar.trainer import DeepSARLitModule, TrainConfig
 from deepsar.dataset import create_dataloader
 from deepsar.utils import symmetric_arch, get_git_hash
 
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{get_git_hash()}_no_lc_features"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/95c85d6"
+RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     climate_feats = [c for c in climate_feats if c in df.columns]
     dem_feats = [c for c in dem_feats if c in df.columns]
     
-    feature_names = climate_feats + dem_feats + ["log_sp_unit_area"] #+ lc_feats
+    feature_names = climate_feats + dem_feats + ["log_sp_unit_area"] + lc_feats
     logger.info(f"Training with features: {feature_names}")
         
     for fold_id in range(5):

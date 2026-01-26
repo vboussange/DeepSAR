@@ -17,7 +17,7 @@ from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 
 ROOT = Path(__file__).parents[2]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_d5eb0a5.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "fee8771_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
