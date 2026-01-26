@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import json
 
 from deepsar.plotting import CMAP_BR
 
@@ -36,7 +37,7 @@ def load_data():
     return train_dataset, gift_dataset
 
 
-def export_sampling_effort_stats(train_dataset, gift_dataset, output_path: Path) -> None:
+def export_dataset_stats_json(train_dataset, gift_dataset, output_path: Path) -> None:
     def summarize(series: np.ndarray) -> dict:
         values = np.asarray(series)
         return {
@@ -49,20 +50,26 @@ def export_sampling_effort_stats(train_dataset, gift_dataset, output_path: Path)
         }
 
     stats = {
-        "train": summarize(train_dataset["coverage"].dropna().values),
-        "gift": summarize(gift_dataset["coverage"].dropna().values),
+        "sampling_effort": {
+            "train": summarize(train_dataset["coverage"].dropna().values),
+            "gift": summarize(gift_dataset["coverage"].dropna().values),
+        },
+        "spatial_unit_area": {
+            "train": summarize(train_dataset["sp_unit_area"].dropna().values),
+            "gift": summarize(gift_dataset["sp_unit_area"].dropna().values),
+        },
     }
-    pd.DataFrame(stats).T.to_csv(output_path, index_label="dataset")
+    output_path.write_text(json.dumps(stats, indent=2))
 
 
 if __name__ == "__main__":
     train_dataset, gift_dataset = load_data()
     colors = ["#f72585","#4cc9f0"]
 
-    export_sampling_effort_stats(
+    export_dataset_stats_json(
         train_dataset,
         gift_dataset,
-        Path(__file__).with_name("sampling_effort_stats.csv"),
+        Path(__file__).with_name("dataset_stats.json"),
     )
     
     fig, ax = plt.subplots(figsize=(6, 4))

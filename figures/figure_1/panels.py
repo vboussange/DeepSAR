@@ -3,6 +3,7 @@ from scipy import ndimage
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.patches import Rectangle
 
 # Function to create 3D blocks
 def plot_3d_env_pred(ax, data, cmap):
@@ -68,4 +69,24 @@ data.flat[indices] = 1
 ax1 = fig.add_subplot(projection='3d')
 plot_vegetation_plots(ax1, data)
 fig.savefig("vegetation_plots.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+
+
+def plot_spatial_unit_boxes_on_3d(ax, grid_size, sizes, colors, linewidth=2.5, z=0.12):
+    center = grid_size / 2
+    for size, color in zip(sizes, colors):
+        start = center - size / 2
+        end = center + size / 2
+        ax.plot([start, end], [start, start], [z, z], color=color, linewidth=linewidth)
+        ax.plot([end, end], [start, end], [z, z], color=color, linewidth=linewidth)
+        ax.plot([end, start], [end, end], [z, z], color=color, linewidth=linewidth)
+        ax.plot([start, start], [end, start], [z, z], color=color, linewidth=linewidth)
+
+
+fig = plt.figure()
+ax1 = fig.add_subplot(projection='3d')
+plot_vegetation_plots(ax1, data)
+box_colors = ["#f72585", "#4cc9f0", "#3a0ca3"]
+box_sizes = [10, 18, 26]
+plot_spatial_unit_boxes_on_3d(ax1, data.shape[0], box_sizes, box_colors)
+fig.savefig("vegetation_plots_boxes.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 

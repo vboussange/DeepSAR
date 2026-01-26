@@ -20,6 +20,8 @@ import xarray as xr
 import logging
 import json
 import random
+import os
+import multiprocessing as mp
 
 from deepsar.data_processing.utils_eva import EVADataset
 from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
@@ -34,6 +36,11 @@ logging.basicConfig(
 )
 numba_logger = logging.getLogger("numba")
 numba_logger.setLevel(logging.WARNING)
+
+_EVA_DF = None
+_ENV_DS = None
+_LC_DS = None
+_OUTPUT_PATH = None
 
 CONFIG = {
     "output_file_path": Path(
@@ -118,6 +125,80 @@ def save_compiled_data(
     with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=2)
 
+def configure_worker_logging(fold_id: int) -> None:
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        f"%(asctime)s - %(levelname)s - Fold {fold_id} - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
+    numba_logger = logging.getLogger("numba")
+    numba_logger.setLevel(logging.WARNING)
+
+
+def process_fold(fold_id: int) -> int:
+    configure_worker_logging(fold_id)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Processing Fold {fold_id + 1}/{CONFIG['n_splits']}...")
+
+    df = _EVA_DF
+    env_ds = _ENV_DS
+    lc_ds = _LC_DS
+    output_path = _OUTPUT_PATH
+
+    test_fold_id = fold_id
+    val_fold_id = (fold_id + 1) % CONFIG["n_splits"]
+
+    test_df = df[df["spatial_split"] == test_fold_id]
+    val_df = df[df["spatial_split"] == val_fold_id]
+    train_df = df[(df["spatial_split"] != test_fold_id) & (df["spatial_split"] != val_fold_id)]
+
+    logger.info(
+        f"Fold {fold_id}: Train plots: {len(train_df):,}, "
+        f"Val plots: {len(val_df):,}, Test plots: {len(test_df):,}"
+    )
+
+    logger.info(f"Generating training samples for Fold {fold_id}...")
+    train_data = run_sp_unit_compilation(
+        train_df,
+        env_ds,
+        lc_ds,
+        n_sp_units=int(CONFIG["ratio_samples_plots"] * len(train_df)),
+        area_range=CONFIG["spunit_area_range_train"],
+        env_var_names=CONFIG["env_vars"],
+    )
+    save_compiled_data(train_data, output_path, f"fold_{fold_id}_train")
+
+    logger.info(f"Generating validation samples for Fold {fold_id}...")
+    val_data = run_sp_unit_compilation(
+        val_df,
+        env_ds,
+        lc_ds,
+        n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
+        area_range=CONFIG["spunit_area_range_train"],
+        env_var_names=CONFIG["env_vars"],
+    )
+    save_compiled_data(val_data, output_path, f"fold_{fold_id}_val")
+
+    logger.info(f"Generating test samples for Fold {fold_id}...")
+    test_data = run_sp_unit_compilation(
+        test_df,
+        env_ds,
+        lc_ds,
+        n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)),
+        area_range=CONFIG["spunit_area_range_test"],
+        env_var_names=CONFIG["env_vars"],
+    )
+    save_compiled_data(test_data, output_path, f"fold_{fold_id}_test")
+
+    logger.info(f"Completed Fold {fold_id}.")
+    return fold_id
+
 if __name__ == "__main__":
     # Set up random seeds for reproducibility
     random.seed(CONFIG["random_state"])
@@ -146,53 +227,18 @@ if __name__ == "__main__":
     env_features = EnvironmentalFeatureDataset()
     chelsa_dem_ds, lc_ds = env_features.load(use_cache=True)
     
-    # Loop through folds
-    for fold_id in range(CONFIG["n_splits"]):
-        logging.info(f"Processing Fold {fold_id + 1}/{CONFIG['n_splits']}...")
-        
-        # Define fold indices
-        test_fold_id = fold_id
-        val_fold_id = (fold_id + 1) % CONFIG["n_splits"]
-        
-        # Split data
-        test_df = df[df['spatial_split'] == test_fold_id]
-        val_df = df[df['spatial_split'] == val_fold_id]
-        train_df = df[(df['spatial_split'] != test_fold_id) & (df['spatial_split'] != val_fold_id)]
-        
-        logging.info(f"Fold {fold_id}: Train plots: {len(train_df):,}, Val plots: {len(val_df):,}, Test plots: {len(test_df):,}")
-        
-        # Generate Training Data
-        logging.info(f"Generating training samples for Fold {fold_id}...")
-        train_data = run_sp_unit_compilation(
-            train_df,
-            chelsa_dem_ds, lc_ds,
-            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(train_df)),
-            area_range=CONFIG["spunit_area_range_train"],
-            env_var_names=CONFIG["env_vars"],
-        )
-        save_compiled_data(train_data, output_file_path, f"fold_{fold_id}_train")
-        
-        # Generate Validation Data
-        logging.info(f"Generating validation samples for Fold {fold_id}...")
-        val_data = run_sp_unit_compilation(
-            val_df,
-            chelsa_dem_ds, lc_ds,
-            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
-            area_range=CONFIG["spunit_area_range_train"],
-            env_var_names=CONFIG["env_vars"],
-        )
-        save_compiled_data(val_data, output_file_path, f"fold_{fold_id}_val")
-        
-        # Generate Test Data
-        logging.info(f"Generating test samples for Fold {fold_id}...")
-        test_data = run_sp_unit_compilation(
-            test_df,
-            chelsa_dem_ds, lc_ds,
-            n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)), # Smaller test set
-            area_range=CONFIG["spunit_area_range_test"],
-            env_var_names=CONFIG["env_vars"],
-        )
-        save_compiled_data(test_data, output_file_path, f"fold_{fold_id}_test")
+    global _EVA_DF, _ENV_DS, _LC_DS, _OUTPUT_PATH
+    _EVA_DF = df
+    _ENV_DS = chelsa_dem_ds
+    _LC_DS = lc_ds
+    _OUTPUT_PATH = output_file_path
+
+    ctx = mp.get_context("fork")
+    n_workers = min(CONFIG["n_splits"], os.cpu_count() or 1)
+    logging.info(f"Processing folds in parallel with {n_workers} workers...")
+    with ctx.Pool(processes=n_workers) as pool:
+        for _ in pool.imap_unordered(process_fold, range(CONFIG["n_splits"])):
+            pass
 
     with open(output_file_path / "config_used.json", 'w') as f:
         json.dump({k: str(v) if isinstance(v, Path) else v for k, v in CONFIG.items()}, f, indent=2)

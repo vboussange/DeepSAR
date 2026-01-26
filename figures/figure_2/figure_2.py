@@ -8,7 +8,6 @@ import geopandas as gpd
 import torch
 from pathlib import Path
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 import scipy.stats as stats
 from scipy.stats import ttest_ind
@@ -20,7 +19,7 @@ from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 ROOT = Path(__file__).parents[2]
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_d5eb0a5.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "fee8771_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
@@ -164,12 +163,13 @@ def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def add_performance_panels(
+    ax1: plt.Axes,
+    ax2: plt.Axes,
     df_deepsar: pd.DataFrame,
     df_chao2: pd.DataFrame,
     metric: str,
     label_map: dict[str, str] | None = None,
-) -> tuple[plt.Figure, plt.Axes, plt.Axes]:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+) -> None:
 
     datasets = ["interp", "extrap"]
     titles_main = [
@@ -229,7 +229,7 @@ def add_performance_panels(
 
         ax.set_xticks(range(1, len(experiments) + 1))
         display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
-        ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=10)
+        ax.set_xticklabels(display_labels, rotation=0, ha="right", fontsize=10)
         ax.set_ylabel(f"{metric.upper()}") if j == 0 else None
         ax.set_title(titles_main[j], fontsize=12, fontweight="bold", pad=18)
         ax.text(
@@ -241,10 +241,6 @@ def add_performance_panels(
             va="bottom",
             fontsize=9,
         )
-
-        y_min, y_max = ax.get_ylim()
-        y_range = y_max - y_min
-        ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.3 * y_range)
 
         alpha = 0.05
         flat_data = []
@@ -279,10 +275,10 @@ def add_performance_panels(
                         color="black",
                     )
 
-    return fig, ax1, ax2
+    return None
 
 
-def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object]:
+def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object, dict]:
     checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
     config = checkpoint["config"]
     model = Deep4PWeibull(
@@ -294,13 +290,8 @@ def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
-    return model, config
-
-
-def compute_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    y_true = np.asarray(y_true).reshape(-1)
-    y_pred = np.asarray(y_pred).reshape(-1)
-    return float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
+    metrics = checkpoint.get("metrics", {})
+    return model, config, metrics
 
 
 def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, gpd.GeoDataFrame, int]:
@@ -309,32 +300,34 @@ def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, g
         raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
 
     best_rmse = np.inf
-    best_model = None
-    best_test_df = None
+    best_ckpt_path = None
     best_fold = -1
+    best_config = None
 
     for ckpt_path in ckpt_paths:
         fold_id = int(ckpt_path.stem.split("_")[-1])
-        model, config = load_fold_model(ckpt_path, device)
-        test_path = config.path_sbcv_data / f"fold_{fold_id}_test.parquet"
-        if not test_path.exists():
-            raise FileNotFoundError(f"Test file for fold {fold_id} not found at {test_path}")
-
-        test_df = gpd.read_parquet(test_path)
-        test_df["log_sp_unit_area"] = np.log(test_df["sp_unit_area"])
-        test_df["log_observed_area"] = np.log(test_df["observed_area"])
-        test_df = test_df.replace([np.inf, -np.inf], np.nan).dropna()
-        y_pred = model.predict_sr(test_df)
-        y_true = test_df["sr"].values
-        rmse = compute_rmse(y_true, y_pred)
+        _, config, metrics = load_fold_model(ckpt_path, device)
+        rmse = metrics.get("test", {}).get("rmse")
+        if rmse is None:
+            continue
         if rmse < best_rmse:
             best_rmse = rmse
-            best_model = model
-            best_test_df = test_df
+            best_ckpt_path = ckpt_path
             best_fold = fold_id
+            best_config = config
 
-    if best_model is None or best_test_df is None:
-        raise FileNotFoundError("Could not select a best fold model; check fold test files.")
+    if best_ckpt_path is None or best_config is None:
+        raise FileNotFoundError("Could not select a best fold model; check checkpoint metrics.")
+
+    best_model, _, _ = load_fold_model(best_ckpt_path, device)
+    test_path = best_config.path_sbcv_data / f"fold_{best_fold}_test.parquet"
+    if not test_path.exists():
+        raise FileNotFoundError(f"Test file for fold {best_fold} not found at {test_path}")
+
+    best_test_df = gpd.read_parquet(test_path)
+    best_test_df["log_sp_unit_area"] = np.log(best_test_df["sp_unit_area"])
+    best_test_df["log_observed_area"] = np.log(best_test_df["observed_area"])
+    best_test_df = best_test_df.replace([np.inf, -np.inf], np.nan).dropna()
 
     return best_model, best_test_df, best_fold
 
@@ -358,26 +351,20 @@ if __name__ == "__main__":
 
     label_map = {
         "DeepSAR_Area": "DeepSAR\n(area only)",
-        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(environment\nonly)",
+        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(env. only)",
         "DeepSAR_All": "DeepSAR",
         "MLP_All": "MLP",
-        "chao2_estimator": "Chao2 estimator",
+        "chao2_estimator": "Chao2\nestimator",
     }
 
     df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
 
     metric = "rmse"
-    fig, ax1, ax2 = add_performance_panels(df_deepsar, df_chao2, metric, label_map=label_map)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+    ax1, ax2 = axes[0]
+    ax3, ax4 = axes[1]
 
-    # Third plot: observed vs predicted for area+environment model on EVA dataset
-    ax3 = inset_axes(
-        ax1,
-        width="40%",
-        height="40%",
-        loc="upper right",
-        bbox_to_anchor=(-0.05, 0, 1, 1),
-        bbox_transform=ax1.transAxes,
-    )
+    add_performance_panels(ax1, ax2, df_deepsar, df_chao2, metric, label_map=label_map)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
@@ -390,10 +377,15 @@ if __name__ == "__main__":
     y_eva = mask_eva["predicted_sr"]
     eva_relative_bias = (y_eva - x_eva) / x_eva
     eva_median_bias = eva_relative_bias.median()
-    ax3.text(0.1, 0.06, f'Rel. bias: {eva_median_bias:.3f}', 
-            transform=ax3.transAxes, 
-            fontsize=10,
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
+    eva_pearson_r = stats.pearsonr(x_eva, y_eva)[0]
+    ax3.text(
+        0.05,
+        0.08,
+        f"Rel. bias: {eva_median_bias:.3f}\nPearson r: {eva_pearson_r:.3f}",
+        transform=ax3.transAxes,
+        fontsize=9,
+        bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
+    )
 
     ax3.scatter(x_eva, y_eva, alpha=0.6, s=10, color="#f72585")
     
@@ -410,20 +402,22 @@ if __name__ == "__main__":
     # Fourth plot: model predictions vs GIFT observations
     gift_dataset = prepare_gift_data(best_model)
 
-    # Create inset axes in ax2
-    ax4 = inset_axes(ax2, width="40%", height="40%", loc='upper right', bbox_to_anchor=(-0.02, 0, 1, 1), bbox_transform=ax2.transAxes)
-    
     # Plot predictions vs observations for GIFT
     mask_gift = gift_dataset[["sr", "predicted_sr"]].dropna()
     x_gift = mask_gift["sr"]
     y_gift = mask_gift["predicted_sr"]
     gift_relative_bias = (y_gift - x_gift) / x_gift
     gift_median_bias = gift_relative_bias.median()
+    gift_pearson_r = stats.pearsonr(x_gift, y_gift)[0]
 
-    ax4.text(0.1, 0.06, f'Rel. bias: {gift_median_bias:.3f}', 
-            transform=ax4.transAxes, 
-            fontsize=10,
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', pad=1))
+    ax4.text(
+        0.05,
+        0.08,
+        f"Rel. bias: {gift_median_bias:.3f}\nPearson r: {gift_pearson_r:.3f}",
+        transform=ax4.transAxes,
+        fontsize=9,
+        bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
+    )
     ax4.scatter(x_gift, y_gift, alpha=0.6, s=10, color="#4cc9f0")
     
     # Add 1:1 line
@@ -442,9 +436,9 @@ if __name__ == "__main__":
     
     # Add panel labels (a, b, c, d) in Nature style
     ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax2.text(0.1, 0.1, 'c', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax3.text(0.15, 0.95, 'b', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax4.text(0.15, 0.95, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax3.text(0.1, 0.1, 'c', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax4.text(0.1, 0.1, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
     
     plt.tight_layout()
     plt.show()
