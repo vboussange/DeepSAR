@@ -41,8 +41,8 @@ def extract_habitat_lev1(ESyhab: str):
         
 class EVADataset:
     """
-    Loader and preprocessor for EVA (European Vegetation Archive) vegetation plot data.
-    
+    Loader and preprocessor for EVA vegetation plot data.
+
     Handles loading of species occurrence data and plot metadata, with efficient
     preprocessing for large-scale datasets (500k+ plots, 20k+ species).
     """
@@ -54,6 +54,12 @@ class EVADataset:
         self.preprocessed_cache = self.data_dir / "anonymised/preprocessed_cache.parquet"
 
     def read_species_data(self):
+        """Load anonymised EVA species data from parquet.
+
+        Returns:
+            pd.DataFrame: Species-level records with `record_id` and
+                `anonymised_species_name` columns.
+        """
         species_dataframe_path = self.data_dir / "anonymised/species_data.parquet"
         if species_dataframe_path.exists():
             species_df = pd.read_parquet(species_dataframe_path)
@@ -62,6 +68,11 @@ class EVADataset:
             raise FileNotFoundError(f"Anonymised species data not found in {self.data_dir / 'anonymised'}. Did you download/anonymise the data?")
     
     def read_plot_data(self):
+        """Load anonymised EVA plot data from parquet.
+
+        Returns:
+            gpd.GeoDataFrame: Plot-level point geometries and metadata.
+        """
         plot_data_file = self.data_dir / "anonymised/plot_data.parquet"
         if plot_data_file.exists():
             plot_data = gpd.read_parquet(plot_data_file)
@@ -71,18 +82,17 @@ class EVADataset:
     
     def load_species_matrix(self, use_cache=True):
         """
-        Converts GeoPandas data and species dict into a single DataFrame for deep learning.
-        Optimized for large datasets (500k+ plots, 20k+ species).
+        Converts GeoPandas data and species dict into a single DataFrame holding presence-absence matrix.
         
         Args:
             use_cache: Whether to use cached preprocessed data if available (default: True).
         
         Returns:
-            pd.DataFrame: DataFrame containing:
-                - geometry: Point geometry
+            gpd.GeoDataFrame: DataFrame containing:
+                - geometry: Point geometry, holding location of corresponding sampling site
                 - area_m2: float32
-                - species_matrix: np.array (N_species,) bool presence/absence per row
-                - species_list: list of species names corresponding to matrix columns (metadata)
+                - species columns: bool presence/absence for each species
+                - species_list: list of species names corresponding to columns (metadata)
         """
         # Check cache first
         if use_cache and self.preprocessed_cache.exists():

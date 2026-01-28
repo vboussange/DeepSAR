@@ -9,10 +9,10 @@ GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/anonymised/"
 
 class GIFTDataset:
     """
-    Loader and preprocessor for GIFT (Global Inventory of Floras and Traits) vegetation plot data.
-    
-    Handles loading of species occurrence data and plot metadata, with efficient
-    preprocessing for large-scale datasets.
+    Loader and preprocessor for the GIFT dataset.
+
+    Provides helpers to read anonymised parquet files and build a plot-level
+    presence-absence matrix.
     """
     
     def __init__(self, data_dir=GIFT_DATA_DIR):
@@ -22,7 +22,12 @@ class GIFTDataset:
         self.preprocessed_cache = self.data_dir / "preprocessed_cache.parquet"
 
     def read_species_data(self):
-        """Load GIFT species data from parquet file."""
+        """Load GIFT species data from the parquet file.
+
+        Returns:
+            pd.DataFrame: Species-level records with `record_id` and
+                `anonymised_species_name` columns.
+        """
         species_dataframe_path = self.data_dir / "species_data.parquet"
         if species_dataframe_path.exists():
             species_df = pd.read_parquet(species_dataframe_path)
@@ -31,7 +36,11 @@ class GIFTDataset:
             raise FileNotFoundError(f"Species data not found at {species_dataframe_path}. Did you preprocess the data?")
     
     def read_plot_data(self):
-        """Load GIFT plot data from parquet file."""
+        """Load GIFT plot data from the parquet file.
+
+        Returns:
+            gpd.GeoDataFrame: Plot-level polygons and metadata.
+        """
         plot_data_file = self.data_dir / "plot_data.parquet"
         if plot_data_file.exists():
             plot_data = gpd.read_parquet(plot_data_file)
@@ -42,7 +51,6 @@ class GIFTDataset:
     def load_species_matrix(self, use_cache=True):
         """
         Converts plot data and species data into a single DataFrame with presence-absence matrix.
-        Optimized for large datasets.
         
         Args:
             use_cache: Whether to use cached preprocessed data if available (default: True).

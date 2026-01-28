@@ -16,6 +16,7 @@ from statsmodels.stats.multicomp import MultiComparison
 
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from deepsar.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
@@ -344,7 +345,7 @@ def prepare_gift_data(model: Deep4PWeibull) -> gpd.GeoDataFrame:
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
     gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
-    gift_dataset["predicted_sr"] = model.predict_sr_tot(gift_dataset)
+    gift_dataset["predicted_sr"] = model.predict_mean_sr_tot(gift_dataset)
     return gift_dataset
 
 if __name__ == "__main__":
@@ -369,6 +370,7 @@ if __name__ == "__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
+    ensemble_model = load_ensemble_from_folds(RUN_DIR, device=device)
 
     eva_test_data = prepare_eva_test_data(best_test_df, best_model)
 
@@ -401,7 +403,7 @@ if __name__ == "__main__":
     ax3.set_xscale('log')
 
     # Fourth plot: model predictions vs GIFT observations
-    gift_dataset = prepare_gift_data(best_model)
+    gift_dataset = prepare_gift_data(ensemble_model)
 
     # Plot predictions vs observations for GIFT
     mask_gift = gift_dataset[["sr", "predicted_sr"]].dropna()

@@ -17,14 +17,10 @@ CACHE_DIR = Path(os.getenv('CACHE_DIR', BASE_DIR / 'processed/environmental_feat
 
 class EnvironmentalFeatureDataset():
     """
-    Environmental feature dataset loader that combines CHELSA climate data,
-    DEM elevation data, and Corine Land Cover data into a single aligned xarray Dataset.
-    
-    The dataset is suitable for downstream deep learning applications with:
-    - All rasters aligned to the same spatial grid
-    - Remapped landcover classes (stored as integers for memory efficiency)
-    - Consistent coordinate reference system (default: EPSG:3035)
-    - Optimized caching with compression and float32 coordinates
+    Environmental feature dataset loader.
+
+    Combines CHELSA climate variables, DEM elevation, and Corine Land Cover into a
+    single aligned xarray Dataset on a shared grid.
     """
     
     # Compression settings for netCDF files (zlib with complevel 5 is a good balance)
@@ -50,18 +46,18 @@ class EnvironmentalFeatureDataset():
         Loads and combines environmental raster data into a single xarray Dataset.
         
         This method loads CHELSA climate variables, DEM elevation, and Corine Land Cover data,
-        aligns them to a common grid, and one-hot encodes the landcover classes.
+        and aligns them to a common grid.
         All rasters are cropped to the extent of the smallest raster.
             
         Args:
             use_cache (bool): Whether to use cached data if available.
 
-        Returns:
-            xr.Dataset: Combined dataset with:
-                - CHELSA bioclimatic variables (bio1, bio2, ..., bio19)
-                - DEM elevation (elevation)
-                - Remapped landcover classes (landcover) as integers
-                All in target_crs coordinate system.
+                Returns:
+                        tuple[xr.Dataset, xr.Dataset]:
+                                - CHELSA + DEM dataset with bioclimatic variables (bio1..bio19)
+                                    and elevation (elevation)
+                                - Landcover dataset with remapped classes (landcover) as integers
+                                Both in the target CRS.
         """
         print("Loading and aligning environmental datasets...")
         
@@ -84,8 +80,11 @@ class EnvironmentalFeatureDataset():
         """Load CHELSA bioclimatic variables and reproject to target CRS.
         
         Args:
-            ref_da: Reference DataArray to match grid and extent.
-            use_cache: Whether to use cached data if available.
+            ref_da: Reference DataArray used to match grid, CRS, and extent.
+            use_cache: Whether to use cached data when available.
+
+        Returns:
+            xr.Dataset: CHELSA variables aligned to the reference grid.
         """
         # Check cache
         if use_cache and self.chelsa_cache.is_file():
@@ -125,6 +124,9 @@ class EnvironmentalFeatureDataset():
         
         Args:
             use_cache: Whether to use cached data if available.
+
+        Returns:
+            xr.Dataset: DEM elevation dataset with variable name `elevation`.
         """
         # Check cache
         if use_cache and self.dem_cache.exists():
@@ -158,8 +160,11 @@ class EnvironmentalFeatureDataset():
         """Load and remap Corine Land Cover data and reproject to target CRS.
         
         Args:
-            ref_da: Reference DataArray to match grid and extent.
-            use_cache: Whether to use cached data if available.
+            ref_da: Reference DataArray used to match grid, CRS, and extent.
+            use_cache: Whether to use cached data when available.
+
+        Returns:
+            xr.Dataset: Remapped landcover dataset aligned to the reference grid.
         """
         # Check cache
         if use_cache and self.lc_cache.exists():

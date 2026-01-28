@@ -1,5 +1,6 @@
 """
-Memory-Efficient Species Richness Computation using cKDTree
+Memory-efficient species richness computation using cKDTree.
+
 Spatial queries optimized for large-scale biodiversity datasets.
 """
 
@@ -29,16 +30,17 @@ def compute_single_square_stats_ckdtree(
     Memory-efficient implementation using spatial indexing.
     
     Args:
-        center_coords: Center coordinates [x, y]
-        half_length: Half side length of the square
-        kdtree: Pre-built cKDTree for spatial queries
-        coords: All plot coordinates (N, 2) - needed for filtering if not using p=inf
-        obs_areas: All observed areas (N,)
-        species_matrix: Presence-absence matrix (N, M) - sparse or dense boolean
-        rng: Numpy random generator for subsampling
+        center_coords: Center coordinates [x, y].
+        half_length: Half side length of the square.
+        kdtree: Pre-built cKDTree for spatial queries.
+        coords: All plot coordinates (N, 2), used for box filtering.
+        obs_areas: Observed areas for all plots (N,).
+        species_matrix: Presence-absence matrix (N, M), boolean.
+        rng: NumPy random generator for subsampling.
         
     Returns:
-        Tuple of (observed_area, sp_unit_area, sr, geometry)
+        tuple[float, float, int, shapely.geometry.Polygon]:
+            (observed_area, sp_unit_area, sr, geometry)
     """
     cx, cy = center_coords
     
@@ -131,14 +133,15 @@ def run_SR_compilation_ckdtree(
     without accumulating large intermediate arrays.
     
     Args:
-        df: GeoDataFrame containing plot data (geometry, observed_area, species columns)
-        n_sp_units: Number of spatial units to generate
-        area_range: Tuple of (min_area, max_area) for random squares
-        verbose: Whether to show progress bar
-        random_state: Random seed
+        df: GeoDataFrame containing plot data (geometry, area_m2, species columns).
+        n_sp_units: Number of spatial units to generate.
+        area_range: Tuple of (min_area, max_area) for random squares.
+        verbose: Whether to show a progress bar.
+        random_state: Random seed.
         
     Returns:
-        GeoDataFrame with columns: observed_area, sp_unit_area, sr, geometry
+        gpd.GeoDataFrame: Spatial units with columns observed_area, sp_unit_area,
+            sr, and geometry.
     """
     # Extract arrays from DataFrame
     coords = np.column_stack((df.geometry.x, df.geometry.y))
