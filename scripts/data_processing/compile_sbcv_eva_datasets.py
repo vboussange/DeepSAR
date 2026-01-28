@@ -64,7 +64,7 @@ CONFIG = {
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
     "n_splits": 5, # number of spatial folds, should be >=3
-    "block_size": 50_000, # Block size in meters (e.g., 20km x 20km)
+    "block_size": 1_000, # Block size in meters (e.g., 20km x 20km)
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).parents[3]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_d5eb0a5.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 
 
@@ -194,11 +194,11 @@ if __name__ == "__main__":
         interp_table,
         caption=interp_caption,
         label=interp_label,
-        output_path=Path(__file__).with_name("interp_performance.tex"),
+        output_path=BENCHMARK_RESULTS.parent / (BENCHMARK_RESULTS.stem + "_interp_performance.tex"),
     )
     write_latex_table(
         extrap_table,
         caption=extrap_caption,
         label=extrap_label,
-        output_path=Path(__file__).with_name("extrap_performance.tex"),
+        output_path=BENCHMARK_RESULTS.parent / (BENCHMARK_RESULTS.stem + "_extrap_performance.tex"),
     )

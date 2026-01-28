@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 import scipy.stats as stats
 from scipy.stats import ttest_ind
+from sklearn.metrics import r2_score
 from statsmodels.stats.multicomp import MultiComparison
 
 from deepsar.deep4pweibull import Deep4PWeibull
@@ -19,7 +20,7 @@ from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 ROOT = Path(__file__).parents[2]
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "fee8771_no_lc_features"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "95c85d6_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
@@ -377,11 +378,11 @@ if __name__ == "__main__":
     y_eva = mask_eva["predicted_sr"]
     eva_relative_bias = (y_eva - x_eva) / x_eva
     eva_median_bias = eva_relative_bias.median()
-    eva_pearson_r = stats.pearsonr(x_eva, y_eva)[0]
+    eva_r2 = r2_score(x_eva, y_eva)
     ax3.text(
         0.05,
         0.08,
-        f"Rel. bias: {eva_median_bias:.3f}\nPearson r: {eva_pearson_r:.3f}",
+        f"Rel. bias: {eva_median_bias:.3f}\nR$^2$: {eva_r2:.3f}",
         transform=ax3.transAxes,
         fontsize=9,
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
@@ -408,12 +409,12 @@ if __name__ == "__main__":
     y_gift = mask_gift["predicted_sr"]
     gift_relative_bias = (y_gift - x_gift) / x_gift
     gift_median_bias = gift_relative_bias.median()
-    gift_pearson_r = stats.pearsonr(x_gift, y_gift)[0]
+    gift_r2 = r2_score(x_gift, y_gift)
 
     ax4.text(
         0.05,
         0.08,
-        f"Rel. bias: {gift_median_bias:.3f}\nPearson r: {gift_pearson_r:.3f}",
+        f"Rel. bias: {gift_median_bias:.3f}\nR$^2$: {gift_r2:.3f}",
         transform=ax4.transAxes,
         fontsize=9,
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
