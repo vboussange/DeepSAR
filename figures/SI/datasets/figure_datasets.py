@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Area (km²)")
+    ax.set_xlabel("Spatial unit area (km²)")
     ax.set_ylabel("Species richness")
     ax.legend()
     fig.savefig("figure_datasets.pdf", dpi=300, bbox_inches="tight")

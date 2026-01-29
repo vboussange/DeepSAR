@@ -23,6 +23,16 @@ BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_resu
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "95c85d6_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
+PLOT_STYLE = {
+    "axis_label": 12,
+    "tick_label": 12,
+    "title": 15,
+    "subtitle": 12,
+    "annotation": 10,
+    "panel_label": 12,
+    "panel_letter_weight": "bold",
+    "quantiles": (0.005, 0.995),
+}
 
 def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
     """
@@ -231,9 +241,9 @@ def add_performance_panels(
 
         ax.set_xticks(range(1, len(experiments) + 1))
         display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
-        ax.set_xticklabels(display_labels, rotation=0, ha="right", fontsize=10)
-        ax.set_ylabel(f"{metric.upper()}") if j == 0 else None
-        ax.set_title(titles_main[j], fontsize=12, fontweight="bold", pad=18)
+        ax.set_xticklabels(display_labels, rotation=45, ha="center", fontsize=PLOT_STYLE["tick_label"])
+        ax.set_ylabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"]) if j == 0 else None
+        ax.set_title(titles_main[j], fontsize=PLOT_STYLE["title"], fontweight="bold", pad=24)
         ax.text(
             0.5,
             1.02,
@@ -241,7 +251,7 @@ def add_performance_panels(
             transform=ax.transAxes,
             ha="center",
             va="bottom",
-            fontsize=9,
+            fontsize=PLOT_STYLE["subtitle"],
         )
 
         alpha = 0.05
@@ -273,7 +283,7 @@ def add_performance_panels(
                         letters[experiment],
                         ha="left",
                         va="bottom",
-                        fontsize=10,
+                        fontsize=PLOT_STYLE["annotation"],
                         color="black",
                     )
 
@@ -382,23 +392,27 @@ if __name__ == "__main__":
     eva_median_bias = eva_relative_bias.median()
     eva_r2 = r2_score(x_eva, y_eva)
     ax3.text(
-        0.05,
+        0.55,
         0.08,
         f"Rel. bias: {eva_median_bias:.3f}\nR$^2$: {eva_r2:.3f}",
         transform=ax3.transAxes,
-        fontsize=9,
+        fontsize=PLOT_STYLE["annotation"],
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
     )
 
     ax3.scatter(x_eva, y_eva, alpha=0.6, s=10, color="#f72585")
+    x_eva_q = np.nanquantile(x_eva, PLOT_STYLE["quantiles"])
+    y_eva_q = np.nanquantile(y_eva, PLOT_STYLE["quantiles"])
+    eva_min = min(x_eva_q[0], y_eva_q[0])
+    eva_max = max(x_eva_q[1], y_eva_q[1])
+    ax3.set_xlim(eva_min, eva_max)
+    ax3.set_ylim(eva_min, eva_max)
     
-    # Add 1:1 line
-    max_val = np.nanmax([x_eva.max(), y_eva.max()])
-    min_val = np.nanmin([x_eva.min(), y_eva.min()])
-    ax3.plot([min_val, max_val], [min_val, max_val], linestyle='--',color="black", linewidth=1)
+    # Add 1:1 line through plot corners
+    ax3.plot([eva_min, eva_max], [eva_min, eva_max], linestyle='--', color="black", linewidth=1)
     
-    ax3.set_xlabel('EVA observed SR', fontsize=8)
-    ax3.set_ylabel('Predicted SR', fontsize=8)
+    ax3.set_xlabel('EVA observed SR', fontsize=PLOT_STYLE["axis_label"])
+    ax3.set_ylabel('Predicted SR', fontsize=PLOT_STYLE["axis_label"])
     ax3.set_yscale('log')
     ax3.set_xscale('log')
 
@@ -414,22 +428,26 @@ if __name__ == "__main__":
     gift_r2 = r2_score(x_gift, y_gift)
 
     ax4.text(
-        0.05,
+        0.55,
         0.08,
         f"Rel. bias: {gift_median_bias:.3f}\nR$^2$: {gift_r2:.3f}",
         transform=ax4.transAxes,
-        fontsize=9,
+        fontsize=PLOT_STYLE["annotation"],
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
     )
     ax4.scatter(x_gift, y_gift, alpha=0.6, s=10, color="#4cc9f0")
+    x_gift_q = np.nanquantile(x_gift, PLOT_STYLE["quantiles"])
+    y_gift_q = np.nanquantile(y_gift, PLOT_STYLE["quantiles"])
+    gift_min = min(x_gift_q[0], y_gift_q[0])
+    gift_max = max(x_gift_q[1], y_gift_q[1])
+    ax4.set_xlim(gift_min, gift_max)
+    ax4.set_ylim(gift_min, gift_max)
     
-    # Add 1:1 line
-    max_val_gift = np.nanmax([x_gift.max(), y_gift.max()])
-    min_val_gift = np.nanmin([x_gift.min(), y_gift.min()])
-    ax4.plot([min_val_gift, max_val_gift], [min_val_gift, max_val_gift],  linestyle='--', color="black", linewidth=1)
+    # Add 1:1 line through plot corners
+    ax4.plot([gift_min, gift_max], [gift_min, gift_max], linestyle='--', color="black", linewidth=1)
     
-    ax4.set_xlabel('GIFT observed SR', fontsize=8)
-    ax4.set_ylabel('Predicted SR', fontsize=8)
+    ax4.set_xlabel('GIFT observed SR', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_ylabel('Predicted SR', fontsize=PLOT_STYLE["axis_label"])
     ax4.set_yscale('log')
     ax4.set_xscale('log')
     
@@ -438,10 +456,10 @@ if __name__ == "__main__":
     ax2.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
     
     # Add panel labels (a, b, c, d) in Nature style
-    ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax3.text(0.1, 0.1, 'c', transform=ax3.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
-    ax4.text(0.1, 0.1, 'd', transform=ax4.transAxes, fontsize=14, fontweight='bold', va='top', ha='right')
+    ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
+    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
+    ax3.text(0.1, 0.9, 'c', transform=ax3.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
+    ax4.text(0.1, 0.9, 'd', transform=ax4.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
     
     plt.tight_layout()
     plt.show()

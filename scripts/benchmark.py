@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/a9a058d"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/d0848f6"
 
 def setup_logger():
     log = logging.getLogger("benchmark")
