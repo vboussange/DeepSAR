@@ -8,6 +8,7 @@ import geopandas as gpd
 import torch
 from pathlib import Path
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 
 import scipy.stats as stats
 from scipy.stats import ttest_ind
@@ -19,9 +20,9 @@ from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 from deepsar.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_95c85d6.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_a9a058d.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "95c85d6_no_lc_features"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "a9a058d_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
 PLOT_STYLE = {
     "axis_label": 12,
@@ -189,27 +190,17 @@ def add_performance_panels(
         "Extrapolation performance",
     ]
     titles_sub = [
-        "(spatial block cross evaluation with EVA dataset)",
-        "(independent evaluation with GIFT dataset)",
+        "(spatial block cross evaluation,\n EVA dataset)",
+        "(independent evaluation,\n GIFT dataset)",
     ]
     colors = ["#f72585", "#4cc9f0"]
     axes = [ax1, ax2]
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
-        if dataset == "interp":
-            experiments = ["DeepSAR_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_All", "MLP_All"]
-            df_plot = df_deepsar
-        else:
-            experiments = [
-                "MLP_All",
-                "chao2_estimator",
-                "DeepSAR_Area",
-                "DeepSAR_ClimateDEM_Landcover",
-                "DeepSAR_All",
-            ]
-            df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
+        df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
 
         box_data = []
+        experiments = list(label_map.keys())
         for experiment in experiments:
             exp_data = df_plot[df_plot["experiment"] == experiment]
             metric_col = f"{dataset}_{metric}"
@@ -225,12 +216,13 @@ def add_performance_panels(
             meanline=True,
             meanprops={"color": "black", "linewidth": 1.2},
             medianprops={"color": "none"},
+            vert=False,
         )
 
         color = colors[j]
         for i, data in enumerate(box_data):
-            x = np.random.normal(i + 1, 0.06, size=len(data))
-            ax.scatter(x, data, alpha=0.6, s=10, color=color, zorder=3)
+            y = np.random.normal(i + 1, 0.06, size=len(data))
+            ax.scatter(data, y, alpha=0.6, s=10, color=color, zorder=3)
 
         for patch in bplot["boxes"]:
             patch.set_facecolor("none")
@@ -239,11 +231,20 @@ def add_performance_panels(
             for element in bplot[item]:
                 element.set_color("none")
 
-        ax.set_xticks(range(1, len(experiments) + 1))
-        display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
-        ax.set_xticklabels(display_labels, rotation=45, ha="center", fontsize=PLOT_STYLE["tick_label"])
-        ax.set_ylabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"]) if j == 0 else None
-        ax.set_title(titles_main[j], fontsize=PLOT_STYLE["title"], fontweight="bold", pad=24)
+        ax.set_yticks(range(1, len(experiments) + 1))
+        ax.set_xlabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"])
+        # ax.set_xscale("log")
+        # ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+        # # ax.xaxis.get_major_formatter().set_scientific(False)
+        # ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.0f}'))
+
+        if j == 0:
+            display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
+            ax.set_yticklabels(display_labels, rotation=0, ha="right", fontsize=PLOT_STYLE["tick_label"])
+        else:
+            ax.set_yticklabels([])
+            ax.tick_params(axis='y', length=0)
+        ax.set_title(titles_main[j], fontsize=PLOT_STYLE["title"], fontweight="bold", pad=36)
         ax.text(
             0.5,
             1.02,
@@ -274,18 +275,21 @@ def add_performance_panels(
                     q75 = np.percentile(data_vals, 75)
                     iqr = np.percentile(data_vals, 75) - np.percentile(data_vals, 25)
                     whisker_top = q75 + 1.5 * iqr
-                    ypos = min(whisker_top, max(data_vals)) + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.02
+                    xpos = min(whisker_top, max(data_vals)) + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.02
 
                     mean_val = np.mean(data_vals)
                     ax.text(
+                        mean_val + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.01,
                         i + 0.7,
-                        mean_val + (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.01,
                         letters[experiment],
                         ha="left",
                         va="bottom",
                         fontsize=PLOT_STYLE["annotation"],
                         color="black",
                     )
+        
+        # Add grid after all other elements
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5, axis='both', zorder=0)
 
     return None
 
@@ -362,17 +366,17 @@ if __name__ == "__main__":
     df_deepsar, df_chao2 = load_benchmark_results()
 
     label_map = {
-        "DeepSAR_Area": "DeepSAR\n(area only)",
-        "DeepSAR_ClimateDEM_Landcover": "DeepSAR\n(env. only)",
-        "DeepSAR_All": "DeepSAR",
-        "MLP_All": "MLP",
+        "DeepSAR_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
+        "DeepSAR_Area": "MuScaRi\n(area only)",
+        "DeepSAR_ClimateDEM": "MuScaRi\n(env. only)",
+        "MLP_ClimateDEM_Area": "FFNN\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
     }
 
     df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
 
     metric = "rmse"
-    fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+    fig, axes = plt.subplots(2, 2, figsize=(8, 7))
     ax1, ax2 = axes[0]
     ax3, ax4 = axes[1]
 
@@ -402,7 +406,7 @@ if __name__ == "__main__":
 
     ax3.scatter(x_eva, y_eva, alpha=0.6, s=10, color="#f72585")
     x_eva_q = np.nanquantile(x_eva, PLOT_STYLE["quantiles"])
-    y_eva_q = np.nanquantile(y_eva, PLOT_STYLE["quantiles"])
+    y_eva_q = np.nanquantile(y_eva[y_eva > 0], PLOT_STYLE["quantiles"])
     eva_min = min(x_eva_q[0], y_eva_q[0])
     eva_max = max(x_eva_q[1], y_eva_q[1])
     ax3.set_xlim(eva_min, eva_max)
@@ -411,8 +415,8 @@ if __name__ == "__main__":
     # Add 1:1 line through plot corners
     ax3.plot([eva_min, eva_max], [eva_min, eva_max], linestyle='--', color="black", linewidth=1)
     
-    ax3.set_xlabel('EVA observed SR', fontsize=PLOT_STYLE["axis_label"])
-    ax3.set_ylabel('Predicted SR', fontsize=PLOT_STYLE["axis_label"])
+    ax3.set_xlabel(r'Empirical species richness, $S(a)$', fontsize=PLOT_STYLE["axis_label"])
+    ax3.set_ylabel(r'Predicted species richness, $S(a)$', fontsize=PLOT_STYLE["axis_label"])
     ax3.set_yscale('log')
     ax3.set_xscale('log')
 
@@ -446,18 +450,14 @@ if __name__ == "__main__":
     # Add 1:1 line through plot corners
     ax4.plot([gift_min, gift_max], [gift_min, gift_max], linestyle='--', color="black", linewidth=1)
     
-    ax4.set_xlabel('GIFT observed SR', fontsize=PLOT_STYLE["axis_label"])
-    ax4.set_ylabel('Predicted SR', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_xlabel(r'Empirical species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_ylabel(r'Predicted species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
     ax4.set_yscale('log')
     ax4.set_xscale('log')
     
-    # Add grid lines to ax1 and ax2
-    ax1.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
-    ax2.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
-    
     # Add panel labels (a, b, c, d) in Nature style
-    ax1.text(0.1, 0.1, 'a', transform=ax1.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
-    ax2.text(0.1, 0.1, 'b', transform=ax2.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
+    ax1.text(0.9, 0.1, 'a', transform=ax1.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
+    ax2.text(0.9, 0.1, 'b', transform=ax2.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
     ax3.text(0.1, 0.9, 'c', transform=ax3.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
     ax4.text(0.1, 0.9, 'd', transform=ax4.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
     
