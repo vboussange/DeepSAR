@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from pyproj import Transformer
 
+ROOT = Path(__file__).parents[2]
+TRAINING_DATASET_SEED = "a9a058d"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features"
 
 def load_environmental_features(model):
     env_features = EnvironmentalFeatureDataset()
@@ -142,17 +145,24 @@ if __name__ == "__main__":
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
-    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "6dcd90c"
-    model = load_ensemble_from_folds(run_dir, device="cpu")
+    model = load_ensemble_from_folds(RUN_DIR, device="cpu")
 
     env_ds, lc_ds, res_env_pixel = load_environmental_features(model)
 
     
-    dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long
+    # dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long # old lat long
+    #                    "SRs": [],},
+    #           "loc2": {"coords": (53, 8.4),
+    #                    "SRs": [],},
+    #         "loc3": {"coords": (42.1, -5),
+    #                    "SRs": [],}
+    #         }
+    
+    dict_SAR = {"loc1": {"coords": (49.66, 16.00), # Žďárské vrchy Protected Landscape Area
                        "SRs": [],},
-              "loc2": {"coords": (53, 8.4),
+              "loc2": {"coords": (46.67, 10.2), # Parc Naziunal Svizzer
                        "SRs": [],},
-            "loc3": {"coords": (42.1, -5),
+            "loc3": {"coords": (52.05, 6.02), #Nationaal Park Veluwezoom
                        "SRs": [],}
             }
     

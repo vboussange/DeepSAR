@@ -15,6 +15,9 @@ from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
 from deepsar.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from deepsar.plotting import CMAP_BR
 
+ROOT = Path(__file__).parents[2]
+TRAINING_DATASET_SEED = "a9a058d"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features"
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -131,6 +134,7 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
 
 
     mean_SR = np.mean(SR01_list[0], axis=1)
+    # mean_SR = SR01_list[0][:, 2]
     std_SR = np.std(SR01_list[0], axis=1)
         
     dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
@@ -155,17 +159,15 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     return env_ds, lc_ds
 
 if __name__ == "__main__":
-    seed = 1
     plotting = True
-    run_dir = Path(__file__).parents[2] / "scripts" / "results" / "train" / "37b69ea"
 
-    model_name = run_dir.name
+    model_name = RUN_DIR.name
 
     projection_path = Path(__file__).parents[2] / Path(f"data/processed/projections/{model_name}")
     projection_path.mkdir(parents=True, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = load_ensemble_from_folds(run_dir, device=device)
+    model = load_ensemble_from_folds(RUN_DIR, device=device)
     env_dataset, lc_dataset = load_environmental_features()
 
     for res in [5e3, 5e4]:

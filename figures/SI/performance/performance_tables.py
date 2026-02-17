@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).parents[3]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_d5eb0a5.csv"
-CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
-
+TRAINING_DATASET_SEED = "a9a058d"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
+CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
 
 def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
     df_nw = pd.read_csv(BENCHMARK_RESULTS)
@@ -45,11 +45,12 @@ def build_performance_table(
     metrics: list[str],
 ) -> pd.DataFrame:
     if dataset == "interp":
-        experiments = ["MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_Landcover", "DeepSAR_ClimateDEM_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_Landcover_Area", "DeepSAR_All"]
+        experiments = ["MLP_ClimateDEM_Area", "MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_Landcover", "DeepSAR_ClimateDEM_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_Landcover_Area", "DeepSAR_All"]
         df_plot = df_deepsar
     else:
         experiments = [
             "MLP_All",
+            "MLP_ClimateDEM_Area",
             "chao2_estimator",
             "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_Landcover", "DeepSAR_ClimateDEM_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_Landcover_Area", "DeepSAR_All",
         ]
@@ -81,10 +82,18 @@ def build_performance_table(
     best_flags = {}
     for metric in metrics:
         means = df.set_index("_experiment")[f"_{metric}_mean"].to_dict()
-        best_flags[metric] = apply_best_bold(
-            means,
-            higher_is_better=metric in {"r2", "d2"},
-        )
+        if metric in {"mean_relative_bias", "median_relative_bias"}:
+            # For bias, closest to 0 is best
+            abs_means = {k: abs(v) if np.isfinite(v) else np.inf for k, v in means.items()}
+            best_flags[metric] = apply_best_bold(
+                abs_means,
+                higher_is_better=False,
+            )
+        else:
+            best_flags[metric] = apply_best_bold(
+                means,
+                higher_is_better=metric in {"r2", "d2"},
+            )
 
     for metric in metrics:
         for idx, experiment in df["_experiment"].items():
@@ -100,16 +109,16 @@ def render_latex_table(df: pd.DataFrame, caption: str, label: str) -> str:
         "\\begin{table}\n"
         "    \\centering\n"
         "    \\small\n"
-        "    \\setlength{\\tabcolsep}{5pt}\n"
-        "    \\begin{tabularx}{\\textwidth}{l l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
+        "    \\setlength{\\tabcolsep}{4pt}\n"
+        "    \\begin{tabularx}{\\textwidth}{l l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Model & Predictors & RMSE & MAPE & $R^2$ & $D^2$ \\\n"
+        "    Model & Predictors & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ \\\\\n"
         "    \\midrule\n"
     )
     rows = []
     for _, row in df.iterrows():
         rows.append(
-            f"    {row['model']} & {row['Predictors']} & {row['rmse']} & {row['mape']} & {row['r2']} & {row['d2']} \\\n"
+            f"    {row['model']} & {row['Predictors']} & {row['rmse']} & {row['mape']} & {row['median_relative_bias']} & {row['r2']} & {row['d2']} \\\\\n"
         )
     footer = (
         "    \\bottomrule\n"
@@ -131,14 +140,15 @@ if __name__ == "__main__":
     df_deepsar, df_chao2 = load_benchmark_results()
 
     label_map = {
-        "DeepSAR_Area": "DeepSAR",
-        "DeepSAR_ClimateDEM": "DeepSAR",
-        "DeepSAR_Landcover": "DeepSAR",
-        "DeepSAR_ClimateDEM_Area": "DeepSAR",
-        "DeepSAR_ClimateDEM_Landcover": "DeepSAR",
-        "DeepSAR_Landcover_Area": "DeepSAR",
-        "DeepSAR_All": "DeepSAR",
-        "MLP_All": "MLP",
+        "DeepSAR_Area": "MuScaRi",
+        "DeepSAR_ClimateDEM": "MuScaRi",
+        "DeepSAR_Landcover": "MuScaRi",
+        "DeepSAR_ClimateDEM_Area": "MuScaRi",
+        "DeepSAR_ClimateDEM_Landcover": "MuScaRi",
+        "DeepSAR_Landcover_Area": "MuScaRi",
+        "DeepSAR_All": "MuScaRi",
+        "MLP_All": "FFNN",
+        "MLP_ClimateDEM_Area": "FFNN",
         "chao2_estimator": "Chao2 estimator",
     }
 
@@ -151,12 +161,13 @@ if __name__ == "__main__":
         "DeepSAR_Landcover_Area": "Land. + Area",
         "DeepSAR_All": "Area + Env. + Land.",
         "MLP_All": "Area + Env. + Land.",
+        "MLP_ClimateDEM_Area": "Env. + Area",
         "chao2_estimator": "--",
     }
 
     df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
 
-    metrics = ["rmse", "mape", "r2", "d2"]
+    metrics = ["rmse", "mape", "r2", "d2", "median_relative_bias"]
     interp_table = build_performance_table(
         df_deepsar,
         df_chao2,
@@ -176,11 +187,11 @@ if __name__ == "__main__":
 
     interp_caption = (
         "Interpolation performance on the EVA test dataset (mean ± SD across folds). "
-        "Lower RMSE and MAPE, and higher $R^2$ and $D^2$, indicate better performance."
+        "Lower RMSE, MAPE, and Rel. Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
     )
     extrap_caption = (
         "Extrapolation performance on the GIFT dataset under asymptotic sampling effort (mean ± SD across folds). "
-        "Lower RMSE and MAPE, and higher $R^2$ and $D^2$, indicate better performance."
+        "Lower RMSE, MAPE, and Rel. Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
     )
     interp_label = "tab:interp_performance"
     extrap_label = "tab:extrap_performance"

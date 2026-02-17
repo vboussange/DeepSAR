@@ -20,9 +20,10 @@ from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 from deepsar.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_results_a9a058d.csv"
-CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "a9a058d_no_lc_features"
+TRAINING_DATASET_SEED = "a9a058d"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
+CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
 PLOT_STYLE = {
     "axis_label": 12,
@@ -35,7 +36,7 @@ PLOT_STYLE = {
     "quantiles": (0.005, 0.995),
 }
 
-def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metric, output_file="model_performance_and_bias_report.txt"):
+def report_model_performance(df_plot, metric, output_file="model_performance_and_bias_report.txt"):
     """
     Report model performance, statistical significance, and relative bias for eva and gift datasets.
     
@@ -43,10 +44,6 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
     -----------
     df_plot : pd.DataFrame
         Combined dataframe with model results
-    eva_test_data : pd.DataFrame
-        EVA test dataset with observed and predicted SR values
-    gift_dataset : pd.DataFrame
-        GIFT dataset with observed and predicted SR values
     metric : str
         Performance metric to analyze
     output_file : str
@@ -55,43 +52,6 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
     datasets = ["interp", "extrap"]
     
     with open(output_file, "w") as file:
-        print("Relative bias calculated as (predicted - observed) / observed", file=file)
-        print("Positive values indicate model overestimation, negative values indicate underestimation\n", file=file)
-
-        # Relative Bias Analysis
-        print("RELATIVE BIAS ANALYSIS", file=file)
-        print("=" * 50, file=file)
-        
-        # EVA dataset bias
-        eva_mask = eva_test_data[["sr", "predicted_sr"]].dropna()
-        eva_observed = eva_mask["sr"]
-        eva_predicted = eva_mask["predicted_sr"]
-        eva_relative_bias = (eva_predicted - eva_observed) / eva_observed
-        
-        print("EVA Dataset", file=file)
-        print("-" * 20, file=file)
-        print(f"Mean relative bias: {eva_relative_bias.mean():.4f}", file=file)
-        print(f"Median relative bias: {eva_relative_bias.median():.4f}", file=file)
-        print(f"Std relative bias: {eva_relative_bias.std():.4f}", file=file)
-        print(f"Min relative bias: {eva_relative_bias.min():.4f}", file=file)
-        print(f"Max relative bias: {eva_relative_bias.max():.4f}", file=file)
-        print(f"N observations: {len(eva_relative_bias)}", file=file)
-        
-        # GIFT dataset bias
-        gift_mask = gift_dataset[["sr", "predicted_sr"]].dropna()
-        gift_observed = gift_mask["sr"]
-        gift_predicted = gift_mask["predicted_sr"]
-        gift_relative_bias = (gift_predicted - gift_observed) / gift_observed
-        
-        print("\nGIFT Dataset", file=file)
-        print("-" * 20, file=file)
-        print(f"Mean relative bias: {gift_relative_bias.mean():.4f}", file=file)
-        print(f"Median relative bias: {gift_relative_bias.median():.4f}", file=file)
-        print(f"Std relative bias: {gift_relative_bias.std():.4f}", file=file)
-        print(f"Min relative bias: {gift_relative_bias.min():.4f}", file=file)
-        print(f"Max relative bias: {gift_relative_bias.max():.4f}", file=file)
-        print(f"N observations: {len(gift_relative_bias)}", file=file)
-        
         # Model Performance and Statistical Significance Analysis
         print("\n\nMODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE", file=file)
         print("=" * 60, file=file)
@@ -169,17 +129,17 @@ def report_model_performance_and_bias(df_plot, eva_test_data, gift_dataset, metr
     print(f"Model performance and bias analysis saved to '{output_file}'")
 
 
-def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
-    df_nw = pd.read_csv(BENCHMARK_RESULTS)
+def load_benchmark_results() -> pd.DataFrame:
+    df_deepsar = pd.read_csv(BENCHMARK_RESULTS)
     df_chao2 = pd.read_csv(CHAO2_RESULTS)
-    return df_nw, df_chao2
+    df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
+    return df_plot
 
 
 def add_performance_panels(
     ax1: plt.Axes,
     ax2: plt.Axes,
-    df_deepsar: pd.DataFrame,
-    df_chao2: pd.DataFrame,
+    df_perf: pd.DataFrame,
     metric: str,
     label_map: dict[str, str] | None = None,
 ) -> None:
@@ -197,12 +157,11 @@ def add_performance_panels(
     axes = [ax1, ax2]
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
-        df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
 
         box_data = []
         experiments = list(label_map.keys())
         for experiment in experiments:
-            exp_data = df_plot[df_plot["experiment"] == experiment]
+            exp_data = df_perf[df_perf["experiment"] == experiment]
             metric_col = f"{dataset}_{metric}"
             data = exp_data[metric_col].values
             box_data.append(data)
@@ -363,8 +322,18 @@ def prepare_gift_data(model: Deep4PWeibull) -> gpd.GeoDataFrame:
     return gift_dataset
 
 if __name__ == "__main__":
-    df_deepsar, df_chao2 = load_benchmark_results()
+    df_perf = load_benchmark_results()
+    metric = "rmse"
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
+    ensemble_model = load_ensemble_from_folds(RUN_DIR, device=device)
 
+    eva_test_data = prepare_eva_test_data(best_test_df, best_model)
+    gift_dataset = prepare_gift_data(ensemble_model)
+
+    report_model_performance(df_perf, metric)
+    
     label_map = {
         "DeepSAR_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
         "DeepSAR_Area": "MuScaRi\n(area only)",
@@ -373,32 +342,25 @@ if __name__ == "__main__":
         "chao2_estimator": "Chao2\nestimator",
     }
 
-    df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
+    df_perf = df_perf[df_perf["experiment"].isin(label_map)].copy()
 
-    metric = "rmse"
     fig, axes = plt.subplots(2, 2, figsize=(8, 7))
     ax1, ax2 = axes[0]
     ax3, ax4 = axes[1]
 
-    add_performance_panels(ax1, ax2, df_deepsar, df_chao2, metric, label_map=label_map)
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
-    ensemble_model = load_ensemble_from_folds(RUN_DIR, device=device)
-
-    eva_test_data = prepare_eva_test_data(best_test_df, best_model)
+    add_performance_panels(ax1, ax2, df_perf, metric, label_map=label_map)
 
     # Plot predictions vs observations for EVA
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
     x_eva = mask_eva["sr"]
     y_eva = mask_eva["predicted_sr"]
     eva_relative_bias = (y_eva - x_eva) / x_eva
-    eva_median_bias = eva_relative_bias.median()
+    eva_relative_bias_stat = eva_relative_bias.median()
     eva_r2 = r2_score(x_eva, y_eva)
     ax3.text(
         0.55,
         0.08,
-        f"Rel. bias: {eva_median_bias:.3f}\nR$^2$: {eva_r2:.3f}",
+        f"Rel. bias: {eva_relative_bias_stat:.3f}\nR$^2$: {eva_r2:.3f}",
         transform=ax3.transAxes,
         fontsize=PLOT_STYLE["annotation"],
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
@@ -421,20 +383,18 @@ if __name__ == "__main__":
     ax3.set_xscale('log')
 
     # Fourth plot: model predictions vs GIFT observations
-    gift_dataset = prepare_gift_data(ensemble_model)
-
     # Plot predictions vs observations for GIFT
     mask_gift = gift_dataset[["sr", "predicted_sr"]].dropna()
     x_gift = mask_gift["sr"]
     y_gift = mask_gift["predicted_sr"]
     gift_relative_bias = (y_gift - x_gift) / x_gift
-    gift_median_bias = gift_relative_bias.median()
+    gift_relative_bias_stat = gift_relative_bias.median()
     gift_r2 = r2_score(x_gift, y_gift)
 
     ax4.text(
         0.55,
         0.08,
-        f"Rel. bias: {gift_median_bias:.3f}\nR$^2$: {gift_r2:.3f}",
+        f"Rel. bias: {gift_relative_bias_stat:.3f}\nR$^2$: {gift_r2:.3f}",
         transform=ax4.transAxes,
         fontsize=PLOT_STYLE["annotation"],
         bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=1),
@@ -464,5 +424,3 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
     fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
-
-    report_model_performance_and_bias(df_deepsar, eva_test_data, gift_dataset, metric)

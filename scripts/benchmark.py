@@ -22,7 +22,16 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/d0848f6"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/95c85d6"
+BIOCLIMATE_VARS = [
+            "bio1",
+            "pet_penman_mean",
+            "sfcWind_mean",
+            "bio4",
+            "rsds_1981-2010_range_V.2.1",
+            "bio12",
+            "bio15",
+        ]
 
 def setup_logger():
     log = logging.getLogger("benchmark")
@@ -73,7 +82,7 @@ if __name__ == "__main__":
     df = gpd.read_parquet(sample_file)
     
     # Identify features
-    climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
+    climate_feats = BIOCLIMATE_VARS + [f"std_{v}" for v in BIOCLIMATE_VARS]
     dem_feats = ["elevation", "std_elevation"]
     lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
     
@@ -145,13 +154,13 @@ if __name__ == "__main__":
     })
     
     # Varying training samples (on All Env + Area)
-    for frac in [0.01, 0.1]:
-        experiments.append({
-            "name": f"DeepSAR_All_frac_{frac}",
-            "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
-            "feature_names": all_env_feats + ["log_sp_unit_area"],
-            "train_frac": frac
-        })
+    # for frac in [0.01, 0.1]:
+    #     experiments.append({
+    #         "name": f"DeepSAR_All_frac_{frac}",
+    #         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+    #         "feature_names": all_env_feats + ["log_sp_unit_area"],
+    #         "train_frac": frac
+    #     })
         
     # # Varying architecture (on All Env + Area)
     # # Base 64
@@ -168,6 +177,13 @@ if __name__ == "__main__":
         "name": "MLP_All",
         "model_init": MLPInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
+        "train_frac": 1.0
+    })
+    
+    experiments.append({
+        "name": "MLP_ClimateDEM_Area",
+        "model_init": MLPInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
     

@@ -29,12 +29,12 @@ numba_logger.setLevel(
 )  # see https://stackoverflow.com/questions/65398774/numba-printing-information-regarding-nvidia-driver-to-python-console-when-using
 
 GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/606e055"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/fee8771"
 
 CONFIG = {
     "crs": "EPSG:3035",
     "run_folder": Path(Path(__file__).parent, "results", "benchmark"),
-    "run_name": "benchmark_chao2_results",
+    "run_name": f"benchmark_chao2_results_{SBCV_SAMPLES_PATH.name}",
     "seed": 42,  # For reproducibility
     "n_splits": 5,
     "block_size": 20_000,
@@ -142,6 +142,10 @@ for fold_id in range(n_folds):
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
 
+    relative_bias = (y_pred - y_true) / y_true
+    median_relative_bias = np.median(relative_bias)
+    mean_relative_bias = np.mean(relative_bias)
+
     metrics = {
         "experiment": "chao2_estimator",
         "fold": fold_id,
@@ -149,6 +153,8 @@ for fold_id in range(n_folds):
         "extrap_d2": d2_absolute_error_score(y_true, y_pred),
         "extrap_rmse": root_mean_squared_error(y_true, y_pred),
         "extrap_mape": mean_absolute_percentage_error(y_true, y_pred),
+        "extrap_median_relative_bias": median_relative_bias,
+        "extrap_mean_relative_bias": mean_relative_bias,
     }
     results.append(metrics)
 
@@ -161,4 +167,5 @@ if not metrics_df.empty:
     print(f"D2: {metrics_df['extrap_d2'].mean():.3f} ± {metrics_df['extrap_d2'].std():.3f}")
     print(f"RMSE: {metrics_df['extrap_rmse'].mean():.3f} ± {metrics_df['extrap_rmse'].std():.3f}")
     print(f"MAPE: {metrics_df['extrap_mape'].mean():.3f} ± {metrics_df['extrap_mape'].std():.3f}")
-    
+    print(f"Median Relative Bias: {metrics_df['extrap_median_relative_bias'].mean():.3f} ± {metrics_df['extrap_median_relative_bias'].std():.3f}")
+    print(f"Mean Relative Bias: {metrics_df['extrap_mean_relative_bias'].mean():.3f} ± {metrics_df['extrap_mean_relative_bias'].std():.3f}")

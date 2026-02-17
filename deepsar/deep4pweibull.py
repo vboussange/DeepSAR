@@ -36,12 +36,11 @@ class Deep4PWeibull(DeepSARModel):
         # self.last_fully_connected.bias.data = torch.tensor(p0, dtype=torch.float32)
         # nn.init.xavier_normal_(self.last_fully_connected.weight, gain=0.05)
         
-    def _weibull_4p(self, x, b, c, d, e):
+    def _weibull_4p(self, x, b, c, d, log_e):
         """
-        4-parameter Weibull function: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - ln(e))))
+        4-parameter Weibull function: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - log_e)))
         """
         log_x = torch.log(torch.clamp(x, min=1e-8))
-        log_e = torch.log(torch.clamp(e, min=1e-8))
         # Clamp the inner exponential to prevent overflow
         inner_exp = torch.clamp(b * (log_x - log_e), min=-50, max=50)
         outer_exp = torch.clamp(-torch.exp(inner_exp), min=-50, max=0)
@@ -57,13 +56,13 @@ class Deep4PWeibull(DeepSARModel):
         b = x[:, 0:1]
         c = x[:, 1:2]
         d = c - F.softplus(x[:, 2:3])  # Ensure d < c
-        e = F.softplus(x[:, 3:4])      # Ensure e > 0
-        return b, c, d, e
+        log_e = x[:, 3:4]
+        return b, c, d, log_e
 
     def forward(self, x):
         log_aplot, features = x[:, :1], x[:, 1:]
-        b, c, d, e = self._predict_b_c_d_e(features)
-        sr = self._weibull_4p(log_aplot, b, c, d, e)
+        b, c, d, log_e = self._predict_b_c_d_e(features)
+        sr = self._weibull_4p(log_aplot, b, c, d, log_e)
         return sr
     
     def _predict_sr_tot(self, x):

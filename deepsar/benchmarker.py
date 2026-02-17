@@ -108,11 +108,14 @@ class Benchmarker:
         return targets.flatten(), preds.flatten()
 
     def _compute_metrics(self, y_true, y_pred):
+        relative_bias = (y_pred - y_true) / y_true
         return {
             "r2": r2_score(y_true, y_pred),
             "d2": d2_absolute_error_score(y_true, y_pred),
             "rmse": root_mean_squared_error(y_true, y_pred),
             "mape": mean_absolute_percentage_error(y_true, y_pred),
+            "mean_relative_bias": np.mean(relative_bias),
+            "median_relative_bias": np.median(relative_bias),
         }
 
     def _train_fold(self, fold_id, device, experiment_name, model_init, feature_names, train_frac):

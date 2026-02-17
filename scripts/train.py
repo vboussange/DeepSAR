@@ -19,10 +19,19 @@ from sklearn.metrics import (
 from deepsar.deep4pweibull import Deep4PWeibull
 from deepsar.trainer import DeepSARLitModule, TrainConfig
 from deepsar.dataset import create_dataloader
-from deepsar.utils import symmetric_arch, get_git_hash
+from deepsar.utils import symmetric_arch
 
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/95c85d6"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/a9a058d"
 RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_no_lc_features"
+BIOCLIMATE_VARS = [
+            "bio1",
+            "pet_penman_mean",
+            "sfcWind_mean",
+            "bio4",
+            "rsds_1981-2010_range_V.2.1",
+            "bio12",
+            "bio15",
+        ]
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -161,7 +170,7 @@ if __name__ == "__main__":
     sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
     df = gpd.read_parquet(sample_file)
     
-    climate_feats = config.climate_variables + [f"std_{v}" for v in config.climate_variables]
+    climate_feats = BIOCLIMATE_VARS + [f"std_{v}" for v in BIOCLIMATE_VARS]
     dem_feats = ["elevation", "std_elevation"]
     lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
     

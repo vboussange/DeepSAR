@@ -25,9 +25,10 @@ rcparams = {
 plt.rcParams.update(rcparams)
 
 ROOT = Path(__file__).parents[2]
+TRAINING_DATASET_SEED = "a9a058d"
 
 CONFIG = {
-    "model_hash": "37b69ea",
+    "model_name": f"{TRAINING_DATASET_SEED}_no_lc_features",
     "sar_path": Path(__file__).parent / "SARs",
     "panels_dir": Path(__file__).parent / "panels",
     "rolling_kwargs": {"x": 2, "y": 2, "center": False, "min_periods": 2},
@@ -54,7 +55,7 @@ CONFIG = {
     "sar_labels": ["A", "B", "C"],
 }
 
-RAST_PATH = ROOT / "data" / "processed" / "projections" / CONFIG["model_hash"]
+RAST_PATH = ROOT / "data" / "processed" / "projections" / CONFIG["model_name"]
 
 
 def load_data(rast_path=None, sar_path=None):
@@ -95,7 +96,7 @@ def require_raster(rasters, name):
 
 
 def raster_name(prefix: str, res_m: int) -> str:
-    return f"{prefix}_raster_{CONFIG['model_hash']}_{int(res_m)}m"
+    return f"{prefix}_raster_{CONFIG['model_name']}_{int(res_m)}m"
 
 def plot_bounding_boxes(ax, dict_sar, dict_plot, buffer_size_meters=100000):
     """Plot bounding boxes on corner plots."""
