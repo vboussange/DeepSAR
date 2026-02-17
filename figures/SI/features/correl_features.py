@@ -9,40 +9,47 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.plotting import CMAP_BR
-from deepsar.ensemble_trainer import EnsembleConfig
 
-MODEL_NAME = "deep4pweibull_basearch6_0b85791"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../../../data/processed/training_samples/sbcv/a9a058d"
+BIOCLIMATE_VARS = [
+            "bio1",
+            "pet_penman_mean",
+            "sfcWind_mean",
+            # "bio4",
+            # "rsds_1981-2010_range_V.2.1",
+            "bio12",
+            # "bio15",
+        ]
 
-def load_data_and_model():
-    """Load model and data."""
-    path_results = Path(__file__).parent / f"../../../scripts/results/train/checkpoint_{MODEL_NAME}.pth"
-    checkpoint = torch.load(path_results, map_location="cpu")
-    config = checkpoint["config"]
+def load_data():
+    fold_id = 0
+    train_path = SBCV_SAMPLES_PATH / f"fold_{fold_id}_train.parquet"
+    # val_path = SBCV_SAMPLES_PATH / f"fold_{fold_id}_val.parquet"
+    # test_path = SBCV_SAMPLES_PATH / f"fold_{fold_id}_test.parquet"
+
+
+    # train_df = gpd.read_parquet(train_path)
+    # val_df = gpd.read_parquet(val_path)
+    # test_df = gpd.read_parquet(test_path)
     
-    eva_dataset = gpd.read_parquet(config.path_eva_data)
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
-    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
+    # df = pd.concat([train_df, val_df, test_df], ignore_index=True)
+    # return df
+    return gpd.read_parquet(train_path)
     
-    model = Deep4PWeibull.initialize_ensemble(checkpoint)
+if __name__ == "__main__":  
+    df = load_data()
+    df["log_sp_unit_area"] = np.log(df["sp_unit_area"])
     
-    return model, checkpoint, eva_dataset, config
+    climate_feats = BIOCLIMATE_VARS + [f"std_{v}" for v in BIOCLIMATE_VARS]
+    dem_feats = ["elevation", "std_elevation"]
 
-if __name__ == "__main__":    
-    model, checkpoint, eva_dataset, config = load_data_and_model()
-
-    config = checkpoint["config"]
-    predictors = checkpoint["predictors"][1:]
-
+    feature_names = climate_feats + dem_feats + ["log_sp_unit_area"]
+    features = df[feature_names]
     
-    # Load all data to fit PCA globally
-    eva_dataset = eva_dataset[predictors]
-    eva_dataset = eva_dataset.rename(columns={"log_sp_unit_area": "log_area"})
-    corr_matrix = eva_dataset.corr()
+    corr_matrix = features.corr()
     
     fig, ax = plt.subplots(figsize=(15, 12))
-    heatmap = sns.heatmap(corr_matrix, annot=True, cmap=CMAP_BR, square=True, ax=ax, cbar_kws={'label': 'Correlation', 'ticks': [i/10 for i in range(-10, 11)]})
+    heatmap = sns.heatmap(corr_matrix, annot=True, cmap=CMAP_BR, square=True, ax=ax, cbar_kws={'label': 'Correlation', 'ticks': [i/10 for i in range(-10, 11)]}, vmin=-1, vmax=1)
     cbar = heatmap.collections[0].colorbar
     cbar.ax.tick_params(labelsize=14)
     cbar.set_label('Correlation', size=16)

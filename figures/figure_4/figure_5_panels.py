@@ -25,10 +25,10 @@ rcparams = {
 plt.rcParams.update(rcparams)
 
 ROOT = Path(__file__).parents[2]
-TRAINING_DATASET_SEED = "a9a058d"
+TRAINING_DATASET_SEED = "ceacce0"
 
 CONFIG = {
-    "model_name": f"{TRAINING_DATASET_SEED}_no_lc_features",
+    "model_name": f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars",
     "sar_path": Path(__file__).parent / "SARs",
     "panels_dir": Path(__file__).parent / "panels",
     "rolling_kwargs": {"x": 2, "y": 2, "center": False, "min_periods": 2},
@@ -50,7 +50,7 @@ CONFIG = {
     },
     "sar_window": 10,
     "sar_xlim": (2e3**2/1e6, 2e5**2/1e6), # km2
-    "sar_ylim": (500, 3000),
+    "sar_ylim": (500, 2200),
     "sar_vlines": [5e3**2/1e6, 5e4**2/1e6],
     "sar_labels": ["A", "B", "C"],
 }
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     #         rasters[key] = rasters[key].coarsen(x=factor, y=factor, boundary="trim").mean()
 
     # Plot species richness at resolution 5km
-    cbar_kwargs = {**CONFIG["cbar_base"], "label": "Species richness", "location": "left"}
+    cbar_kwargs = {**CONFIG["cbar_base"], "label": "Predicted species\nrichness ($S_T$)", "location": "left"}
     
     fig = plt.figure(figsize=CONFIG["figure_size"])
     gs = GridSpec(3, 6, figure=fig, height_ratios=[0.4, 1, 1])
@@ -206,13 +206,13 @@ if __name__ == "__main__":
         for xline in CONFIG["sar_vlines"]:
             ax.axvline(x=xline, color="gray", linestyle="--", alpha=0.7)
 
-        ax.text(CONFIG["sar_vlines"][0], 2200, f"{labels[i]}1", ha="center", va="top", fontsize=10, weight="bold")
-        ax.text(CONFIG["sar_vlines"][1], 2200, f"{labels[i]}2", ha="center", va="top", fontsize=10, weight="bold")
+        ax.text(CONFIG["sar_vlines"][0], 2500, f"{labels[i]}1", ha="center", va="top", fontsize=10, weight="bold")
+        ax.text(CONFIG["sar_vlines"][1], 2500, f"{labels[i]}2", ha="center", va="top", fontsize=10, weight="bold")
         
         ax.set_xscale('log')
         
         if i == 0:
-            ax.set_ylabel("Species richness")
+            ax.set_ylabel("Predicted species\nrichness ($S_T$)")
         if i == 1:
             ax.set_xlabel("Area (km$^2$)")
         ax.set_xlim(*CONFIG["sar_xlim"])
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     ax_sr1 = fig.add_subplot(gs[1, 0:3])
     ax_sr2 = fig.add_subplot(gs[1, 3:6])
 
-    cbar_kwargs = {**CONFIG["cbar_base"], "label": "Species richness", "location": "left"}
+    cbar_kwargs = {**CONFIG["cbar_base"], "label": "Predicted species\nrichness ($S_T$)", "location": "left"}
 
     sr_axes = [ax_sr1, ax_sr2]
     for ax, panel in zip(sr_axes, CONFIG["sr_panels"]):
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     ax_dsr1 = fig.add_subplot(gs[2, 0:3])
     ax_dsr2 = fig.add_subplot(gs[2, 3:6])
 
-    cbar_kwargs["label"] = "Species turnover ($\\frac{d S}{d A}$)"
+    cbar_kwargs["label"] = "Species accumulation\nrate ($\\frac{d S}{d A}$)"
 
     dsr_axes = [ax_dsr1, ax_dsr2]
     for ax, panel in zip(dsr_axes, CONFIG["dsr_panels"]):

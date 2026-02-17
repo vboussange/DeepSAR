@@ -13,8 +13,8 @@ from pathlib import Path
 from pyproj import Transformer
 
 ROOT = Path(__file__).parents[2]
-TRAINING_DATASET_SEED = "a9a058d"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features"
+TRAINING_DATASET_SEED = "ceacce0"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars"
 
 def load_environmental_features(model):
     env_features = EnvironmentalFeatureDataset()

@@ -22,15 +22,15 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/95c85d6"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            "bio4",
-            "rsds_1981-2010_range_V.2.1",
+            # "bio4",
+            # "rsds_1981-2010_range_V.2.1",
             "bio12",
-            "bio15",
+            # "bio15",
         ]
 
 def setup_logger():
@@ -197,7 +197,7 @@ if __name__ == "__main__":
         results.append(res)
     
     df_results = pd.concat(results)
-    output_file = root_folder / f"benchmark_results_{SBCV_SAMPLES_PATH.name}.csv"
+    output_file = root_folder / f"benchmark_results_{SBCV_SAMPLES_PATH.name}_reduced_bioclim_vars.csv"
     df_results.to_csv(output_file, index=False)
     
     logger.info(f"Benchmark completed, output saved at {output_file}.")

@@ -21,16 +21,16 @@ from deepsar.trainer import DeepSARLitModule, TrainConfig
 from deepsar.dataset import create_dataloader
 from deepsar.utils import symmetric_arch
 
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/a9a058d"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_no_lc_features"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
+RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_no_lc_features_reduced_bioclim_vars"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            "bio4",
-            "rsds_1981-2010_range_V.2.1",
+            # "bio4",
+            # "rsds_1981-2010_range_V.2.1",
             "bio12",
-            "bio15",
+            # "bio15",
         ]
 
 # Set up logging
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     climate_feats = [c for c in climate_feats if c in df.columns]
     dem_feats = [c for c in dem_feats if c in df.columns]
     
-    feature_names = climate_feats + dem_feats + ["log_sp_unit_area"] # + lc_feats
+    feature_names = climate_feats + dem_feats + ["log_sp_unit_area"] # + lc_feats 
     logger.info(f"Training with features: {feature_names}")
         
     for fold_id in range(5):

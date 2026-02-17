@@ -12,22 +12,15 @@ from captum.attr import ShapleyValueSampling
 from deepsar.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "6dcd90c"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0_no_lc_features_reduced_bioclim_vars"
 
 # Configuration
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda:3" if torch.cuda.is_available() else "cpu"
 PLOT_CONFIG = [
     ("Area", "#f72585", "o", "-"),
     ("Environmental heterogeneity", "#4cc9f0", "s", "-"),
     ("Mean environmental conditions", "#3a0ca3", "^", "-"),
-    ("Landcover", "#3f37c9", "D", "-"),
 ]
-SAMPLES_PER_BIN = np.inf
-
-def sample_data_by_area(gdf, n_bins=100):
-    """Sample data stratified by log area bins."""
-    gdf['log_area_bins'] = pd.cut(gdf['log_sp_unit_area'], bins=n_bins, labels=False)
-    return gdf.groupby('log_area_bins', group_keys=False)
 
 class ShapleyAnalyzer:
     """Handles Shapley value computation and analysis."""
@@ -37,10 +30,9 @@ class ShapleyAnalyzer:
         self.model = model.models[0]  # use the first model of the ensemble
     
     def compute_shapley_values(self, gdf):
-        """Compute Shapley values for given dataframe."""
-        gdf_sampled = sample_data_by_area(gdf)
+        """Compute Shapley values for given dataframe."""        
         features = torch.tensor(
-            gdf_sampled[["log_observed_area"] + self.model.feature_names].values,
+            gdf[["log_observed_area"] + self.model.feature_names].values,
             dtype=torch.float32,
         )
         feature_scaler = self.model.feature_scaler
@@ -52,17 +44,17 @@ class ShapleyAnalyzer:
                 return self.model._predict_sr_tot(X).flatten()
 
         explainer = ShapleyValueSampling(forward_fn)
-        shap_values = explainer.attribute(X, n_samples=SAMPLES_PER_BIN).cpu().numpy()
+        shap_values = explainer.attribute(X, n_samples=100).cpu().numpy()
         
         df_shap = pd.DataFrame(shap_values, columns=self.model.feature_names)
-        df_shap["log_sp_unit_area_values"] = gdf_sampled["log_sp_unit_area"].values
+        df_shap["log_sp_unit_area_values"] = gdf["log_sp_unit_area"].values
         
         return df_shap
 
 def load_data_and_model():
     """Load model and data."""
     model, config = load_ensemble_from_folds(RUN_DIR, device=DEVICE, return_config=True)
-    eva_dataset = gpd.read_parquet(config.sbcv_path / "fold_0_test.parquet")
+    eva_dataset = gpd.read_parquet(config.path_sbcv_data / "fold_0_test.parquet")
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
     return model, config, eva_dataset
@@ -70,13 +62,11 @@ def load_data_and_model():
 def aggregate_shapley_features(df_shap):
     """Aggregate Shapley values by feature groups."""
     feature_names = df_shap.columns.tolist()
-    landcover_features = [f for f in feature_names if f.startswith("lc_frac_")]
     std_features = [f for f in feature_names if f.startswith("std_")]
     mean_features = [
         f
         for f in feature_names
         if f not in std_features
-        and f not in landcover_features
         and f != "log_sp_unit_area"
         and f != "log_sp_unit_area_values"
     ]
@@ -86,9 +76,6 @@ def aggregate_shapley_features(df_shap):
     )
     df_shap["Mean environmental conditions"] = (
         np.abs(df_shap[mean_features]).sum(axis=1) if mean_features else 0.0
-    )
-    df_shap["Landcover"] = (
-        np.abs(df_shap[landcover_features]).sum(axis=1) if landcover_features else 0.0
     )
     df_shap["Area"] = (
         np.abs(df_shap[["log_sp_unit_area"]]).sum(axis=1)
@@ -100,7 +87,6 @@ def aggregate_shapley_features(df_shap):
         "Area",
         "Environmental heterogeneity",
         "Mean environmental conditions",
-        "Landcover",
     ]
     total_importance = df_shap[feature_cols].sum(axis=1)
     df_shap[feature_cols] = df_shap[feature_cols].div(total_importance, axis=0)

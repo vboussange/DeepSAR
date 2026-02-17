@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).parents[3]
-TRAINING_DATASET_SEED = "a9a058d"
+TRAINING_DATASET_SEED = "ceacce0_reduced_bioclim_vars"
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
-CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
+CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_ceacce0.csv"
 
 def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
     df_nw = pd.read_csv(BENCHMARK_RESULTS)

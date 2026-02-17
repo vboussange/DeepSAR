@@ -16,8 +16,8 @@ from deepsar.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from deepsar.plotting import CMAP_BR
 
 ROOT = Path(__file__).parents[2]
-TRAINING_DATASET_SEED = "a9a058d"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features"
+TRAINING_DATASET_SEED = "ceacce0"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars"
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -169,6 +169,8 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_ensemble_from_folds(RUN_DIR, device=device)
     env_dataset, lc_dataset = load_environmental_features()
+    env_dataset = env_dataset.sel(y=slice(6.505e6, 1.2e6)) # trim to ensure fine and coarse maps align
+    
 
     for res in [5e3, 5e4]:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
