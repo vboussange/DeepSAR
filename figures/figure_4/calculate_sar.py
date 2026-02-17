@@ -117,7 +117,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
         "    \\setlength{\\tabcolsep}{5pt}\n"
         "    \\begin{tabularx}{\\textwidth}{l r r >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Location & Lat & Lon & SR at $A_{low}$ & SR at $A_{high}$ & Slope at $A_{low}$ & Slope at $A_{high}$ \\\\\n"
+        "    Location & Lat & Lon & $S_T$ at $A_{low}$ & $S_T$ at $A_{high}$ & $\\frac{d \log(S_T)}{d \log(A)}$ at $A_{low}$ &  $\\frac{d \log(S_T)}{d \log(A)}$ at $A_{high}$ \\\\\n"
         "    \\midrule\n"
     )
 

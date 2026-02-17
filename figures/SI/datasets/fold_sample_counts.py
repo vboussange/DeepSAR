@@ -4,7 +4,7 @@ import pandas as pd
 import geopandas as gpd
 
 ROOT = Path(__file__).parents[3]
-SBCV_SAMPLES_PATH = ROOT / "data" / "processed" / "training_samples" / "sbcv" / "606e055"
+SBCV_SAMPLES_PATH = ROOT / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"
 OUTPUT_TEX = Path(__file__).with_name("fold_sample_counts.tex")
 
 

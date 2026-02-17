@@ -1,13 +1,13 @@
 """"
 Plotting environmental feature correlation structure.'
 """
-import torch
 from pathlib import Path
 import seaborn as sns
 import matplotlib.pyplot as plt
-import pandas as pd
 import geopandas as gpd
 import numpy as np
+
+from deepsar.plotting import CMAP_BR
 
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../../../data/processed/training_samples/sbcv/a9a058d"
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     
     corr_matrix = features.corr()
     
-    fig, ax = plt.subplots(figsize=(15, 12))
+    fig, ax = plt.subplots(figsize=(10, 7))
     heatmap = sns.heatmap(corr_matrix, annot=True, cmap=CMAP_BR, square=True, ax=ax, cbar_kws={'label': 'Correlation', 'ticks': [i/10 for i in range(-10, 11)]}, vmin=-1, vmax=1)
     cbar = heatmap.collections[0].colorbar
     cbar.ax.tick_params(labelsize=14)

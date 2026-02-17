@@ -12,15 +12,16 @@ import pandas as pd
 
 from deepsar.data_processing.utils_eva import EVADataset
 from deepsar.plotting import COLORS_BR
+from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
 
-SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "606e055"
+SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"
 SAMPLE_FILE = SBCV_PATH / "fold_0_train.parquet"
 VAL_SAMPLE_FILE = SBCV_PATH / "fold_0_val.parquet"
 TEST_SAMPLE_FILE = SBCV_PATH / "fold_0_test.parquet"
-N_SAMPLES = 150
-N_PLOTS = 100
+N_SAMPLES = 50
+N_PLOTS = 2000
 BOX_HALF_SIZE_KM = 20
-BLOCK_SIZE_M = 20_000
+BLOCK_SIZE_M = 1_000
 
 COUNTRY_DATA = Path(__file__).parents[3] / "data" / "raw" / "NaturalEarth" / "ne_10m_admin_0_countries.shp"
 COUNTRY_NAME = "Switzerland"
@@ -41,6 +42,7 @@ if __name__ == "__main__":
 
     eva_plots = EVADataset().read_plot_data()
     eva_plots = eva_plots.to_crs(samples.crs)
+    eva_plots = assign_checkerboard_folds(eva_plots, n_splits=5, block_size=BLOCK_SIZE_M) # "spatial_split" == 0 is the test set, the rest is val/train
 
     countries = gpd.read_file(COUNTRY_DATA)
     countries = countries.to_crs(samples.crs)
@@ -70,9 +72,6 @@ if __name__ == "__main__":
     if len(test_samples_ch) > N_SAMPLES:
         test_samples_ch = test_samples_ch.sample(N_SAMPLES, random_state=42)
 
-    if len(eva_plots_ch) > N_PLOTS:
-        eva_plots_ch = eva_plots_ch.sample(N_PLOTS, random_state=42)
-
     fig, ax = plt.subplots(figsize=(8, 5))
     samples_ch.plot(ax=ax, color="#4361ee", alpha=0.6, linewidth=0, zorder=1)
     test_samples_ch.plot(ax=ax, color="#ff7a00", alpha=0.7, linewidth=0, zorder=2)
@@ -96,15 +95,18 @@ if __name__ == "__main__":
     grid = gpd.GeoSeries(verticals + horizontals, crs=samples.crs)
 
     grid.plot(ax=ax, color="#9aa0a6", linewidth=0.4, alpha=0.6, zorder=0)
-    eva_plots_ch.plot(ax=ax, color=COLORS_BR[0], markersize=4, zorder=3)
+    eva_plots_ch[eva_plots_ch.spatial_split == 0].plot(ax=ax, color="#ff7a00", markersize=10, linewidth=0.5, zorder=0, marker="x")
+    eva_plots_ch[eva_plots_ch.spatial_split > 0].sample(n=N_PLOTS, random_state=42).plot(ax=ax, color="#4361ee", markersize=10, linewidth=0.5, zorder=0, marker="x")
 
     countries.boundary.plot(ax=ax, color="#1f1f1f", linewidth=0.6, zorder=5)
     legend_handles = [
-        Patch(facecolor="#4361ee", edgecolor="none", alpha=0.6, label="Train samples"),
-        Patch(facecolor="#ff7a00", edgecolor="none", alpha=0.7, label="Test samples"),
-        Line2D([0], [0], marker="o", color="none", markerfacecolor=COLORS_BR[0],
-               markeredgecolor="none", markersize=6, label="Vegetation plots"),
-        Patch(facecolor="none", edgecolor="#9aa0a6", linewidth=1.2, label="Spatial blocks"),
+        Patch(facecolor="#4361ee", edgecolor="none", alpha=0.6, label="Training/validation spatial units"),
+        Patch(facecolor="#ff7a00", edgecolor="none", alpha=0.7, label="Test spatial units"),
+        Line2D([0], [0], marker="x", color="none", markerfacecolor="none",
+               markeredgecolor="#4361ee", markersize=6, markeredgewidth=1.5, label="Vegetation plots, training/validation split"),
+        Line2D([0], [0], marker="x", color="none", markerfacecolor="none",
+               markeredgecolor="#ff7a00", markersize=6, markeredgewidth=1.5, label="Vegetation plots, test split"),
+        # Patch(facecolor="none", edgecolor="#9aa0a6", linewidth=1.2, label="Spatial blocks"),
     ]
     ax.legend(
         handles=legend_handles,
