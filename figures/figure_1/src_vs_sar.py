@@ -76,11 +76,11 @@ def plot_src_vs_sar(curves: list[dict[str, np.ndarray]]) -> None:
 		)
 
 	ax_src.set_xscale("log")
-	ax_src.set_ylabel("Species richness")
-	ax_src.set_xlabel("Sampling effort (m²)")
+	ax_src.set_ylabel(r"Species richness, $S$")
+	ax_src.set_xlabel(r"Sampling effort, $a$ (m²)")
 	ax_src.set_title("Species rarefaction curves")
 	ax_src.grid(True, alpha=0.3)
-	ax_src.legend(frameon=False, fontsize=9)
+	# ax_src.legend(frameon=False, fontsize=9)
 
 	asymptotes = np.array([c["asymptote"] for c in curves])
 	area_grid = np.logspace(np.log10(1e2), np.log10(1e6), 200)
@@ -90,11 +90,11 @@ def plot_src_vs_sar(curves: list[dict[str, np.ndarray]]) -> None:
 	ax_sar.scatter(areas, asymptotes, color=colors, s=30, zorder=3)
 	ax_sar.set_xscale("log")
 	# ax_sar.set_yscale("log")
-	ax_sar.set_xlabel("Spatial unit area (m²)")
+	ax_sar.set_xlabel(r"Spatial unit area, $A$ (m²)")
 	# ax_sar.set_ylabel("")
 	ax_sar.set_title("Species–area relationship")
 	ax_sar.grid(True, alpha=0.3)
-	ax_sar.legend(frameon=False, fontsize=9)
+	# ax_sar.legend(frameon=False, fontsize=9)
 
 	fig.tight_layout()
 	fig.savefig(Path(__file__).with_suffix(".pdf"), dpi=300, bbox_inches="tight")

@@ -184,14 +184,16 @@ if __name__ == "__main__":
         predictor_map=predictor_map,
         metrics=metrics,
     )
+    
+    description = "RMSE: root mean squared error; MAPE: mean absolute percentage error; Rel.\\ Bias: median relative bias, defined as $\\mathrm{median}[(\\hat{S}-S)/S]$; $R^2$: coefficient of determination; $D^2$: fraction of deviance explained. Lower RMSE, MAPE, and Rel.\\ Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
 
     interp_caption = (
-        "Interpolation performance on the EVA test dataset (mean ± SD across folds). "
-        "Lower RMSE, MAPE, and Rel. Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
+        "Interpolation performance on the EVA test dataset (mean ± standard deviation across splits). "
+        f"{description}"
     )
     extrap_caption = (
-        "Extrapolation performance on the GIFT dataset under asymptotic sampling effort (mean ± SD across folds). "
-        "Lower RMSE, MAPE, and Rel. Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
+        "Extrapolation performance on the GIFT dataset under asymptotic sampling effort (mean ± standard deviation across splits). "
+        f"{description}"
     )
     interp_label = "tab:interp_performance"
     extrap_label = "tab:extrap_performance"
