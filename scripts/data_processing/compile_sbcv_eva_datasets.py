@@ -212,7 +212,7 @@ if __name__ == "__main__":
     # Load EVA data (species matrix format)
     logging.info("Loading EVA data...")
     df = EVADataset().load_species_matrix()
-    logging.info(f"Loaded {len(df):,} plots")
+    logging.info(f"Loaded {len(df):,} plots, with {df.shape[1] - 2} distinct species.")
     
     # Assign spatial folds
     logging.info("Assigning spatial folds...")

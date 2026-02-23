@@ -117,7 +117,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
         "    \\setlength{\\tabcolsep}{5pt}\n"
         "    \\begin{tabularx}{\\textwidth}{l r r >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Location & Lat & Lon & $S_T$ at $A_{low}$ & $S_T$ at $A_{high}$ & $\\frac{d \log(S_T)}{d \log(A)}$ at $A_{low}$ &  $\\frac{d \log(S_T)}{d \log(A)}$ at $A_{high}$ \\\\\n"
+        "    Location & Lat & Lon & $S_T$ at 25km$^2$ & $S_T$ at 2500km$^2$ & $\\frac{d \log(S_T)}{d \log(A)}$ at 25km$^2$ &  $\\frac{d \log(S_T)}{d \log(A)}$ at 2500km$^2$ \\\\\n"
         "    \\midrule\n"
     )
 
@@ -130,7 +130,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{SAR summary for $A_{low}=5\\times10^3\\,\\mathrm{m}$ and $A_{high}=5\\times10^4\\,\\mathrm{m}$ (areas in km$^2$). Values are mean ± SD across ensemble members.}\n"
+        "    \\caption{Pointwise estimate of species richness and rate of species accumulation obtained for nested spatial units at sampling areas of 25km$^2$ and 2500km$^2$. Values are mean ± standard deviation across ensemble members.}\n"
         "    \\label{tab:sar_summary}\n"
         "\\end{table}\n"
     )

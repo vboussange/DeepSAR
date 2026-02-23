@@ -54,4 +54,4 @@ if __name__ == "__main__":
     cbar.ax.tick_params(labelsize=14)
     cbar.set_label('Correlation', size=16)
     ax.tick_params(axis='both', which='major', labelsize=14)
-    fig.savefig("correlation_feature_EVA.pdf", transparent=True, dpi=300, bbox_inches='tight')
+    fig.savefig("correlation_feature.pdf", transparent=True, dpi=300, bbox_inches='tight')

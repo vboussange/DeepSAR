@@ -29,6 +29,9 @@ reports/*
 *.csv
 *.zip
 *.svg
+benchmark_results*.tex
+*.json
+
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
