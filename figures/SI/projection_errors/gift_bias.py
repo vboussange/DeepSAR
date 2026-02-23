@@ -8,7 +8,7 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from muscari.muscari import MuScaRi
+from muscari import MuScaRiEnsemble
 from muscari.plotting import CMAP_GO
 
 from matplotlib.colors import TwoSlopeNorm
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         # Load model and data
         result_modelling = torch.load(path_results, map_location="cpu")
         config = result_modelling["config"]
-        model = MuScaRi.initialize_ensemble(result_modelling, "cpu")
+        model = MuScaRiEnsemble.from_folds(path_results.parent, device="cpu")
         eva_dataset, gift_dataset = load_data(config.path_eva_data, gift_data_dir)
 
         # Process data

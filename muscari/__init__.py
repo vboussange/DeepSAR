@@ -1,7 +1,7 @@
 import matplotlib as mpl
 from .plotting import RCPARAMS_DICT
-from .ensemble_model import MuScaRiEnsemble
+from .muscari_ensemble import MuScaRiEnsemble
 
 mpl.rcParams.update(RCPARAMS_DICT)
 
-__all__ = ["MuScaRiEnsemble"]
+__all__ = ["MuScaRi", "MuScaRiEnsemble"]

@@ -62,10 +62,6 @@ def _dict_to_scaler(d: dict):
     return scaler
 
 
-# ---------------------------------------------------------------------------
-# MuScaRiEnsemble
-# ---------------------------------------------------------------------------
-
 class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
     """
     Ensemble of :class:`MuScaRi` models.

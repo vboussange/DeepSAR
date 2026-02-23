@@ -84,23 +84,3 @@ class MuScaRi(nn.Module):
         )
         model.load_state_dict(checkpoint["model_state_dict"])
         return model.to(device).eval()
-
-    @staticmethod
-    def initialize_ensemble(checkpoint, device="cuda"):
-        """Load an ensemble of models from a saved checkpoint."""
-        # Deferred import avoids circular dependency
-        from muscari.ensemble_model import MuScaRiEnsemble
-        config = checkpoint["config"]
-        feature_names = checkpoint["feature_names"]
-        feature_scalers = checkpoint["feature_scalers"]
-        target_scalers = checkpoint["target_scalers"]
-        models = [
-            MuScaRi(config.layer_sizes,
-                    feature_names=feature_names,
-                    feature_scaler=feature_scalers[i],
-                    target_scaler=target_scalers[i])
-            for i in range(config.n_ensembles)
-        ]
-        ensemble = MuScaRiEnsemble.from_models(models)
-        ensemble.load_state_dict(checkpoint["ensemble_model_state_dict"])
-        return ensemble.to(device).eval()

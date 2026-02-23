@@ -4,8 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import geopandas as gpd
-from muscari.muscari import MuScaRi
-from muscari.plotting import CMAP_GO
+from muscari import MuScaRiEnsemble
 
 
 def load_data(config_path):
@@ -50,7 +49,7 @@ if __name__ == "__main__":
 
     # Load model and data
     checkpoint = torch.load(path_results, map_location="cpu", weights_only=False)
-    model = MuScaRi.initialize_ensemble(checkpoint, "cpu")
+    model = MuScaRiEnsemble.from_folds(path_results.parent, device="cpu")
     eva_dataset = load_data(checkpoint["config"].path_eva_data)
     eva_test_dataset = eva_dataset[eva_dataset["test"] == True]
     
