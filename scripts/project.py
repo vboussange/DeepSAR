@@ -6,7 +6,7 @@ import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
-from muscari.ensemble_model import MuScaRiEnsemble
+from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.plotting import CMAP_BR
 import pandas as pd

@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import git
 
-from muscari.ensemble_model import MuScaRiEnsembleModel  # alias kept for compat
-
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
         super(MSELogLoss, self).__init__()

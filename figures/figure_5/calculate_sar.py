@@ -6,7 +6,7 @@ Using Ensemble model.
 import numpy as np
 import pandas as pd
 from muscari.utils import save_to_pickle
-from muscari.ensemble_model import MuScaRiEnsemble
+from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 import matplotlib.pyplot as plt
 

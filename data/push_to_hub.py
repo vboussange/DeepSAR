@@ -24,7 +24,7 @@ from pathlib import Path
 from muscari.data_processing.utils_eva import EVADataset
 from muscari.data_processing.utils_gift import GIFTDataset
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
-from muscari.ensemble_model import MuScaRiEnsemble
+from muscari import MuScaRiEnsemble
 
 DATASET_REPO = "vboussange/muscari-data"
 MODEL_REPO   = "vboussange/muscari"

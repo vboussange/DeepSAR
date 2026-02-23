@@ -17,7 +17,7 @@ from statsmodels.stats.multicomp import MultiComparison
 
 from muscari.muscari import MuScaRi
 from muscari.cld import create_comp_matrix_allpair_t_test, multcomp_letters
-from muscari.ensemble_model import MuScaRiEnsemble
+from muscari import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"

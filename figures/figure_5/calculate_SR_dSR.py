@@ -10,7 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
 
-from muscari.ensemble_model import MuScaRiEnsemble
+from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from muscari.plotting import CMAP_BR
