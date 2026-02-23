@@ -16,21 +16,18 @@ from sklearn.metrics import (
     mean_absolute_percentage_error,
 )
 
-from muscari.deep4pweibull import Deep4PWeibull
+from muscari.muscari import MuScaRi
 from muscari.trainer import MuScaRiLitModule, TrainConfig
 from muscari.dataset import create_dataloader
 from muscari.utils import symmetric_arch
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_no_lc_features_reduced_bioclim_vars"
+RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            # "bio4",
-            # "rsds_1981-2010_range_V.2.1",
             "bio12",
-            # "bio15",
         ]
 
 # Set up logging
@@ -100,10 +97,10 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     )
     
     # Initialize model
-    model = Deep4PWeibull(config.layer_sizes, 
-                          feature_names=feature_names,
-                          feature_scaler=feature_scaler,
-                          target_scaler=target_scaler)
+    model = MuScaRi(config.layer_sizes, 
+                    feature_names=feature_names,
+                    feature_scaler=feature_scaler,
+                    target_scaler=target_scaler)
     
     # Determine accelerator
     if torch.cuda.is_available():

@@ -3,9 +3,11 @@ import numpy as np
 from pathlib import Path
 import geopandas as gpd
 from tqdm import tqdm
+from muscari.data_processing._cache import MUSCARI_CACHE_DIR
 
 # Default base paths
 GIFT_DATA_DIR = Path(__file__).parent / "../../data/processed/GIFT/anonymised/"
+HF_DATASET_REPO = "vboussange/muscari-data"
 
 class GIFTDataset:
     """
@@ -15,11 +17,12 @@ class GIFTDataset:
     presence-absence matrix.
     """
     
-    def __init__(self, data_dir=GIFT_DATA_DIR):
+    def __init__(self, data_dir=GIFT_DATA_DIR, cache_dir=None):
         self.data_dir = Path(data_dir)
-        
-        # Cache path for preprocessed arrays
-        self.preprocessed_cache = self.data_dir / "preprocessed_cache.parquet"
+        self.cache_dir = Path(cache_dir) if cache_dir is not None else MUSCARI_CACHE_DIR / "GIFT"
+
+        # Cache path for preprocessed species/plot matrix
+        self.preprocessed_cache = self.cache_dir / "species_matrix.parquet"
 
     def read_species_data(self):
         """Load GIFT species data from the parquet file.
@@ -48,20 +51,107 @@ class GIFTDataset:
         else:
             raise FileNotFoundError(f"Plot data not found at {plot_data_file}. Did you preprocess the data?")
 
-    def load_species_matrix(self, use_cache=True):
-        """
-        Converts plot data and species data into a single DataFrame with presence-absence matrix.
-        
+    def push_to_hub(self, repo_id: str, token: str = None):
+        """Upload the GIFT species/plot matrix to the Hugging Face Hub.
+
+        Builds the matrix first if the local cache does not exist yet, then
+        uploads it as ``GIFT/species_matrix.parquet``.
+
         Args:
-            use_cache: Whether to use cached preprocessed data if available (default: True).
-        
+            repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
+            token: HF API token. Falls back to the cached login token when
+                ``None``.
+        """
+        from huggingface_hub import HfApi
+
+        # Ensure the matrix cache exists
+        if not self.preprocessed_cache.exists():
+            print("Matrix cache not found — building it now…")
+            self.load()
+
+        api = HfApi()
+        api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
+
+        path_in_repo = "GIFT/species_matrix.parquet"
+        print(f"Uploading {path_in_repo} …")
+        api.upload_file(
+            path_or_fileobj=str(self.preprocessed_cache),
+            path_in_repo=path_in_repo,
+            repo_id=repo_id,
+            repo_type="dataset",
+            token=token,
+        )
+        print(f"  ✓ {path_in_repo} uploaded")
+
+    @classmethod
+    def from_hub(cls, repo_id: str, local_dir=None, token: str = None):
+        """Download the GIFT species/plot matrix from the Hugging Face Hub.
+
+        Downloads ``GIFT/species_matrix.parquet`` directly into the local cache
+        so that ``load()`` returns it immediately without rebuilding.
+
+        Args:
+            repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
+            local_dir: Base directory for the dataset. The matrix will be saved
+                to ``local_dir/preprocessed_cache.parquet``.
+                Defaults to ``~/.cache/muscari/<repo_id_sanitised>``.
+            token: HF API token. Falls back to the cached login token when
+                ``None``.
+
+        Returns:
+            GIFTDataset: Instance whose ``load()`` immediately serves the
+                downloaded matrix from cache.
+        """
+        import shutil
+        from huggingface_hub import hf_hub_download
+
+        instance = cls(cache_dir=local_dir) if local_dir is not None else cls()
+        dest = instance.preprocessed_cache
+
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            path_in_repo = "GIFT/species_matrix.parquet"
+            print(f"Downloading {path_in_repo} from {repo_id} …")
+            downloaded = hf_hub_download(
+                repo_id=repo_id,
+                filename=path_in_repo,
+                repo_type="dataset",
+                token=token,
+            )
+            shutil.copy(downloaded, dest)
+            print(f"  ✓ Saved to {dest}")
+        else:
+            print(f"  species_matrix.parquet already present, skipping download")
+
+        return instance
+
+    def load(self, use_cache=True):
+        """
+        Return the species/plot matrix as a GeoDataFrame.
+
+        Loads from cache if available, otherwise builds the presence-absence
+        matrix from the raw parquet files and caches the result.
+
+        Args:
+            use_cache: Whether to use/write the local cache (default: True).
+
         Returns:
             gpd.GeoDataFrame: DataFrame containing:
-                - geometry: Polygon geometry
+                - geometry: Polygon geometry of each plot
                 - area_m2: float32
                 - species columns: bool presence/absence for each species
-                - species_list: list of species names (stored in attrs)
+                - attrs['species_list']: ordered list of species column names
         """
+        if use_cache and not self.preprocessed_cache.exists():
+            print(
+                f"Local GIFT cache not found at {self.preprocessed_cache}. "
+                f"Trying Hugging Face ({HF_DATASET_REPO})..."
+            )
+            try:
+                GIFTDataset.from_hub(HF_DATASET_REPO, local_dir=self.preprocessed_cache.parent)
+            except Exception as exc:
+                print(f"Could not download GIFT cache from Hugging Face: {exc}")
+
         # Check cache first
         if use_cache and self.preprocessed_cache.exists():
             print(f"Loading preprocessed data from cache: {self.preprocessed_cache}")
@@ -129,7 +219,7 @@ if __name__ == "__main__":
     dataset = GIFTDataset()
     plot_data = dataset.read_plot_data()
     species_data = dataset.read_species_data()
-    df = dataset.load_species_matrix()
+    df = dataset.load()
     
     obs_areas = df['area_m2'].values
     species_list = df.attrs['species_list']

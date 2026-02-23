@@ -1,0 +1,1 @@
+Raw data can be downloaded by executing the `download_GIFT.R` dataset

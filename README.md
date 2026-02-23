@@ -25,10 +25,10 @@ We provide a self-contained tutorial to predict species richness maps from the p
 ### Training
 To retrain the deep SAR model, follow these steps:
 
-0. Ensure you have [all required data](#data) (biodiversity data and environmental features) under `data/`, and [install the project environment](#installation).
-1. Generate training data using `scripts/data_processing/compile_eva_chelsa.py` (see also `scripts/data_processing/align_gift_chelsa.py` for test data generation).
-2. Train the ensemble model with `train.py`. The main architecture is `Deep4PWeibull`, defined in `muscari/deep4pweibull.py`.
-3. Generate predictions using `project.py` (see also [Inference](#inference)).
+1. Install the project environment (see [Installation](#installation)).
+2. Build training datasets (see [Build training datasets](#build-training-datasets)).
+3. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
+4. Generate predictions using `project.py` (see also [Inference](#inference)).
 
 ## Project Overview
 
@@ -49,30 +49,57 @@ uv pip install -e .
 
 ## Data
 
-### European Vegetation Archive (EVA) Dataset
+### Load datasets (recommended)
 
-Anonymised vegetation plot data for training is located at `data/processed/EVA/anonymised` and consists of:
+Use the built-in loaders to access the public MuScaRi data hosted on Hugging Face (`vboussange/muscari-data`).
 
-- `plot_data.parquet`: Metadata for vegetation plots.
-- `species_data.parquet`: Anonymised species names per plot.
+```python
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.data_processing.utils_gift import GIFTDataset
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 
-To obtain the full dataset, request access at [EVA database](https://euroveg.org/eva-database/).
-
-### GIFT Database
-
-Regional checklists from the [GIFT database](https://gift.uni-goettingen.de/home), harmonized with EVA, are provided as a test dataset under `data/processed/GIFT/anonymised`.
-
-### Predictors
-
-Bioclimatic variables from the CHELSA dataset were used as predictors. To download them (e.g., for use with [pretrained weights](#pretrained-weights)), navigate to `data/CHELSA/` and run:
-
-```bash
-wget --no-host-directories --force-directories --input-file=envidat.txt
+eva_df = EVADataset().load()
+gift_df = GIFTDataset().load()
+env_ds, lc_ds = EnvironmentalFeatureDataset().load()
 ```
+
+- **EVA**: vegetation-plot dataset used for model development and training.
+- **GIFT**: independent regional checklist dataset used for external evaluation/extrapolation.
+- **Environmental Features**: CHELSA climate variables, DEM elevation, and landcover predictors.
+
+### Build training datasets
+
+See `compile_sbcv_eva_datasets.py`.
+
+### Compile from scratch (advanced / optional)
+
+Compiling from raw sources is optional and intended for advanced users or
+researchers who need to fully rebuild the underlying processed datasets.
+
+#### 1) Download raw datasets
+
+For each raw source, a dataset-specific instruction file is provided at:
+
+- `data/raw/DATASETNAME/readme.md`
+
+Follow these readmes to download and place raw files correctly.
+
+#### 2) Preprocess and anonymise EVA/GIFT
+
+Run the following scripts in order (from `scripts/data_processing/`):
+
+1. `eva_preprocessing.py`: sanitize EVA data.
+2. `gift_preprocessing.py`: sanitize GIFT data.
+3. `anonymise_gift_eva.py`: anonymise species names in both datasets.
+
+#### 3) Build training datasets
+
+- Spatial Block Cross-Validation (SBCV) EVA datasets:
+  - `compile_sbcv_eva_datasets.py`
 
 ### Pretrained Weights
 
-Pretrained weights for the ensembled deep SAR model `deep4pweibull` are available at `scripts/results/train/`. See [Quick Start: Inference](#inference) for usage instructions.
+Pretrained weights for the ensembled MuScaRi model are available on Hugging Face. See [Quick Start: Inference](#inference) and `muscari_demo.ipynb` for usage instructions.
 
 # Citations
 

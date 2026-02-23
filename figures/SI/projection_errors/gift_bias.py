@@ -8,9 +8,8 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from muscari.deep4pweibull import Deep4PWeibull
+from muscari.muscari import MuScaRi
 from muscari.plotting import CMAP_GO
-from muscari.ensemble_trainer import EnsembleConfig
 
 from matplotlib.colors import TwoSlopeNorm
 
@@ -39,14 +38,9 @@ def calculate_observed_area(eva_dataset, gift_dataset):
             gift_dataset.at[idx, "eva_observed_area"] = df_box["observed_area"].sum()
     return gift_dataset
 
-def make_predictions(model, feature_scaler, target_scaler, gift_dataset, predictors):
+def make_predictions(model, gift_dataset):
     """Make predictions for GIFT dataset."""
-    X_gift = gift_dataset[predictors].copy()
-    X_gift = torch.tensor(feature_scaler.transform(X_gift), dtype=torch.float32)
-    with torch.no_grad():
-        y_pred_gift = model(X_gift).numpy()
-        y_pred_gift = target_scaler.inverse_transform(y_pred_gift)
-    gift_dataset["predicted_sr"] = y_pred_gift.squeeze()
+    gift_dataset["predicted_sr"] = model.predict_mean_sr(gift_dataset)
     gift_dataset["bias"] = (gift_dataset["sr"] - gift_dataset["predicted_sr"]) / gift_dataset["sr"]
     gift_dataset["sampling_effort"] = gift_dataset["eva_observed_area"] / gift_dataset["sp_unit_area"]
     return gift_dataset
@@ -69,15 +63,12 @@ if __name__ == "__main__":
         # Load model and data
         result_modelling = torch.load(path_results, map_location="cpu")
         config = result_modelling["config"]
-        predictors = result_modelling["predictors"]
-        feature_scaler = result_modelling["feature_scaler"]
-        target_scaler = result_modelling["target_scaler"]
-        model = Deep4PWeibull.initialize_ensemble(result_modelling["ensemble_model_state_dict"], predictors, config, "cpu")
+        model = MuScaRi.initialize_ensemble(result_modelling, "cpu")
         eva_dataset, gift_dataset = load_data(config.path_eva_data, gift_data_dir)
 
         # Process data
         gift_dataset = calculate_observed_area(eva_dataset, gift_dataset)
-        gift_dataset = make_predictions(model, feature_scaler, target_scaler, gift_dataset, predictors)
+        gift_dataset = make_predictions(model, gift_dataset)
         gift_dataset.to_parquet(processed_data_path)
 
     # Filter outliers

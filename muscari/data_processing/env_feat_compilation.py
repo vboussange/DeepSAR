@@ -203,7 +203,7 @@ if __name__ == "__main__":
     
     logging.info("Running tests for env_feat_compilation module...")
     eva_dataset = EVADataset()
-    df = eva_dataset.load_species_matrix()
+    df = eva_dataset.load()
 
     n_test_sp_units = 1000
     area_range = (100**2, 8e5**2)

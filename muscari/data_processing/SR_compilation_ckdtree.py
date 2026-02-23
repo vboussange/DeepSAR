@@ -225,7 +225,7 @@ def run_SR_compilation_ckdtree(
 
 if __name__ == "__main__":
     eva_dataset = EVADataset()
-    df = eva_dataset.load_species_matrix()
+    df = eva_dataset.load()
     coords = np.column_stack((df.geometry.x, df.geometry.y))
     obs_areas = df['area_m2'].values
     species_list = df.attrs['species_list']

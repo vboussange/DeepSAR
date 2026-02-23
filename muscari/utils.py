@@ -6,8 +6,7 @@ import torch
 import torch.nn as nn
 import git
 
-from muscari.deep4pweibull import Deep4PWeibull
-from muscari.ensemble_model import MuScaRiEnsembleModel
+from muscari.ensemble_model import MuScaRiEnsembleModel  # alias kept for compat
 
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
@@ -49,39 +48,3 @@ def get_git_hash(short=True, fallback="unknown"):
     except git.InvalidGitRepositoryError:
         logging.warning("Could not determine git hash; using '%s'.", fallback)
         return fallback
-
-
-def load_ensemble_from_folds(run_dir: Path, device: str = "cpu", return_config: bool = False):
-    ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
-    if not ckpt_paths:
-        raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
-
-    models = []
-    feature_names_ref = None
-    config_ref = None
-    for ckpt_path in ckpt_paths:
-        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
-        feature_names = checkpoint["feature_names"]
-        if feature_names_ref is None:
-            feature_names_ref = feature_names
-            config_ref = checkpoint.get("config")
-        else:
-            assert feature_names_ref == feature_names, "Feature names differ across folds"
-
-        config = checkpoint["config"]
-        model = Deep4PWeibull(
-            config.layer_sizes,
-            feature_names=feature_names,
-            feature_scaler=checkpoint["feature_scaler"],
-            target_scaler=checkpoint["target_scaler"],
-        )
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.to(device)
-        model.eval()
-        models.append(model)
-
-    ensemble = MuScaRiEnsembleModel(models)
-    ensemble.eval()
-    if return_config:
-        return ensemble, config_ref
-    return ensemble

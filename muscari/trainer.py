@@ -74,15 +74,15 @@ class MuScaRiLitModule(pl.LightningModule):
 
 if __name__ == "__main__":
     # Test case for MuScaRiLitModule
-    from muscari.mlp import FullyConnectedBatchNormBlock
+    from muscari.ffnn import FFNNBatchNormBlock
     from muscari.utils import MSELogLoss
 
     # Create a simple test model
     class SimpleTestModel(torch.nn.Module):
         def __init__(self, input_dim=10, output_dim=1):
             super().__init__()
-            self.block1 = FullyConnectedBatchNormBlock(input_dim, 32)
-            self.block2 = FullyConnectedBatchNormBlock(32, 16)
+            self.block1 = FFNNBatchNormBlock(input_dim, 32)
+            self.block2 = FFNNBatchNormBlock(32, 16)
             self.output = torch.nn.Linear(16, output_dim)
 
         def forward(self, x):

@@ -15,7 +15,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from muscari.dataset import create_dataloader
-from muscari.deep4pweibull import Deep4PWeibull
+from muscari.muscari import MuScaRi
 
 # Debug configuration (edit if needed)
 RUN_DIR = Path("6dcd90c")
@@ -159,7 +159,7 @@ if __name__ == "__main__":
             target_scaler,
         )
 
-        model = Deep4PWeibull.initialize(checkpoint, device=DEVICE)
+        model = MuScaRi.initialize(checkpoint, device=DEVICE)
 
         y_train, yhat_train = _predict(model, train_loader, target_scaler, DEVICE)
         y_val, yhat_val = _predict(model, val_loader, target_scaler, DEVICE)

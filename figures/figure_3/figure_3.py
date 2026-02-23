@@ -15,9 +15,9 @@ from scipy.stats import ttest_ind
 from sklearn.metrics import r2_score
 from statsmodels.stats.multicomp import MultiComparison
 
-from muscari.deep4pweibull import Deep4PWeibull
+from muscari.muscari import MuScaRi
 from muscari.cld import create_comp_matrix_allpair_t_test, multcomp_letters
-from muscari.utils import load_ensemble_from_folds
+from muscari.ensemble_model import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
@@ -253,10 +253,10 @@ def add_performance_panels(
     return None
 
 
-def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object, dict]:
+def load_fold_model(ckpt_path: Path, device: str) -> tuple[MuScaRi, object, dict]:
     checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
     config = checkpoint["config"]
-    model = Deep4PWeibull(
+    model = MuScaRi(
         config.layer_sizes,
         feature_names=checkpoint["feature_names"],
         feature_scaler=checkpoint["feature_scaler"],
@@ -269,7 +269,7 @@ def load_fold_model(ckpt_path: Path, device: str) -> tuple[Deep4PWeibull, object
     return model, config, metrics
 
 
-def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, gpd.GeoDataFrame, int]:
+def select_best_fold_model(run_dir: Path, device: str) -> tuple[MuScaRi, gpd.GeoDataFrame, int]:
     ckpt_paths = sorted(run_dir.glob("fold_*.pth"))
     if not ckpt_paths:
         raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
@@ -307,13 +307,13 @@ def select_best_fold_model(run_dir: Path, device: str) -> tuple[Deep4PWeibull, g
     return best_model, best_test_df, best_fold
 
 
-def prepare_eva_test_data(test_df: gpd.GeoDataFrame, model: Deep4PWeibull, sample_frac: float = 0.1) -> gpd.GeoDataFrame:
+def prepare_eva_test_data(test_df: gpd.GeoDataFrame, model: MuScaRi, sample_frac: float = 0.1) -> gpd.GeoDataFrame:
     test_df = test_df.copy()
     test_df["predicted_sr"] = model.predict_sr(test_df)
     return test_df.sample(frac=sample_frac, random_state=42)
 
 
-def prepare_gift_data(model: Deep4PWeibull) -> gpd.GeoDataFrame:
+def prepare_gift_data(model: MuScaRiEnsemble) -> gpd.GeoDataFrame:
     gift_dataset = gpd.read_parquet(GIFT_SAMPLES_PATH)
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
@@ -327,7 +327,7 @@ if __name__ == "__main__":
     
     device = "cpu"
     best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
-    ensemble_model = load_ensemble_from_folds(RUN_DIR, device=device)
+    ensemble_model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
 
     eva_test_data = prepare_eva_test_data(best_test_df, best_model)
     gift_dataset = prepare_gift_data(ensemble_model)
@@ -338,7 +338,7 @@ if __name__ == "__main__":
         "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
         "MuScaRi_Area": "MuScaRi\n(area only)",
         "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
-        "MLP_ClimateDEM_Area": "FFNN\n(env. + area)",
+        "FFNNBatchNormExp_ClimateDEM_Area": "FFNN\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
     }
 

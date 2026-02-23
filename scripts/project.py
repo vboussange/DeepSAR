@@ -1,12 +1,12 @@
 """
-Projecting spatially the predictions of ensembled `Deep4PWeibull` model, and saving to geotiff files.
+Projecting spatially the predictions of the ensembled `MuScaRi` model, and saving to geotiff files.
 See `scripts/train.py` for training the ensemble model.
 """
 import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
-from muscari.utils import load_ensemble_from_folds
+from muscari.ensemble_model import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.plotting import CMAP_BR
 import pandas as pd
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     projection_path.mkdir(parents=True, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = load_ensemble_from_folds(run_dir, device=device)
+    model = MuScaRiEnsemble.from_folds(run_dir, device=device)
     env_dataset, lc_dataset = load_environmental_features()
 
     # for res in range(1000, 100000, 1000):

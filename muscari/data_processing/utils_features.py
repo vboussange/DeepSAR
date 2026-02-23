@@ -5,6 +5,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 from rasterio.enums import Resampling
+from muscari.data_processing._cache import MUSCARI_CACHE_DIR
 
 # Default base paths (can be overridden via environment variables)
 BASE_DIR = Path(os.getenv('MUSCARI_DATA_DIR', Path(__file__).parent.parent.parent / 'data'))
@@ -14,6 +15,7 @@ CHELSA_PATH = Path(os.getenv('CHELSA_PATH', BASE_DIR / 'raw/CHELSA/chelsav2/GLOB
 DEM_PATH = Path(os.getenv('DEM_PATH', BASE_DIR / 'raw/EEA_DEM/eudem_dem_3035_europe_1000m.tif'))
 LC_PATH = Path(os.getenv('LC_PATH', BASE_DIR / 'raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif'))
 CACHE_DIR = Path(os.getenv('CACHE_DIR', BASE_DIR / 'processed/environmental_features'))
+HF_DATASET_REPO = "vboussange/muscari-data"
 
 class EnvironmentalFeatureDataset():
     """
@@ -30,16 +32,92 @@ class EnvironmentalFeatureDataset():
                  chelsa_path=CHELSA_PATH, 
                  dem_path=DEM_PATH, 
                  lc_path=LC_PATH, 
-                 cache_dir=CACHE_DIR):
+                 cache_dir=None):
         self.chelsa_path = Path(chelsa_path)
         self.dem_path = Path(dem_path)
         self.lc_path = Path(lc_path)
-        self.cache_dir = Path(cache_dir)
+        self.cache_dir = Path(cache_dir) if cache_dir is not None else MUSCARI_CACHE_DIR / "environmental_features"
         
-        # Individual cache paths for each dataset
-        self.chelsa_cache = self.cache_dir / 'chelsa_cache.nc'
-        self.dem_cache = self.cache_dir / 'dem_cache.nc'
-        self.lc_cache = self.cache_dir / 'landcover_cache.nc'        
+        # Cache paths
+        self.chelsa_dem_cache = self.cache_dir / 'chelsa_dem_cache.nc'
+        self.lc_cache = self.cache_dir / 'landcover_cache.nc'
+
+    def push_to_hub(self, repo_id: str, token: str = None):
+        """Upload the environmental feature caches to the Hugging Face Hub.
+
+        Builds both caches first if they do not exist, then uploads
+        ``chelsa_dem_cache.nc`` and ``landcover_cache.nc`` under
+        ``environmental_features/`` in the repository.
+
+        Args:
+            repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
+            token: HF API token. Falls back to the cached login token when
+                ``None``.
+        """
+        from huggingface_hub import HfApi
+
+        # Ensure both caches exist
+        if not self.chelsa_dem_cache.is_file() or not self.lc_cache.is_file():
+            print("Cache files not found — building them now…")
+            self.load()
+
+        api = HfApi()
+        api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
+
+        for local_path in (self.chelsa_dem_cache, self.lc_cache):
+            path_in_repo = f"environmental_features/{local_path.name}"
+            print(f"Uploading {path_in_repo} …")
+            api.upload_file(
+                path_or_fileobj=str(local_path),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type="dataset",
+                token=token,
+            )
+            print(f"  ✓ {path_in_repo} uploaded")
+
+    @classmethod
+    def from_hub(cls, repo_id: str, local_dir=None, token: str = None):
+        """Download environmental feature caches from the Hugging Face Hub.
+
+        Downloads ``chelsa_dem_cache.nc`` and ``landcover_cache.nc`` directly
+        into the unified cache directory so that ``load()`` returns them
+        immediately without rebuilding from raw rasters.
+
+        Args:
+            repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
+            local_dir: Override for the cache directory. When ``None`` the
+                unified ``MUSCARI_CACHE_DIR/environmental_features`` is used.
+            token: HF API token. Falls back to the cached login token when
+                ``None``.
+
+        Returns:
+            EnvironmentalFeatureDataset: Instance whose ``load()`` immediately
+                serves the downloaded caches.
+        """
+        import shutil
+        from huggingface_hub import hf_hub_download
+
+        instance = cls(cache_dir=local_dir) if local_dir is not None else cls()
+        instance.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        for filename in ("chelsa_dem_cache.nc", "landcover_cache.nc"):
+            dest = instance.cache_dir / filename
+            if not dest.exists():
+                path_in_repo = f"environmental_features/{filename}"
+                print(f"Downloading {path_in_repo} from {repo_id} …")
+                downloaded = hf_hub_download(
+                    repo_id=repo_id,
+                    filename=path_in_repo,
+                    repo_type="dataset",
+                    token=token,
+                )
+                shutil.copy(downloaded, dest)
+                print(f"  ✓ Saved to {dest}")
+            else:
+                print(f"  {filename} already present, skipping download")
+
+        return instance
 
     def load(self, use_cache=True):
         """
@@ -52,108 +130,84 @@ class EnvironmentalFeatureDataset():
         Args:
             use_cache (bool): Whether to use cached data if available.
 
-                Returns:
-                        tuple[xr.Dataset, xr.Dataset]:
-                                - CHELSA + DEM dataset with bioclimatic variables (bio1..bio19)
-                                    and elevation (elevation)
-                                - Landcover dataset with remapped classes (landcover) as integers
-                                Both in the target CRS.
+        Returns:
+            tuple[xr.Dataset, xr.Dataset]:
+                - CHELSA + DEM dataset with bioclimatic variables (bio1..bio19)
+                  and elevation (elevation)
+                - Landcover dataset with remapped classes (landcover) as integers
+                Both in the target CRS.
         """
         print("Loading and aligning environmental datasets...")
-        
-        # Load DEM first to get reference extent (DEM defines the European extent)
-        dem_ds = self._load_dem(use_cache)
-        
-        # Use DEM as reference grid for alignment
-        ref_da = dem_ds['elevation']
-                
-        # Load other datasets cropped to DEM extent
-        chelsa_ds = self._load_chelsa(ref_da, use_cache)
+
+        if use_cache and (not self.chelsa_dem_cache.is_file() or not self.lc_cache.is_file()):
+            print(
+                "Local environmental cache files are missing. "
+                f"Trying Hugging Face ({HF_DATASET_REPO})..."
+            )
+            try:
+                EnvironmentalFeatureDataset.from_hub(HF_DATASET_REPO, local_dir=self.cache_dir)
+            except Exception as exc:
+                print(f"Could not download environmental caches from Hugging Face: {exc}")
+
+        chelsa_dem_ds = self._load_chelsa_dem(use_cache)
+
+        # Use elevation as reference grid for landcover alignment
+        ref_da = chelsa_dem_ds['elevation']
         lc_ds = self._load_landcover(ref_da, use_cache)
-                
-        # we do not merge lc_ds here as it is np.int16
-        chelsa_dem_ds = xr.merge([dem_ds, chelsa_ds])
-        
+
         return chelsa_dem_ds, lc_ds
-    
-    def _load_chelsa(self, ref_da, use_cache=True):
-        """Load CHELSA bioclimatic variables and reproject to target CRS.
-        
+
+    def _load_chelsa_dem(self, use_cache=True):
+        """Load and combine CHELSA bioclimatic variables and DEM elevation into one dataset.
+
+        DEM defines the reference grid; all CHELSA variables are reprojected to match it.
+
         Args:
-            ref_da: Reference DataArray used to match grid, CRS, and extent.
             use_cache: Whether to use cached data when available.
 
         Returns:
-            xr.Dataset: CHELSA variables aligned to the reference grid.
+            xr.Dataset: Merged dataset with elevation and bioclimatic variables.
         """
-        # Check cache
-        if use_cache and self.chelsa_cache.is_file():
-            print(f"Loading CHELSA from cache: {self.chelsa_cache}")
-            ds = xr.open_dataset(self.chelsa_cache)
-            if ds.rio.bounds() == ref_da.rio.bounds():
-                return ds
-            else:
-                print("Cache does not match reference grid, recompiling.")
-        
-        data_arrays = []
-        for tiff_path in tqdm(sorted(self.chelsa_path.glob("*.tif")), desc="Loading CHELSA variables"):
-            with rioxarray.open_rasterio(tiff_path, mask_and_scale=True) as da:
-                da = da.sel(band=1, drop=True)
-                # Extract variable name and rename
-                name = tiff_path.stem.split("CHELSA_")[1].split("_1981-2010_V.2.1")[0]
-                da = da.rename(name)
-                # Reproject to match reference grid
-                da = da.rio.reproject_match(ref_da, resampling=Resampling.bilinear)
-                data_arrays.append(da)
-                
-        dataset = xr.merge(data_arrays, join="left")
-        dataset.rio.write_crs(ref_da.rio.crs, inplace=True)
-        
-        # Optimize encoding: float32 for data and coordinates, with compression
-        encoding = self._get_optimized_encoding(dataset, dtype='float32')
-        
-        # Cache the dataset
-        if use_cache:
-            self.chelsa_cache.parent.mkdir(parents=True, exist_ok=True)
-            print(f"Caching CHELSA to {self.chelsa_cache}")
-            dataset.to_netcdf(self.chelsa_cache, engine='netcdf4', encoding=encoding)
-        return dataset
-            
-    def _load_dem(self, use_cache=False):
-        """Load DEM elevation data.
-        
-        Args:
-            use_cache: Whether to use cached data if available.
+        if use_cache and self.chelsa_dem_cache.is_file():
+            print(f"Loading CHELSA+DEM from cache: {self.chelsa_dem_cache}")
+            return xr.open_dataset(self.chelsa_dem_cache)
 
-        Returns:
-            xr.Dataset: DEM elevation dataset with variable name `elevation`.
-        """
-        # Check cache
-        if use_cache and self.dem_cache.exists():
-            print(f"Loading DEM from cache: {self.dem_cache}")
-            dataset = xr.open_dataset(self.dem_cache)
-            return dataset
-        
+        # --- Load DEM (defines the reference grid) ---
         print("Loading DEM data...")
-        
         if not self.dem_path.exists():
             raise FileNotFoundError(f"DEM file not found: {self.dem_path}")
-        
+
         with rioxarray.open_rasterio(self.dem_path, mask_and_scale=True) as da:
             dem_da = da.sel(band=1, drop=True)
             dem_ds = xr.Dataset({'elevation': dem_da})
             dem_ds.rio.write_crs(dem_da.rio.crs, inplace=True)
-            
-            # Optimize encoding: float32 for data and coordinates, with compression
-            encoding = self._get_optimized_encoding(dem_ds, dtype='float32')
-            
-            # Cache the dataset
-            if use_cache:
-                self.dem_cache.parent.mkdir(parents=True, exist_ok=True)
-                print(f"Caching DEM to {self.dem_cache}")
-                dem_ds.to_netcdf(self.dem_cache, engine='netcdf4', encoding=encoding)
-            
-            return dem_ds
+
+        ref_da = dem_ds['elevation']
+
+        # --- Load CHELSA variables ---
+        data_arrays = []
+        for tiff_path in tqdm(sorted(self.chelsa_path.glob("*.tif")), desc="Loading CHELSA variables"):
+            with rioxarray.open_rasterio(tiff_path, mask_and_scale=True) as da:
+                da = da.sel(band=1, drop=True)
+                name = tiff_path.stem.split("CHELSA_")[1].split("_1981-2010_V.2.1")[0]
+                da = da.rename(name)
+                da = da.rio.reproject_match(ref_da, resampling=Resampling.bilinear)
+                data_arrays.append(da)
+
+        chelsa_ds = xr.merge(data_arrays, join="left")
+        chelsa_ds.rio.write_crs(ref_da.rio.crs, inplace=True)
+
+        # --- Merge DEM and CHELSA ---
+        chelsa_dem_ds = xr.merge([dem_ds, chelsa_ds])
+
+        # Cache the combined dataset
+        if use_cache:
+            encoding = self._get_optimized_encoding(chelsa_dem_ds, dtype='float32')
+            self.chelsa_dem_cache.parent.mkdir(parents=True, exist_ok=True)
+            print(f"Caching CHELSA+DEM to {self.chelsa_dem_cache}")
+            chelsa_dem_ds.to_netcdf(self.chelsa_dem_cache, engine='netcdf4', encoding=encoding)
+
+        return chelsa_dem_ds
         
     
     def _load_landcover(self, ref_da, use_cache=False):

@@ -44,12 +44,12 @@ def build_performance_table(
     metrics: list[str],
 ) -> pd.DataFrame:
     if dataset == "interp":
-        experiments = ["MLP_ClimateDEM_Area", "MLP_All", "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All"]
+        experiments = ["FFNNBatchNormExp_ClimateDEM_Area", "FFNNBatchNormExp_All", "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All"]
         df_plot = df_muscari
     else:
         experiments = [
-            "MLP_All",
-            "MLP_ClimateDEM_Area",
+            "FFNNBatchNormExp_All",
+            "FFNNBatchNormExp_ClimateDEM_Area",
             "chao2_estimator",
             "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All",
         ]
@@ -146,8 +146,8 @@ if __name__ == "__main__":
         "MuScaRi_ClimateDEM_Landcover": "MuScaRi",
         "MuScaRi_Landcover_Area": "MuScaRi",
         "MuScaRi_All": "MuScaRi",
-        "MLP_All": "FFNN",
-        "MLP_ClimateDEM_Area": "FFNN",
+        "FFNNBatchNormExp_All": "FFNN",
+        "FFNNBatchNormExp_ClimateDEM_Area": "FFNN",
         "chao2_estimator": "Chao2 estimator",
     }
 
@@ -159,8 +159,8 @@ if __name__ == "__main__":
         "MuScaRi_ClimateDEM_Landcover": "Env. + Land.",
         "MuScaRi_Landcover_Area": "Land. + Area",
         "MuScaRi_All": "Area + Env. + Land.",
-        "MLP_All": "Area + Env. + Land.",
-        "MLP_ClimateDEM_Area": "Env. + Area",
+        "FFNNBatchNormExp_All": "Area + Env. + Land.",
+        "FFNNBatchNormExp_ClimateDEM_Area": "Env. + Area",
         "chao2_estimator": "--",
     }
 

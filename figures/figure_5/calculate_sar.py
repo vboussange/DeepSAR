@@ -5,7 +5,8 @@ Using Ensemble model.
 """
 import numpy as np
 import pandas as pd
-from muscari.utils import save_to_pickle, load_ensemble_from_folds
+from muscari.utils import save_to_pickle
+from muscari.ensemble_model import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 import matplotlib.pyplot as plt
 
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
-    model = load_ensemble_from_folds(RUN_DIR, device="cpu")
+    model = MuScaRiEnsemble.from_folds(RUN_DIR, device="cpu")
 
     env_ds, lc_ds, res_env_pixel = load_environmental_features(model)
 

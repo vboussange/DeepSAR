@@ -9,7 +9,7 @@ from pathlib import Path
 import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
-from muscari.utils import load_ensemble_from_folds
+from muscari.ensemble_model import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0_no_lc_features_reduced_bioclim_vars"
@@ -53,7 +53,7 @@ class ShapleyAnalyzer:
 
 def load_data_and_model():
     """Load model and data."""
-    model, config = load_ensemble_from_folds(RUN_DIR, device=DEVICE, return_config=True)
+    model, config = MuScaRiEnsemble.from_folds(RUN_DIR, device=DEVICE, return_config=True)
     eva_dataset = gpd.read_parquet(config.path_sbcv_data / "fold_0_test.parquet")
     eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
     eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])

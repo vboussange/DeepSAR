@@ -14,8 +14,8 @@ import torch
 import torch.nn as nn
 from muscari.utils import symmetric_arch
 from muscari.benchmarker import BenchmarkConfig, Benchmarker
-from muscari.deep4pweibull import Deep4PWeibull
-from muscari.mlp import MLP
+from muscari.muscari import MuScaRi
+from muscari.ffnn import FFNNExp
 import warnings
 from dataclasses import dataclass, field
 
@@ -46,15 +46,15 @@ def setup_logger():
 logger = setup_logger()
 
 @dataclass
-class Deep4PWeibullInit():
+class MuScaRiInit():
     feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=128, factor=4))
     def __call__(self, **kwargs):
-        return Deep4PWeibull(feature_names=self.feature_names, 
-                             layer_sizes=self.architecture, 
-                             **kwargs)
+        return MuScaRi(layer_sizes=self.architecture,
+                       feature_names=self.feature_names,
+                       **kwargs)
 
-class WrappedMLP(MLP):
+class WrappedFFNNBatchNormExp(FFNNExp):
     def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None):
         super().__init__(input_dim, layer_sizes)
         self.feature_names = feature_names
@@ -62,12 +62,12 @@ class WrappedMLP(MLP):
         self.target_scaler = target_scaler
 
 @dataclass
-class MLPInit():
+class FFNNBatchNormExpInit():
     feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=64, factor=4))
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)
-        return WrappedMLP(len(self.feature_names) + 1, self.architecture, **kwargs)
+        return WrappedFFNNBatchNormExp(len(self.feature_names) + 1, self.architecture, **kwargs)
 
 if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path('results', 'benchmark')
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     # MuScaRi Area Only
     experiments.append({
         "name": "MuScaRi_Area",
-        "model_init": Deep4PWeibullInit(feature_names=["log_sp_unit_area"]),
+        "model_init": MuScaRiInit(feature_names=["log_sp_unit_area"]),
         "feature_names": ["log_sp_unit_area"],
         "train_frac": 1.0
     })
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     # MuScaRi Climate+DEM
     experiments.append({
         "name": "MuScaRi_ClimateDEM",
-        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats),
+        "model_init": MuScaRiInit(feature_names=climate_dem_feats),
         "feature_names": climate_dem_feats,
         "train_frac": 1.0
     })
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     # MuScaRi Landcover only
     experiments.append({
         "name": "MuScaRi_Landcover",
-        "model_init": Deep4PWeibullInit(feature_names=landcover_feats),
+        "model_init": MuScaRiInit(feature_names=landcover_feats),
         "feature_names": landcover_feats,
         "train_frac": 1.0
     })
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # MuScaRi Climate+DEM + Landcover
     experiments.append({
         "name": "MuScaRi_ClimateDEM_Landcover",
-        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + landcover_feats),
+        "model_init": MuScaRiInit(feature_names=climate_dem_feats + landcover_feats),
         "feature_names": climate_dem_feats + landcover_feats,
         "train_frac": 1.0
     })
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     # MuScaRi Climate+DEM + Area
     experiments.append({
         "name": "MuScaRi_ClimateDEM_Area",
-        "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "model_init": MuScaRiInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
         "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     # MuScaRi Landcover + Area
     experiments.append({
         "name": "MuScaRi_Landcover_Area",
-        "model_init": Deep4PWeibullInit(feature_names=landcover_feats + ["log_sp_unit_area"]),
+        "model_init": MuScaRiInit(feature_names=landcover_feats + ["log_sp_unit_area"]),
         "feature_names": landcover_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     # MuScaRi All Env + Area
     experiments.append({
         "name": "MuScaRi_All",
-        "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "model_init": MuScaRiInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     # for frac in [0.01, 0.1]:
     #     experiments.append({
     #         "name": f"MuScaRi_All_frac_{frac}",
-    #         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+    #         "model_init": MuScaRiInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
     #         "feature_names": all_env_feats + ["log_sp_unit_area"],
     #         "train_frac": frac
     #     })
@@ -166,23 +166,23 @@ if __name__ == "__main__":
     # # Base 64
     # experiments.append({
     #     "name": "MuScaRi_All_Base64",
-    #     "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
+    #     "model_init": MuScaRiInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
     #                                     architecture=symmetric_arch(6, base=64, factor=4)),
     #     "feature_names": all_env_feats + ["log_sp_unit_area"],
     #     "train_frac": 1.0
     # })
     
-    # MLP (on All Env + Area)
+    # FFNNExp (on All Env + Area)
     experiments.append({
-        "name": "MLP_All",
-        "model_init": MLPInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "name": "FFNNBatchNormExp_All",
+        "model_init": FFNNBatchNormExpInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
     
     experiments.append({
-        "name": "MLP_ClimateDEM_Area",
-        "model_init": MLPInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "name": "FFNNBatchNormExp_ClimateDEM_Area",
+        "model_init": FFNNBatchNormExpInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
         "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })

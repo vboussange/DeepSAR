@@ -1,5 +1,5 @@
 """
-Projecting spatially the predictions of an ensembled `Deep4PWeibull` model,
+Projecting spatially the predictions of an ensembled `MuScaRi` model,
 and saving SR, std_SR, dSR/dlogA and std_dSR/dlogA to geotiffs.
 """
 import torch
@@ -10,7 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
 
-from muscari.utils import load_ensemble_from_folds
+from muscari.ensemble_model import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from muscari.plotting import CMAP_BR
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     projection_path.mkdir(parents=True, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = load_ensemble_from_folds(RUN_DIR, device=device)
+    model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
     env_dataset, lc_dataset = load_environmental_features()
     env_dataset = env_dataset.sel(y=slice(6.505e6, 1.2e6)) # trim to ensure fine and coarse maps align
     
