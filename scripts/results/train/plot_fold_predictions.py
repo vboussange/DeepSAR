@@ -14,8 +14,8 @@ import geopandas as gpd
 import torch
 import matplotlib.pyplot as plt
 
-from deepsar.dataset import create_dataloader
-from deepsar.deep4pweibull import Deep4PWeibull
+from muscari.dataset import create_dataloader
+from muscari.deep4pweibull import Deep4PWeibull
 
 # Debug configuration (edit if needed)
 RUN_DIR = Path("6dcd90c")

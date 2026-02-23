@@ -10,10 +10,10 @@ import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
 
-from deepsar.utils import load_ensemble_from_folds
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
-from deepsar.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
-from deepsar.plotting import CMAP_BR
+from muscari.utils import load_ensemble_from_folds
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
+from muscari.plotting import CMAP_BR
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"

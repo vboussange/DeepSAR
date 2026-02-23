@@ -16,10 +16,10 @@ import logging
 import json
 import random
 
-from deepsar.data_processing.utils_gift import GIFTDataset
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
-from deepsar.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
-from deepsar.utils import get_git_hash
+from muscari.data_processing.utils_gift import GIFTDataset
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
+from muscari.utils import get_git_hash
 
 # Initialize logging
 logging.basicConfig(

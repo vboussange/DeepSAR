@@ -8,9 +8,9 @@ from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
 from scipy.stats import pearsonr
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.plotting import CMAP_GO
-from deepsar.ensemble_trainer import EnsembleConfig
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.plotting import CMAP_GO
+from muscari.ensemble_trainer import EnsembleConfig
 
 from matplotlib.colors import TwoSlopeNorm
 

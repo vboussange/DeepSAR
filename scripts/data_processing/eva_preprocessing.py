@@ -14,7 +14,7 @@ from difflib import get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
-from deepsar.data_processing.utils_eva import extract_habitat_lev1, COUNTRY_DATA, COUNTRY_LIST
+from muscari.data_processing.utils_eva import extract_habitat_lev1, COUNTRY_DATA, COUNTRY_LIST
 
 # Constants
 EVA_SPECIES_FILE = Path(__file__).parent / "../../data/raw/EVA/172_SpeciesAreaRel20230227_notJUICE_species.csv"

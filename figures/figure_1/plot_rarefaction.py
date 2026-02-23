@@ -15,11 +15,11 @@ from sklearn.metrics import mean_squared_error
 from tqdm import tqdm
 import warnings
 
-from deepsar.SR_compilation_jax import clip_EVA_SR, generate_random_square
-from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.data_processing.utils_gift import GIFTDataset
-from deepsar.data_processing.utils_features import CHELSADataset
-from deepsar.utils import save_to_pickle
+from muscari.SR_compilation_jax import clip_EVA_SR, generate_random_square
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.data_processing.utils_gift import GIFTDataset
+from muscari.data_processing.utils_features import CHELSADataset
+from muscari.utils import save_to_pickle
 import random
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score, d2_absolute_error_score

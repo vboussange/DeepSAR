@@ -10,9 +10,9 @@ from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 
-from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.plotting import COLORS_BR
-from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.plotting import COLORS_BR
+from muscari.data_processing.spatial_folds import assign_checkerboard_folds
 
 SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"
 SAMPLE_FILE = SBCV_PATH / "fold_0_train.parquet"

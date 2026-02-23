@@ -23,12 +23,12 @@ import random
 import os
 import multiprocessing as mp
 
-from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
-from deepsar.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
-from deepsar.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
-from deepsar.utils import get_git_hash
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.data_processing.spatial_folds import assign_checkerboard_folds
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
+from muscari.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
+from muscari.utils import get_git_hash
 
 # Initialize logging
 logging.basicConfig(

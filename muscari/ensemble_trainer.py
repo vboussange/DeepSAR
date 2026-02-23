@@ -10,11 +10,11 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 
 from dataclasses import dataclass, field
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.trainer import DeepSARLitModule
-from deepsar.dataset import create_dataloader
-from deepsar.utils import symmetric_arch
-from deepsar.ensemble_model import DeepSAREnsembleModel
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.trainer import MuScaRiLitModule
+from muscari.dataset import create_dataloader
+from muscari.utils import symmetric_arch
+from muscari.ensemble_model import MuScaRiEnsembleModel
 
 @dataclass
 class EnsembleConfig:
@@ -59,7 +59,7 @@ class EnsembleTrainer:
         logs = [r["log"] for r in results]
         feature_scalers = [r["model"].feature_scaler for r in results]
         target_scalers = [r["model"].target_scaler for r in results]
-        ensemble_model = DeepSAREnsembleModel(models)
+        ensemble_model = MuScaRiEnsembleModel(models)
         
         pred_s = ensemble_model.predict_mean_sr(df_test)
         ensemble_mse = root_mean_squared_error(df_test["sr"], pred_s)
@@ -107,7 +107,7 @@ class EnsembleTrainer:
             accelerator = "cpu"
             devices = 1
 
-        lit_model = DeepSARLitModule(model, config, nn.MSELoss())
+        lit_model = MuScaRiLitModule(model, config, nn.MSELoss())
         
         trainer = pl.Trainer(
             max_epochs=config.n_epochs,

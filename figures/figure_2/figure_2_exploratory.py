@@ -12,7 +12,7 @@ if __name__ == "__main__":
     chao2_path = Path(__file__).parents[2] / "scripts" / "results" / "benchmark" / "benchmark_chao2_results.csv"
 
     df_bench = pd.read_csv(benchmark_path)
-    df_bench = df_bench[df_bench["experiment"] != "DeepSAR_All_frac_0.01"]  # Remove low-data experiment
+    df_bench = df_bench[df_bench["experiment"] != "MuScaRi_All_frac_0.01"]  # Remove low-data experiment
     df_chao2 = pd.read_csv(chao2_path)
 
     df_bench = df_bench.copy()

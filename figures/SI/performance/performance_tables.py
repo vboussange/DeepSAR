@@ -36,7 +36,7 @@ def apply_best_bold(values: dict[str, float], higher_is_better: bool) -> dict[st
 
 
 def build_performance_table(
-    df_deepsar: pd.DataFrame,
+    df_muscari: pd.DataFrame,
     df_chao2: pd.DataFrame,
     dataset: str,
     label_map: dict[str, str],
@@ -44,16 +44,16 @@ def build_performance_table(
     metrics: list[str],
 ) -> pd.DataFrame:
     if dataset == "interp":
-        experiments = ["MLP_ClimateDEM_Area", "MLP_All", "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_Landcover", "DeepSAR_ClimateDEM_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_Landcover_Area", "DeepSAR_All"]
-        df_plot = df_deepsar
+        experiments = ["MLP_ClimateDEM_Area", "MLP_All", "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All"]
+        df_plot = df_muscari
     else:
         experiments = [
             "MLP_All",
             "MLP_ClimateDEM_Area",
             "chao2_estimator",
-            "DeepSAR_Area", "DeepSAR_ClimateDEM", "DeepSAR_Landcover", "DeepSAR_ClimateDEM_Area", "DeepSAR_ClimateDEM_Landcover", "DeepSAR_Landcover_Area", "DeepSAR_All",
+            "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All",
         ]
-        df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
+        df_plot = pd.concat([df_chao2, df_muscari], ignore_index=True)
 
     rows = []
     for experiment in experiments:
@@ -136,39 +136,39 @@ def write_latex_table(df: pd.DataFrame, caption: str, label: str, output_path: P
 
 
 if __name__ == "__main__":
-    df_deepsar, df_chao2 = load_benchmark_results()
+    df_muscari, df_chao2 = load_benchmark_results()
 
     label_map = {
-        "DeepSAR_Area": "MuScaRi",
-        "DeepSAR_ClimateDEM": "MuScaRi",
-        "DeepSAR_Landcover": "MuScaRi",
-        "DeepSAR_ClimateDEM_Area": "MuScaRi",
-        "DeepSAR_ClimateDEM_Landcover": "MuScaRi",
-        "DeepSAR_Landcover_Area": "MuScaRi",
-        "DeepSAR_All": "MuScaRi",
+        "MuScaRi_Area": "MuScaRi",
+        "MuScaRi_ClimateDEM": "MuScaRi",
+        "MuScaRi_Landcover": "MuScaRi",
+        "MuScaRi_ClimateDEM_Area": "MuScaRi",
+        "MuScaRi_ClimateDEM_Landcover": "MuScaRi",
+        "MuScaRi_Landcover_Area": "MuScaRi",
+        "MuScaRi_All": "MuScaRi",
         "MLP_All": "FFNN",
         "MLP_ClimateDEM_Area": "FFNN",
         "chao2_estimator": "Chao2 estimator",
     }
 
     predictor_map = {
-        "DeepSAR_Area": "Area",
-        "DeepSAR_ClimateDEM": "Env.",
-        "DeepSAR_Landcover": "Land.",
-        "DeepSAR_ClimateDEM_Area": "Env. + Area",
-        "DeepSAR_ClimateDEM_Landcover": "Env. + Land.",
-        "DeepSAR_Landcover_Area": "Land. + Area",
-        "DeepSAR_All": "Area + Env. + Land.",
+        "MuScaRi_Area": "Area",
+        "MuScaRi_ClimateDEM": "Env.",
+        "MuScaRi_Landcover": "Land.",
+        "MuScaRi_ClimateDEM_Area": "Env. + Area",
+        "MuScaRi_ClimateDEM_Landcover": "Env. + Land.",
+        "MuScaRi_Landcover_Area": "Land. + Area",
+        "MuScaRi_All": "Area + Env. + Land.",
         "MLP_All": "Area + Env. + Land.",
         "MLP_ClimateDEM_Area": "Env. + Area",
         "chao2_estimator": "--",
     }
 
-    df_deepsar = df_deepsar[df_deepsar["experiment"].isin(label_map)].copy()
+    df_muscari = df_muscari[df_muscari["experiment"].isin(label_map)].copy()
 
     metrics = ["rmse", "mape", "r2", "d2", "median_relative_bias"]
     interp_table = build_performance_table(
-        df_deepsar,
+        df_muscari,
         df_chao2,
         dataset="interp",
         label_map=label_map,
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         metrics=metrics,
     )
     extrap_table = build_performance_table(
-        df_deepsar,
+        df_muscari,
         df_chao2,
         dataset="extrap",
         label_map=label_map,

@@ -17,8 +17,8 @@ from sklearn.metrics import (
     mean_absolute_percentage_error,
 )
 
-from deepsar.data_processing.utils_eva import EVADataset
-from deepsar.data_processing.spatial_folds import assign_checkerboard_folds
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.data_processing.spatial_folds import assign_checkerboard_folds
 # Initialize logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

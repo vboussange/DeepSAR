@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
 
-class DeepSARModel(nn.Module, ABC):
+class MuScaRiModel(nn.Module, ABC):
     """
     Abstract class to be inherited by a deep species-area relationship model.
     """

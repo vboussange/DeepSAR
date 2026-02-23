@@ -13,7 +13,7 @@ from tqdm import tqdm
 from shapely.geometry import box
 from scipy.spatial import cKDTree
 
-from deepsar.data_processing.utils_eva import EVADataset
+from muscari.data_processing.utils_eva import EVADataset
 
 def compute_single_square_stats_ckdtree(
     center_coords: np.ndarray,

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 import numpy as np
 
-from deepsar.plotting import CMAP_BR
+from muscari.plotting import CMAP_BR
 
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../../../data/processed/training_samples/sbcv/a9a058d"

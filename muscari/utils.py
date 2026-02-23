@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import git
 
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.ensemble_model import DeepSAREnsembleModel
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.ensemble_model import MuScaRiEnsembleModel
 
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
@@ -80,7 +80,7 @@ def load_ensemble_from_folds(run_dir: Path, device: str = "cpu", return_config: 
         model.eval()
         models.append(model)
 
-    ensemble = DeepSAREnsembleModel(models)
+    ensemble = MuScaRiEnsembleModel(models)
     ensemble.eval()
     if return_config:
         return ensemble, config_ref

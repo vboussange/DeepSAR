@@ -9,7 +9,7 @@ from pathlib import Path
 import geopandas as gpd
 from captum.attr import ShapleyValueSampling
 
-from deepsar.utils import load_ensemble_from_folds
+from muscari.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
 RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0_no_lc_features_reduced_bioclim_vars"

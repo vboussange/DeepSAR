@@ -2,8 +2,8 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from deepsar.ensemble_model import DeepSAREnsembleModel
-from deepsar.deepsar_model import DeepSARModel
+from muscari.ensemble_model import MuScaRiEnsembleModel
+from muscari.muscari_model import MuScaRiModel
 
 class FullyConnectedBlock(nn.Module):
     def __init__(self, in_features, out_features, **kwargs):
@@ -14,7 +14,7 @@ class FullyConnectedBlock(nn.Module):
         x = F.leaky_relu(x)
         return x
     
-class Deep4PWeibull(DeepSARModel):
+class Deep4PWeibull(MuScaRiModel):
     """
     Deep SAR model based on the 4-parameter Weibull function.
     """
@@ -103,7 +103,7 @@ class Deep4PWeibull(DeepSARModel):
                                         feature_names=feature_names,
                                         feature_scaler=feature_scalers[i],
                                         target_scaler=target_scalers[i]))
-        ensemble_model = DeepSAREnsembleModel(models)
+        ensemble_model = MuScaRiEnsembleModel(models)
         ensemble_model.load_state_dict(model_state)
         ensemble_model = ensemble_model.to(device)
         ensemble_model.eval()

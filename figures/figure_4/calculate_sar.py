@@ -1,12 +1,12 @@
 """
-Predicts SAR from an ensembled DeepSAR model at specified locations.
+Predicts SAR from an ensembled MuScaRi model at specified locations.
 
 Using Ensemble model.
 """
 import numpy as np
 import pandas as pd
-from deepsar.utils import save_to_pickle, load_ensemble_from_folds
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.utils import save_to_pickle, load_ensemble_from_folds
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 import matplotlib.pyplot as plt
 
 from pathlib import Path

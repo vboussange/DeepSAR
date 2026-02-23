@@ -1,5 +1,5 @@
 """
-Training DeepSAR models on CV folds.
+Training MuScaRi models on CV folds.
 """
 import logging
 import torch
@@ -16,10 +16,10 @@ from sklearn.metrics import (
     mean_absolute_percentage_error,
 )
 
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.trainer import DeepSARLitModule, TrainConfig
-from deepsar.dataset import create_dataloader
-from deepsar.utils import symmetric_arch
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.trainer import MuScaRiLitModule, TrainConfig
+from muscari.dataset import create_dataloader
+from muscari.utils import symmetric_arch
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
 RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_no_lc_features_reduced_bioclim_vars"
@@ -119,7 +119,7 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
         devices = 1
         eval_device = "cpu"
         
-    lit_model = DeepSARLitModule(model, config, nn.MSELoss())
+    lit_model = MuScaRiLitModule(model, config, nn.MSELoss())
     
     trainer = pl.Trainer(
         max_epochs=config.n_epochs,

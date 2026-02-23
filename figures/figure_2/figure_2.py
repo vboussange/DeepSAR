@@ -15,9 +15,9 @@ from scipy.stats import ttest_ind
 from sklearn.metrics import r2_score
 from statsmodels.stats.multicomp import MultiComparison
 
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.cld import create_comp_matrix_allpair_t_test, multcomp_letters
-from deepsar.utils import load_ensemble_from_folds
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from muscari.utils import load_ensemble_from_folds
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
@@ -130,9 +130,9 @@ def report_model_performance(df_plot, metric, output_file="model_performance_and
 
 
 def load_benchmark_results() -> pd.DataFrame:
-    df_deepsar = pd.read_csv(BENCHMARK_RESULTS)
+    df_muscari = pd.read_csv(BENCHMARK_RESULTS)
     df_chao2 = pd.read_csv(CHAO2_RESULTS)
-    df_plot = pd.concat([df_chao2, df_deepsar], ignore_index=True)
+    df_plot = pd.concat([df_chao2, df_muscari], ignore_index=True)
     return df_plot
 
 
@@ -335,9 +335,9 @@ if __name__ == "__main__":
     report_model_performance(df_perf, metric)
     
     label_map = {
-        "DeepSAR_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
-        "DeepSAR_Area": "MuScaRi\n(area only)",
-        "DeepSAR_ClimateDEM": "MuScaRi\n(env. only)",
+        "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
+        "MuScaRi_Area": "MuScaRi\n(area only)",
+        "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
         "MLP_ClimateDEM_Area": "FFNN\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
     }

@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from pathlib import Path
 
-from deepsar.ensemble_trainer import EnsembleConfig
+from muscari.ensemble_trainer import EnsembleConfig
 
 
 if __name__ == "__main__":

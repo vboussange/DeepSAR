@@ -3,7 +3,7 @@ import rioxarray
 import numpy as np
 import geopandas as gpd
 from pathlib import Path
-from deepsar.plotting import CMAP_BR
+from muscari.plotting import CMAP_BR
 
 rcparams = {
             "font.size": 9,

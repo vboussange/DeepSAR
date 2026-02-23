@@ -1,5 +1,5 @@
 """
-This script benchmarks the DeepSAR model on SBCV datasets, evaluating both
+This script benchmarks the MuScaRi model on SBCV datasets, evaluating both
 Interpolation (on SBCV test set) and Extrapolation (on GIFT dataset).
 """
 
@@ -12,10 +12,10 @@ import pandas as pd
 import geopandas as gpd
 import torch
 import torch.nn as nn
-from deepsar.utils import symmetric_arch
-from deepsar.benchmarker import BenchmarkConfig, Benchmarker
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.mlp import MLP
+from muscari.utils import symmetric_arch
+from muscari.benchmarker import BenchmarkConfig, Benchmarker
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.mlp import MLP
 import warnings
 from dataclasses import dataclass, field
 
@@ -97,57 +97,57 @@ if __name__ == "__main__":
         
     experiments = []
     
-    # DeepSAR Area Only
+    # MuScaRi Area Only
     experiments.append({
-        "name": "DeepSAR_Area",
+        "name": "MuScaRi_Area",
         "model_init": Deep4PWeibullInit(feature_names=["log_sp_unit_area"]),
         "feature_names": ["log_sp_unit_area"],
         "train_frac": 1.0
     })
     
-    # DeepSAR Climate+DEM
+    # MuScaRi Climate+DEM
     experiments.append({
-        "name": "DeepSAR_ClimateDEM",
+        "name": "MuScaRi_ClimateDEM",
         "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats),
         "feature_names": climate_dem_feats,
         "train_frac": 1.0
     })
 
-    # DeepSAR Landcover only
+    # MuScaRi Landcover only
     experiments.append({
-        "name": "DeepSAR_Landcover",
+        "name": "MuScaRi_Landcover",
         "model_init": Deep4PWeibullInit(feature_names=landcover_feats),
         "feature_names": landcover_feats,
         "train_frac": 1.0
     })
 
-    # DeepSAR Climate+DEM + Landcover
+    # MuScaRi Climate+DEM + Landcover
     experiments.append({
-        "name": "DeepSAR_ClimateDEM_Landcover",
+        "name": "MuScaRi_ClimateDEM_Landcover",
         "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + landcover_feats),
         "feature_names": climate_dem_feats + landcover_feats,
         "train_frac": 1.0
     })
     
-    # DeepSAR Climate+DEM + Area
+    # MuScaRi Climate+DEM + Area
     experiments.append({
-        "name": "DeepSAR_ClimateDEM_Area",
+        "name": "MuScaRi_ClimateDEM_Area",
         "model_init": Deep4PWeibullInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
         "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
 
-    # DeepSAR Landcover + Area
+    # MuScaRi Landcover + Area
     experiments.append({
-        "name": "DeepSAR_Landcover_Area",
+        "name": "MuScaRi_Landcover_Area",
         "model_init": Deep4PWeibullInit(feature_names=landcover_feats + ["log_sp_unit_area"]),
         "feature_names": landcover_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
 
-    # DeepSAR All Env + Area
+    # MuScaRi All Env + Area
     experiments.append({
-        "name": "DeepSAR_All",
+        "name": "MuScaRi_All",
         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     # Varying training samples (on All Env + Area)
     # for frac in [0.01, 0.1]:
     #     experiments.append({
-    #         "name": f"DeepSAR_All_frac_{frac}",
+    #         "name": f"MuScaRi_All_frac_{frac}",
     #         "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
     #         "feature_names": all_env_feats + ["log_sp_unit_area"],
     #         "train_frac": frac
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     # # Varying architecture (on All Env + Area)
     # # Base 64
     # experiments.append({
-    #     "name": "DeepSAR_All_Base64",
+    #     "name": "MuScaRi_All_Base64",
     #     "model_init": Deep4PWeibullInit(feature_names=all_env_feats + ["log_sp_unit_area"], 
     #                                     architecture=symmetric_arch(6, base=64, factor=4)),
     #     "feature_names": all_env_feats + ["log_sp_unit_area"],

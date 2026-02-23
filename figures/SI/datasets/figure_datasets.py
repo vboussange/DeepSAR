@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import json
 
-from deepsar.plotting import CMAP_BR
+from muscari.plotting import CMAP_BR
 
 SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "d5eb0a5"
 GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "1cb3898" / "compiled_data.parquet"

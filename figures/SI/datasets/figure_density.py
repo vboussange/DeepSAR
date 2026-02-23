@@ -6,8 +6,8 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
-from deepsar.plotting import CMAP_BR
-from deepsar.data_processing.utils_eva import EVADataset
+from muscari.plotting import CMAP_BR
+from muscari.data_processing.utils_eva import EVADataset
 from scipy.ndimage import gaussian_filter
 
 def load_and_preprocess_data():

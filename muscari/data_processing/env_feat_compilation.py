@@ -197,9 +197,9 @@ def run_environmental_features_compilation_parallel(
 
 
 if __name__ == "__main__":
-    from deepsar.data_processing.utils_eva import EVADataset
-    from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
-    from deepsar.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
+    from muscari.data_processing.utils_eva import EVADataset
+    from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+    from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
     
     logging.info("Running tests for env_feat_compilation module...")
     eva_dataset = EVADataset()

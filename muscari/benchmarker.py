@@ -10,8 +10,8 @@ from pytorch_lightning.callbacks import EarlyStopping
 from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
                              r2_score, mean_absolute_percentage_error)
 from sklearn.model_selection import train_test_split
-from deepsar.dataset import create_dataloader
-from deepsar.trainer import DeepSARLitModule
+from muscari.dataset import create_dataloader
+from muscari.trainer import MuScaRiLitModule
 import torch.multiprocessing as mp
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -58,7 +58,7 @@ class Benchmarker:
         self.gift_df.dropna(inplace=True)
 
     def _train(self, model, train_loader, val_loader, loss_fn, device):
-        lit_model = DeepSARLitModule(model, self.config, loss_fn)
+        lit_model = MuScaRiLitModule(model, self.config, loss_fn)
         
         # Determine accelerator and device
         if "cuda" in device:

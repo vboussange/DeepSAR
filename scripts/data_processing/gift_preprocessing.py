@@ -16,7 +16,7 @@ from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
 from eva_preprocessing import clean_species_name
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 
 # Constants
 OUTPUT_FOLDER = Path(__file__).parent / "../../data/processed/GIFT/preprocessing"

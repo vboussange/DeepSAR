@@ -4,8 +4,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import geopandas as gpd
-from deepsar.deep4pweibull import Deep4PWeibull
-from deepsar.plotting import CMAP_GO
+from muscari.deep4pweibull import Deep4PWeibull
+from muscari.plotting import CMAP_GO
 
 
 def load_data(config_path):

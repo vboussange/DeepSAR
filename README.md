@@ -1,14 +1,14 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb) 
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) 
 
 <p align="center">
-  <img src="logo.gif" width="300" alt="DeepSAR logo" />
+  <img src="logo.gif" width="300" alt="MuScaRi logo" />
 </p>
 
-<!-- # DeepSAR: deep learning-based species-area relationship model  -->
+<!-- # MuScaRi: deep learning-based species-area relationship model  -->
 
-Official implementation for
+Official implementation for `MuScaRi`, from
 
 > **Multi-scale species richness estimation with deep learning**  
 > Victor Boussange, Bert Wuyts, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
@@ -19,19 +19,19 @@ If you ❤️ the project, consider giving it a ⭐️.
 
 ### Inference
 We provide a self-contained tutorial to predict species richness maps from the paper's pretrained deep SAR model:  
-[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/DeepSAR/blob/master/deepsar_demo.ipynb)
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
 
 ### Training
 To retrain the deep SAR model, follow these steps:
 
 0. Ensure you have [all required data](#data) (biodiversity data and environmental features) under `data/`, and [install the project environment](#installation).
 1. Generate training data using `scripts/data_processing/compile_eva_chelsa.py` (see also `scripts/data_processing/align_gift_chelsa.py` for test data generation).
-2. Train the ensemble model with `train.py`. The main architecture is `Deep4PWeibull`, defined in `deepsar/deep4pweibull.py`.
+2. Train the ensemble model with `train.py`. The main architecture is `Deep4PWeibull`, defined in `muscari/deep4pweibull.py`.
 3. Generate predictions using `project.py` (see also [Inference](#inference)).
 
 ## Project Overview
 
-- `deepsar/`: Utility functions for generating training samples and defining deep SAR models.
+- `muscari/`: Utility functions for generating training samples and defining MuScaRi models.
 - `scripts/`: Pipelines for data processing, model training, and mapping predictions.
 - `figures/`: Scripts to generate figures for the paper.
 - `data/`: Contains [the data](#data) associated with the project.

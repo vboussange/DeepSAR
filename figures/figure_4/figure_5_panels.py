@@ -8,7 +8,7 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import box
 from pathlib import Path
-from deepsar.plotting import CMAP_BR, CMAP_DSR
+from muscari.plotting import CMAP_BR, CMAP_DSR
 from matplotlib.gridspec import GridSpec
 import xarray as xr
 

@@ -1,7 +1,7 @@
 [project]
-name = "deepsar"
+name = "muscari"
 version = "0.1.0"
-description = "Deep species-area relationship models"
+description = "Multi-Scale species Richness estimation with deep learning"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

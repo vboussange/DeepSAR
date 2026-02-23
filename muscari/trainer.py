@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from dataclasses import dataclass, field
 from pathlib import Path
-from deepsar.utils import symmetric_arch, get_git_hash
+from muscari.utils import symmetric_arch, get_git_hash
 
 
 @dataclass
@@ -27,7 +27,7 @@ class TrainConfig:
 
 
 
-class DeepSARLitModule(pl.LightningModule):
+class MuScaRiLitModule(pl.LightningModule):
     def __init__(self, model, config, loss_fn):
         super().__init__()
         self.model = model
@@ -73,9 +73,9 @@ class DeepSARLitModule(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    # Test case for DeepSARLitModule
-    from deepsar.mlp import FullyConnectedBatchNormBlock
-    from deepsar.utils import MSELogLoss
+    # Test case for MuScaRiLitModule
+    from muscari.mlp import FullyConnectedBatchNormBlock
+    from muscari.utils import MSELogLoss
 
     # Create a simple test model
     class SimpleTestModel(torch.nn.Module):
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     # Initialize model and module
     model = SimpleTestModel(input_dim=10, output_dim=1)
     loss_fn = MSELogLoss()
-    lit_module = DeepSARLitModule(model, config, loss_fn)
+    lit_module = MuScaRiLitModule(model, config, loss_fn)
 
     # Create dummy data
     x = torch.randn(32, 10)

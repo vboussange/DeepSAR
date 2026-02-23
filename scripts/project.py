@@ -6,9 +6,9 @@ import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
-from deepsar.utils import load_ensemble_from_folds
-from deepsar.data_processing.utils_features import EnvironmentalFeatureDataset
-from deepsar.plotting import CMAP_BR
+from muscari.utils import load_ensemble_from_folds
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+from muscari.plotting import CMAP_BR
 import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd

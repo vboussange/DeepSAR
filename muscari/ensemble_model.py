@@ -1,14 +1,14 @@
-from deepsar.deepsar_model import DeepSARModel
+from muscari.muscari_model import MuScaRiModel
 import torch
 from torch import nn
 import numpy as np
 import pandas as pd
 
-class DeepSAREnsembleModel(nn.Module):
+class MuScaRiEnsembleModel(nn.Module):
     def __init__(self, models, **kwargs):
-        super(DeepSAREnsembleModel, self).__init__()
+        super(MuScaRiEnsembleModel, self).__init__()
 
-        assert all(isinstance(model, DeepSARModel) for model in models), "All models must be instances of DeepSARModel."
+        assert all(isinstance(model, MuScaRiModel) for model in models), "All models must be instances of MuScaRiModel."
         self.models = nn.ModuleList(models)
         
     @property

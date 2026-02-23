@@ -7,7 +7,7 @@ from tqdm import tqdm
 from rasterio.enums import Resampling
 
 # Default base paths (can be overridden via environment variables)
-BASE_DIR = Path(os.getenv('DEEPSAR_DATA_DIR', Path(__file__).parent.parent.parent / 'data'))
+BASE_DIR = Path(os.getenv('MUSCARI_DATA_DIR', Path(__file__).parent.parent.parent / 'data'))
 
 # Default paths with environment variable support
 CHELSA_PATH = Path(os.getenv('CHELSA_PATH', BASE_DIR / 'raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio'))
