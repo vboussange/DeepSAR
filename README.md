@@ -3,7 +3,8 @@
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) 
 
 <p align="center">
-  <img src="logo.gif" width="300" alt="MuScaRi logo" />
+  <!-- <img src="logo.gif" width="300" alt="MuScaRi logo" /> -->
+  <img src="logo/icon.png" width="100" alt="MuScaRi logo" />
 </p>
 
 <!-- # MuScaRi: deep learning-based species-area relationship model  -->
