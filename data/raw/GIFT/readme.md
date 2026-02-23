@@ -1,1 +1,1 @@
-Raw data can be downloaded by executing the `download_GIFT.R` dataset
+Raw data can be downloaded by executing the `download_GIFT.R` dataset. Place `plot_data.gpkg` in this folder.

@@ -10,3 +10,5 @@ gdalwarp -t_srs EPSG:3035 -tr 1000 1000 -r bilinear \
   eudem_dem_3035_europe.tif eudem_dem_3035_europe_1000m.tif
 ```
 <!-- explain compression options -->
+
+Please `eudem_dem_3035_europe_1000m.tif` in this folder.

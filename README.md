@@ -25,14 +25,12 @@ We provide a self-contained tutorial to predict species richness maps from the p
 ### Training
 To retrain the deep SAR model, follow these steps:
 
-1. Install the project environment (see [Installation](#installation)).
-2. Build training datasets (see [Build training datasets](#build-training-datasets)).
-3. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
-4. Generate predictions using `project.py` (see also [Inference](#inference)).
+1. Build training datasets (see [Build training datasets](#build-training-datasets)).
+2. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
 
 ## Project Overview
 
-- `muscari/`: Utility functions for generating training samples and defining MuScaRi models.
+- `muscari/`: Utility functions for generating training samples and building `MuScaRi` models.
 - `scripts/`: Pipelines for data processing, model training, and mapping predictions.
 - `figures/`: Scripts to generate figures for the paper.
 - `data/`: Contains [the data](#data) associated with the project.
@@ -63,22 +61,21 @@ gift_df = GIFTDataset().load()
 env_ds, lc_ds = EnvironmentalFeatureDataset().load()
 ```
 
-- **EVA**: vegetation-plot dataset used for model development and training.
-- **GIFT**: independent regional checklist dataset used for external evaluation/extrapolation.
+- **EVA**: sanitized and anonymized vegetation-plot dataset used for model development and training.
+- **GIFT**: independent regional checklist dataset used for external evaluation/extrapolation, aligned with the EVA dataset.
 - **Environmental Features**: CHELSA climate variables, DEM elevation, and landcover predictors.
 
-### Build training datasets
+These datasets have been compiled from raw sources; see below for details.
 
-See `compile_sbcv_eva_datasets.py`.
+### Building training samples
 
-### Compile from scratch (advanced / optional)
+See `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`
 
-Compiling from raw sources is optional and intended for advanced users or
-researchers who need to fully rebuild the underlying processed datasets.
+### Compile datasets from scratch (advanced / optional)
 
 #### 1) Download raw datasets
 
-For each raw source, a dataset-specific instruction file is provided at:
+For each dataset (EVA/GIFT/EnvironmentalFeatures), a specific instruction file is provided at:
 
 - `data/raw/DATASETNAME/readme.md`
 
