@@ -19,7 +19,24 @@ If you ❤️ the project, consider giving it a ⭐️.
 ## Quick Start
 
 ### Inference
-We provide a self-contained tutorial to predict species richness maps from the paper's pretrained deep SAR model:  
+
+Load the pretrained ensemble and inspect its required environmental features:
+
+```python
+from muscari import MuScaRiEnsemble
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+
+# Load pretrained ensemble from Hugging Face (no authentication needed)
+model = MuScaRiEnsemble.from_pretrained("vboussange/muscari")
+print(f"Ensemble with {model.n_models} members")
+print("Required features:", model.feature_names)
+
+# Load matching environmental features (auto-downloaded from vboussange/muscari-data)
+env_dataset, lc_dataset = EnvironmentalFeatureDataset().load()
+print("Available environmental variables:", list(env_dataset.data_vars))
+```
+
+For a full end-to-end prediction walkthrough, see the self-contained Colab tutorial:  
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
 
 ### Training

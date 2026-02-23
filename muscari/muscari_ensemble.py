@@ -204,8 +204,3 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         """Standard deviation of asymptotic species-richness predictions."""
         return np.std([m.predict_sr_tot(df) for m in self.models], axis=0).squeeze()
 
-
-# Backward-compatibility alias
-MuScaRiEnsembleModel = MuScaRiEnsemble
-
-
