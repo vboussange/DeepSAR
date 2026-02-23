@@ -149,10 +149,6 @@ class EVADataset:
                 token=token,
             )
             shutil.copy(downloaded, dest)
-            print(f"  ✓ Saved to {dest}")
-        else:
-            print("  species_matrix.parquet already present, skipping download")
-
         return instance
 
     def load(self, use_cache=True):
@@ -184,7 +180,6 @@ class EVADataset:
 
         # Check cache first
         if use_cache and self.preprocessed_cache.exists():
-            print(f"Loading preprocessed data from cache: {self.preprocessed_cache}")
             df = gpd.read_parquet(self.preprocessed_cache)
             
             # Identify species columns (all columns except geometry and area_m2)

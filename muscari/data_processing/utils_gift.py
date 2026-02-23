@@ -143,10 +143,8 @@ class GIFTDataset:
                 - attrs['species_list']: ordered list of species column names
         """
         if use_cache and not self.preprocessed_cache.exists():
-            print(
-                f"Local GIFT cache not found at {self.preprocessed_cache}. "
-                f"Trying Hugging Face ({HF_DATASET_REPO})..."
-            )
+            print(f"Downloading {path_in_repo} from {repo_id} …")
+
             try:
                 GIFTDataset.from_hub(HF_DATASET_REPO, local_dir=self.preprocessed_cache.parent)
             except Exception as exc:
@@ -154,7 +152,6 @@ class GIFTDataset:
 
         # Check cache first
         if use_cache and self.preprocessed_cache.exists():
-            print(f"Loading preprocessed data from cache: {self.preprocessed_cache}")
             df = gpd.read_parquet(self.preprocessed_cache)
             
             # Identify species columns (all columns except geometry and area_m2)

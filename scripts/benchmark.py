@@ -7,11 +7,9 @@ import logging
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import geopandas as gpd
-import torch
-import torch.nn as nn
+
 from muscari.utils import symmetric_arch
 from muscari.benchmarker import BenchmarkConfig, Benchmarker
 from muscari.muscari import MuScaRi
@@ -21,7 +19,7 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1085825/compiled_data.parquet"
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
 BIOCLIMATE_VARS = [
             "bio1",
@@ -54,7 +52,7 @@ class MuScaRiInit():
                        feature_names=self.feature_names,
                        **kwargs)
 
-class WrappedFFNNBatchNormExp(FFNNExp):
+class WrappedFFNNExp(FFNNExp):
     def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None):
         super().__init__(input_dim, layer_sizes)
         self.feature_names = feature_names
@@ -62,12 +60,12 @@ class WrappedFFNNBatchNormExp(FFNNExp):
         self.target_scaler = target_scaler
 
 @dataclass
-class FFNNBatchNormExpInit():
+class FFNNExpInit():
     feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=64, factor=4))
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)
-        return WrappedFFNNBatchNormExp(len(self.feature_names) + 1, self.architecture, **kwargs)
+        return WrappedFFNNExp(len(self.feature_names) + 1, self.architecture, **kwargs)
 
 if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path('results', 'benchmark')
@@ -174,15 +172,15 @@ if __name__ == "__main__":
     
     # FFNNExp (on All Env + Area)
     experiments.append({
-        "name": "FFNNBatchNormExp_All",
-        "model_init": FFNNBatchNormExpInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "name": "FFNN_All",
+        "model_init": FFNNExpInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
     
     experiments.append({
-        "name": "FFNNBatchNormExp_ClimateDEM_Area",
-        "model_init": FFNNBatchNormExpInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "name": "FFNN_ClimateDEM_Area",
+        "model_init": FFNNExpInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
         "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })

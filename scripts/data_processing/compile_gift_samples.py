@@ -121,11 +121,7 @@ if __name__ == "__main__":
     # Load environmental rasters
     logging.info("Loading environmental rasters...")
     env_features = EnvironmentalFeatureDataset()
-    chelsa_dem_ds, lc_ds = env_features.load(use_cache=True)
-    
-    # Rename area column
-    df.rename(columns={"area_m2": "observed_area"}, inplace=True)
-    df["sp_unit_area"] = df["observed_area"]
+    chelsa_dem_ds, lc_ds = env_features.load()
 
     # Extract environmental features
     logging.info("Extracting environmental features...")
