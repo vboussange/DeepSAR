@@ -60,33 +60,38 @@ class GIFTDataset:
     def push_to_hub(self, repo_id: str, token: str = None):
         """Upload the GIFT species/plot matrix to the Hugging Face Hub.
 
-        Builds the matrix first if the local cache does not exist yet, then
-        uploads it as ``GIFT/species_matrix.parquet``.
+        Always rebuilds the matrix from source, writes it to a temporary
+        parquet file, and uploads it as ``GIFT/species_matrix.parquet``.
 
         Args:
             repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
             token: HF API token. Falls back to the cached login token when
                 ``None``.
         """
+        import tempfile
         from huggingface_hub import HfApi
 
-        # Always rebuild from source before upload
-        print("Building matrix from source before upload…")
-        GIFTDataset.from_source(data_dir=self.data_dir, use_cache=False)
+        print("Building environmental caches from source before upload…")
+        df = GIFTDataset.from_source(
+            data_dir=self.data_dir,
+            use_cache=False,
+        )
 
         api = HfApi()
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
 
         path_in_repo = "GIFT/species_matrix.parquet"
-        print(f"Uploading {path_in_repo} …")
-        api.upload_file(
-            path_or_fileobj=str(self.preprocessed_cache),
-            path_in_repo=path_in_repo,
-            repo_id=repo_id,
-            repo_type="dataset",
-            token=token,
-        )
-        print(f"  ✓ {path_in_repo} uploaded")
+        with tempfile.TemporaryDirectory(prefix="muscari_gift_upload_") as tmp_dir:
+            temp_parquet = Path(tmp_dir) / "species_matrix.parquet"
+            df.to_parquet(temp_parquet, index=False)
+
+            api.upload_file(
+                path_or_fileobj=str(temp_parquet),
+                path_in_repo=path_in_repo,
+                repo_id=repo_id,
+                repo_type="dataset",
+                token=token,
+            )
 
     @classmethod
     def from_source(cls, data_dir=GIFT_DATA_DIR, cache_dir=GIFT_CACHE_DIR, use_cache: bool = True):

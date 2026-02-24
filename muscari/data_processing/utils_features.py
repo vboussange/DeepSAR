@@ -46,8 +46,8 @@ class EnvironmentalFeatureDataset():
     def push_to_hub(self, repo_id: str, token: str = None):
         """Upload the environmental feature caches to the Hugging Face Hub.
 
-        Builds both caches first if they do not exist, then uploads
-        ``chelsa_dem_cache.nc`` and ``landcover_cache.nc`` under
+        Always rebuilds both datasets from source, writes temporary netCDF
+        files, then uploads ``chelsa_dem_cache.nc`` and ``landcover_cache.nc`` under
         ``environmental_features/`` in the repository.
 
         Args:
@@ -55,32 +55,39 @@ class EnvironmentalFeatureDataset():
             token: HF API token. Falls back to the cached login token when
                 ``None``.
         """
+        import tempfile
         from huggingface_hub import HfApi
 
-        # Always rebuild from source before upload
         print("Building environmental caches from source before upload…")
-        EnvironmentalFeatureDataset.from_source(
+        chelsa_dem_ds, lc_ds = EnvironmentalFeatureDataset.from_source(
             chelsa_path=self.chelsa_path,
             dem_path=self.dem_path,
             lc_path=self.lc_path,
-            cache_dir=self.cache_dir,
-            use_cache=True,
+            use_cache=False,
         )
 
         api = HfApi()
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
 
-        for local_path in (self.chelsa_dem_cache, self.lc_cache):
-            path_in_repo = f"environmental_features/{local_path.name}"
-            print(f"Uploading {path_in_repo} …")
-            api.upload_file(
-                path_or_fileobj=str(local_path),
-                path_in_repo=path_in_repo,
-                repo_id=repo_id,
-                repo_type="dataset",
-                token=token,
-            )
-            print(f"  ✓ {path_in_repo} uploaded")
+        with tempfile.TemporaryDirectory(prefix="muscari_env_upload_") as tmp_dir:
+            tmp_dir_path = Path(tmp_dir)
+            temp_chelsa_dem = tmp_dir_path / "chelsa_dem_cache.nc"
+            temp_lc = tmp_dir_path / "landcover_cache.nc"
+
+            chelsa_encoding = self._get_optimized_encoding(chelsa_dem_ds, dtype='float32')
+            lc_encoding = self._get_optimized_encoding(lc_ds, dtype='int16', fill_value=-9999)
+            chelsa_dem_ds.to_netcdf(temp_chelsa_dem, engine='netcdf4', encoding=chelsa_encoding)
+            lc_ds.to_netcdf(temp_lc, engine='netcdf4', encoding=lc_encoding)
+
+            for local_path in (temp_chelsa_dem, temp_lc):
+                path_in_repo = f"environmental_features/{local_path.name}"
+                api.upload_file(
+                    path_or_fileobj=str(local_path),
+                    path_in_repo=path_in_repo,
+                    repo_id=repo_id,
+                    repo_type="dataset",
+                    token=token,
+                )
 
     @classmethod
     def from_source(
