@@ -143,8 +143,7 @@ class GIFTDataset:
                 - attrs['species_list']: ordered list of species column names
         """
         if use_cache and not self.preprocessed_cache.exists():
-            print(f"Downloading {path_in_repo} from {repo_id} …")
-
+            print(f"Downloading from {HF_DATASET_REPO}")
             try:
                 GIFTDataset.from_hub(HF_DATASET_REPO, local_dir=self.preprocessed_cache.parent)
             except Exception as exc:
