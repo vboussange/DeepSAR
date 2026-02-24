@@ -5,11 +5,10 @@ tags:
   - ecology
   - biodiversity
   - species-richness
+  - species-distribution
   - vegetation
   - Europe
   - geospatial
-  - deep-learning
-  - pytorch
 pretty_name: MuScaRi
 pipeline_tag: other
 ---
@@ -25,11 +24,11 @@ pipeline_tag: other
 
 ## Model Description
 
-MuScaRi composes a fully connected feedforward neural network with a four-parameter Weibull rarefaction model. Given the area of a spatial unit and summary statistics of environmental covariates within it, the neural network predicts the parameters of the rarefaction curve, which in turn predicts expected species richness as a function of sampling effort. Evaluating the curve at infinite sampling effort yields total (asymptotic) species richness.
+MuScaRi composes a fully connected feedforward neural network with a four-parameter Weibull rarefaction model. Given the area of a spatial unit and summary statistics of environmental covariates within it, the neural network predicts the parameters of the rarefaction curve, which in turn predicts expected species richness as a function of sampling effort. Evaluating the curve at infinite sampling effort yields total (asymptotic) species richness predictions.
 
-The pretrained model is an **ensemble of 5 members**, one per spatial cross-validation fold, trained on ~490k European vegetation plots from the European Vegetation Archive (EVA). Ensemble predictions are aggregated by arithmetic mean; standard deviations quantify prediction uncertainty.
+The pretrained model is an **ensemble of 5 members**, one per spatial cross-validation fold, trained on ~350k European vegetation plots from the European Vegetation Archive (EVA). Ensemble predictions are aggregated by arithmetic mean; standard deviations quantify prediction uncertainty.
 
-See the [paper](https://arxiv.org/abs/2507.06358) for full architecture details and benchmarks.
+See the [paper](https://arxiv.org/abs/2507.06358) for full architecture details and benchmarks, and the [`muscari-data` dataset card](https://huggingface.co/datasets/vboussange/muscari-data) for the dataset used during training.
 
 ## Quick Start
 
@@ -38,13 +37,9 @@ from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 import pandas as pd
 
-# Load pretrained ensemble (no authentication needed)
 model = MuScaRiEnsemble.from_pretrained("vboussange/muscari")
 print(f"Ensemble with {model.n_models} members")
 print("Required features:", model.feature_names)
-
-# Load environmental features (auto-downloaded from vboussange/muscari-data)
-env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub()
 
 # Predict total species richness for a spatial unit
 # df must contain columns listed in model.feature_names
@@ -73,11 +68,6 @@ For an end-to-end walkthrough, see the [Colab demo](https://colab.research.googl
 
 ## Training Data and Evaluation
 
-Trained on ~490k vegetation plots from the European Vegetation Archive (EVA), covering 44 European countries. Evaluated in two settings:
-
-- **In-distribution (EVA, interpolation mode):** RMSE 47.2 +/- 1.3, R² 0.988 (5-fold spatial block cross-validation)
-- **Out-of-distribution (GIFT, extrapolation mode):** RMSE 498.5 +/- 32.9, R² 0.679, relative bias -5.4% against 184 independent regional plant inventories; 61% RMSE reduction over the Chao2 estimator
-
 Full performance tables are in the [paper](https://arxiv.org/abs/2507.06358).
 
 ## Limitations
@@ -85,7 +75,6 @@ Full performance tables are in the [paper](https://arxiv.org/abs/2507.06358).
 - Trained on European vascular plants; performance outside Europe is untested.
 - Environmental predictors use a 1981-2010 climatological baseline.
 - Predictions are less reliable in data-sparse regions (e.g. parts of France, Spain, Scandinavia).
-- Species names in the training data are anonymized; the model predicts richness counts, not species identities.
 
 ## Citation
 

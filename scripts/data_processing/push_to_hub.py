@@ -11,7 +11,7 @@ from muscari import MuScaRiEnsemble
 
 DATASET_REPO = "vboussange/muscari-data"
 MODEL_REPO   = "vboussange/muscari"
-RUN_DIR      = Path(__file__).parent / "results/train/ceacce0"
+RUN_DIR      = Path(__file__).parents[1] / "results/train/ceacce0"
 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
@@ -36,6 +36,6 @@ if __name__ == "__main__":
     print(f"Pushing ensemble ({ensemble.n_models} models) to {MODEL_REPO} …")
     ensemble.push_to_hub(MODEL_REPO)
 
-    print("\n✓ All assets pushed successfully.")
+    print("\nAll assets pushed successfully.")
     print(f"  Dataset : https://huggingface.co/datasets/{DATASET_REPO}")
     print(f"  Model   : https://huggingface.co/{MODEL_REPO}")
