@@ -72,7 +72,7 @@ class GIFTDataset:
 
         # Always rebuild from source before upload
         print("Building matrix from source before upload…")
-        GIFTDataset.from_source(data_dir=self.data_dir, cache_dir=self.cache_dir, use_cache=True)
+        GIFTDataset.from_source(data_dir=self.data_dir, use_cache=False)
 
         api = HfApi()
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
