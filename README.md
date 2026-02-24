@@ -1,6 +1,8 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2507.06358-b31b1b.svg)](https://arxiv.org/abs/2507.06358)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) 
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
+[![Hugging Face Model](https://img.shields.io/badge/🤗%20Model-vboussange%2Fmuscari-yellow)](https://huggingface.co/vboussange/muscari)
+[![Hugging Face Dataset](https://img.shields.io/badge/🤗%20Dataset-vboussange%2Fmuscari--data-blue)](https://huggingface.co/datasets/vboussange/muscari-data)
 
 Official implementation for `MuScaRi`, from
 
@@ -50,7 +52,7 @@ uv pip install -e .
 
 ### Loading anonymized datasets from Hugging Face (recommended)
 
-Use the built-in loaders to access the public MuScaRi data hosted on Hugging Face (`vboussange/muscari-data`).
+Use the built-in loaders to access the public MuScaRi data hosted on [Hugging Face (`vboussange/muscari-data`)](https://huggingface.co/datasets/vboussange/muscari-data).
 
 ```python
 from muscari.data_processing.utils_eva import EVADataset
@@ -71,7 +73,7 @@ These datasets have been compiled from raw sources; see below for details.
 
 ### Pretrained weights
 
-Pretrained weights for the ensembled MuScaRi model are available on Hugging Face. See [Quick Start: Inference](#inference) and `muscari_demo.ipynb` for usage instructions.
+Pretrained weights for the ensembled MuScaRi model are available on [Hugging Face (`vboussange/muscari`)](https://huggingface.co/vboussange/muscari). See [Quick Start](#quick-start) and `muscari_demo.ipynb` for usage instructions.
 
 
 ### Compile datasets from raw sources
