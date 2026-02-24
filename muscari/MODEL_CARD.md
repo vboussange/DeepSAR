@@ -5,7 +5,7 @@ tags:
   - ecology
   - biodiversity
   - species-richness
-  - species-distribution
+  - species-distribution-modeling
   - vegetation
   - Europe
   - geospatial
@@ -43,7 +43,7 @@ print("Required features:", model.feature_names)
 
 # Predict total species richness for a spatial unit
 # df must contain columns listed in model.feature_names
-df = pd.DataFrame([...])  # one row per spatial unit
+df = pd.DataFrame([...])  # one row per spatial unit; see Colab demo for how to build it
 sr_mean = model.predict_mean_sr_tot(df)   # asymptotic richness
 sr_std  = model.get_std_sr_tot(df)        # ensemble uncertainty
 ```
@@ -52,7 +52,8 @@ For an end-to-end walkthrough, see the [Colab demo](https://colab.research.googl
 
 ## Inputs and Outputs
 
-**Inputs** (one row per spatial unit):
+**Inputs:**
+a `df: pandas.Dataframe` with the following columns (see [Colab demo](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) for more details)
 
 | Feature group | Columns | Description |
 |---|---|---|
@@ -62,9 +63,9 @@ For an end-to-end walkthrough, see the [Colab demo](https://colab.research.googl
 
 **Outputs:**
 
-- `predict_mean_sr(df)`: expected species richness at a given sampling effort (interpolation mode)
-- `predict_mean_sr_tot(df)`: total species richness under asymptotic sampling effort (extrapolation mode)
-- `get_std_sr_tot(df)`: ensemble standard deviation of the above
+- `model.predict_mean_sr(df)`: expected species richness at a given sampling effort (interpolation mode)
+- `model.predict_mean_sr_tot(df)`: total species richness under asymptotic sampling effort (extrapolation mode)
+- `model.get_std_sr_tot(df)`: ensemble standard deviation of the above
 
 ## Training Data and Evaluation
 

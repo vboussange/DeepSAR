@@ -2,28 +2,15 @@
 license: mit
 task_categories:
   - other
-task_ids: []
-language: []
 tags:
   - ecology
   - biodiversity
   - species-richness
+  - species-distribution-modeling
   - vegetation
   - Europe
-  - climate
   - geospatial
-  - species-distribution-modeling
-  - deep-learning
 pretty_name: MuScaRi Data
-size_categories:
-  - 100K<n<1M
-multilinguality:
-  - monolingual
-source_datasets:
-  - original
-annotations_creators:
-  - expert-generated
-paperswithcode_id: null
 ---
 
 # Dataset Card for `muscari-data`
