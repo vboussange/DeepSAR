@@ -13,7 +13,6 @@ If you ❤️ the project, consider giving it a ⭐️.
 
 ## Quick Start
 
-
 Load the pretrained ensemble and inspect its required environmental features:
 
 ```python
@@ -24,10 +23,6 @@ from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 model = MuScaRiEnsemble.from_pretrained("vboussange/muscari")
 print(f"Ensemble with {model.n_models} members")
 print("Required features:", model.feature_names)
-
-# Load matching environmental features (auto-downloaded from vboussange/muscari-data)
-env_dataset, lc_dataset = EnvironmentalFeatureDataset().load()
-print("Available environmental variables:", list(env_dataset.data_vars))
 ```
 
 For a full end-to-end prediction walkthrough, see the self-contained Colab tutorial:  
@@ -39,7 +34,7 @@ For a full end-to-end prediction walkthrough, see the self-contained Colab tutor
 - `muscari/`: Utility functions for generating training samples and building `MuScaRi` models.
 - `scripts/`: Pipelines for data processing, model training, and mapping predictions.
 - `figures/`: Scripts to generate figures for the paper.
-- `data/`: Contains [the data](#data) associated with the project.
+- `data/`: Skeleton to host the training and test [data](#data).
 
 ## Installation
 
@@ -53,7 +48,7 @@ uv pip install -e .
 
 ## Data
 
-### Load Datasets (Recommended)
+### Loading anonymized datasets from Hugging Face (recommended)
 
 Use the built-in loaders to access the public MuScaRi data hosted on Hugging Face (`vboussange/muscari-data`).
 
@@ -74,14 +69,14 @@ env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub()
 These datasets have been compiled from raw sources; see below for details.
 
 
-### Pretrained Weights
+### Pretrained weights
 
 Pretrained weights for the ensembled MuScaRi model are available on Hugging Face. See [Quick Start: Inference](#inference) and `muscari_demo.ipynb` for usage instructions.
 
 
-### Compile Datasets from Scratch
+### Compile datasets from raw sources
 
-#### 1) Download Raw Datasets
+#### 1) Download raw datasets
 
 For each dataset (EVA, GIFT, and Environmental Features), specific instructions are provided in:
 
@@ -89,7 +84,7 @@ For each dataset (EVA, GIFT, and Environmental Features), specific instructions 
 
 Follow these instructions to download and place raw files correctly.
 
-#### 2) Preprocess and Anonymize EVA/GIFT
+#### 2) Preprocess and anonymize EVA/GIFT
 
 Run the following scripts in order (from `scripts/data_processing/`):
 
@@ -97,7 +92,7 @@ Run the following scripts in order (from `scripts/data_processing/`):
 2. `gift_preprocessing.py`: Sanitize GIFT data.
 3. `anonymise_gift_eva.py`: Anonymize species names in both datasets.
 
-#### 3) Build from source
+#### 3) Loading from source
 
 Once preprocessed, load the locally compiled datasets:
 
@@ -118,7 +113,6 @@ env_ds, lc_ds = EnvironmentalFeatureDataset.from_source()
 To retrain the `MuScaRi` models, follow these steps:
 
 1. Compile training and test samples with `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`.
-
 2. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
 
 ## Citations
