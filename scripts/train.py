@@ -22,12 +22,15 @@ from muscari.dataset import create_dataloader
 from muscari.utils import symmetric_arch
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}"
+RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_full_clim_features"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
+            "bio4",
+            "rsds_1981-2010_range_V.2.1",
             "bio12",
+            "bio15",
         ]
 
 # Set up logging
