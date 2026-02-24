@@ -2,14 +2,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) 
 
-<p align="center">
-  <img src="logo/icon.png" width="100" alt="MuScaRi logo" />
-</p>
-
 Official implementation for `MuScaRi`, from
 
 > **Multi-scale species richness estimation with deep learning**  
 > Victor Boussange, Bert Wuyts, Philipp Brun, Johanna T. Malle, Gabriele Midolo, Jeanne Portier, Théophile Sanchez, Niklaus E. Zimmermann, Irena Axmanová, Helge Bruelheide, Milan Chytrý, Stephan Kambach, Zdeňka Lososová, Martin Večeřa, Idoia Biurrun, Klaus T. Ecker, Jonathan Lenoir, Jens-Christian Svenning, Dirk Nikolaus Karger. arXiv: [2507.06358](https://arxiv.org/abs/2507.06358) (2025)
+
+![](muscari_architecture.png)
 
 If you ❤️ the project, consider giving it a ⭐️.
 
