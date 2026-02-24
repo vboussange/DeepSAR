@@ -149,76 +149,37 @@ class EnvironmentalFeatureDataset():
             cache_dir=cache_dir,
         )
 
-        if not use_cache:
-            return cls.from_source(
-                chelsa_path=chelsa_path,
-                dem_path=dem_path,
-                lc_path=lc_path,
-                cache_dir=cache_dir,
-                use_cache=False,
-            )
-
-        instance.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        for filename in ("chelsa_dem_cache.nc", "landcover_cache.nc"):
-            dest = instance.cache_dir / filename
-            if not dest.exists():
-                path_in_repo = f"environmental_features/{filename}"
-                print(f"Downloading {path_in_repo} from {repo_id} …")
-                try:
-                    downloaded = hf_hub_download(
-                        repo_id=repo_id,
-                        filename=path_in_repo,
-                        repo_type="dataset",
-                        token=token,
-                    )
-                    shutil.copy(downloaded, dest)
-                    print(f"  ✓ Saved to {dest}")
-                except Exception as exc:
-                    print(f"Could not download {filename} from Hugging Face: {exc}")
-            else:
-                print(f"  {filename} already present, skipping download")
-
-        if instance.chelsa_dem_cache.is_file() and instance.lc_cache.is_file():
+        if use_cache and instance.chelsa_dem_cache.is_file() and instance.lc_cache.is_file():
             chelsa_dem_ds = xr.open_dataset(instance.chelsa_dem_cache)
             lc_ds = xr.open_dataset(instance.lc_cache)
             return chelsa_dem_ds, lc_ds
 
-        return cls.from_source(
-            chelsa_path=chelsa_path,
-            dem_path=dem_path,
-            lc_path=lc_path,
-            cache_dir=cache_dir,
-            use_cache=True,
+        downloaded_chelsa = hf_hub_download(
+            repo_id=repo_id,
+            filename="environmental_features/chelsa_dem_cache.nc",
+            repo_type="dataset",
+            token=token,
+        )
+        downloaded_lc = hf_hub_download(
+            repo_id=repo_id,
+            filename="environmental_features/landcover_cache.nc",
+            repo_type="dataset",
+            token=token,
         )
 
-    def load(self, use_cache=True):
-        """
-        Loads and combines environmental raster data into a single xarray Dataset.
-        
-        This method loads CHELSA climate variables, DEM elevation, and Corine Land Cover data,
-        and aligns them to a common grid.
-        All rasters are cropped to the extent of the smallest raster.
-            
-        Args:
-            use_cache (bool): Whether to use cached data if available.
+        if use_cache:
+            instance.cache_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy(downloaded_chelsa, instance.chelsa_dem_cache)
+            print(f"  ✓ Saved to {instance.chelsa_dem_cache}")
+            shutil.copy(downloaded_lc, instance.lc_cache)
+            print(f"  ✓ Saved to {instance.lc_cache}")
+            chelsa_dem_ds = xr.open_dataset(instance.chelsa_dem_cache)
+            lc_ds = xr.open_dataset(instance.lc_cache)
+            return chelsa_dem_ds, lc_ds
 
-        Returns:
-            tuple[xr.Dataset, xr.Dataset]:
-                - CHELSA + DEM dataset with bioclimatic variables (bio1..bio19)
-                  and elevation (elevation)
-                - Landcover dataset with remapped classes (landcover) as integers
-                Both in the target CRS.
-        """
-        print("Loading and aligning environmental datasets...")
-        return EnvironmentalFeatureDataset.from_hub(
-            repo_id=HF_DATASET_REPO,
-            chelsa_path=self.chelsa_path,
-            dem_path=self.dem_path,
-            lc_path=self.lc_path,
-            cache_dir=self.cache_dir,
-            use_cache=use_cache,
-        )
+        chelsa_dem_ds = xr.open_dataset(downloaded_chelsa)
+        lc_ds = xr.open_dataset(downloaded_lc)
+        return chelsa_dem_ds, lc_ds
 
     def _load_chelsa_dem(self, use_cache=True):
         """Load and combine CHELSA bioclimatic variables and DEM elevation into one dataset.
@@ -378,4 +339,10 @@ class EnvironmentalFeatureDataset():
 
 if __name__ == "__main__":
     features = EnvironmentalFeatureDataset()
-    env_features_ds, lc_ds = features.load(use_cache=True)
+    env_features_ds, lc_ds = EnvironmentalFeatureDataset.from_hub(
+        chelsa_path=features.chelsa_path,
+        dem_path=features.dem_path,
+        lc_path=features.lc_path,
+        cache_dir=features.cache_dir,
+        use_cache=True,
+    )

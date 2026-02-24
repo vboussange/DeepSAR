@@ -219,29 +219,25 @@ class EVADataset:
         instance = cls(data_dir=data_dir, cache_dir=cache_dir)
         dest = instance.preprocessed_cache
 
-        if not use_cache:
-            return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=False)
-
-        if not dest.exists():
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            path_in_repo = "EVA/species_matrix.parquet"
-            print(f"Downloading {path_in_repo} from {repo_id} …")
-            try:
-                downloaded = hf_hub_download(
-                    repo_id=repo_id,
-                    filename=path_in_repo,
-                    repo_type="dataset",
-                    token=token,
-                )
-                shutil.copy(downloaded, dest)
-                print(f"  ✓ Saved to {dest}")
-            except Exception as exc:
-                print(f"Could not download EVA cache from Hugging Face: {exc}")
-
-        if dest.exists():
+        if use_cache and dest.exists():
             return cls._set_species_list_attr(gpd.read_parquet(dest))
 
-        return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=True)
+        path_in_repo = "EVA/species_matrix.parquet"
+        print(f"Downloading {path_in_repo} from {repo_id} …")
+        downloaded = hf_hub_download(
+            repo_id=repo_id,
+            filename=path_in_repo,
+            repo_type="dataset",
+            token=token,
+        )
+
+        if use_cache:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(downloaded, dest)
+            print(f"  ✓ Saved to {dest}")
+            return cls._set_species_list_attr(gpd.read_parquet(dest))
+
+        return cls._set_species_list_attr(gpd.read_parquet(downloaded))
 
 if __name__ == "__main__":
     # test `extract_habitat_lev1`

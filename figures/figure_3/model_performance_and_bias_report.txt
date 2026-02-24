@@ -1,0 +1,122 @@
+
+
+MODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE
+============================================================
+
+Interpolation Dataset
+==================================================
+                  Experiment              RMSE  N
+                MuScaRi_Area 161.5789 ± 5.8635  5
+          MuScaRi_ClimateDEM  47.7757 ± 2.0047  5
+           MuScaRi_Landcover 55.6340 ± 11.5736  5
+MuScaRi_ClimateDEM_Landcover  48.1419 ± 1.3942  5
+     MuScaRi_ClimateDEM_Area  46.8637 ± 1.3952  5
+      MuScaRi_Landcover_Area  47.7375 ± 1.1439  5
+                 MuScaRi_All  46.3328 ± 1.4740  5
+                    FFNN_All  48.2357 ± 2.2249  5
+        FFNN_ClimateDEM_Area  47.4308 ± 2.9115  5
+
+Pairwise Statistical Significance Tests (Interpolation)
+--------------------------------------------------
+MuScaRi_Area vs MuScaRi_ClimateDEM: t=36.730, p=0.0000 ***, rel_diff=-70.7%
+MuScaRi_Area vs MuScaRi_Landcover: t=16.332, p=0.0000 ***, rel_diff=-69.7%
+MuScaRi_Area vs MuScaRi_ClimateDEM_Landcover: t=37.643, p=0.0000 ***, rel_diff=-70.7%
+MuScaRi_Area vs MuScaRi_ClimateDEM_Area: t=38.066, p=0.0000 ***, rel_diff=-71.6%
+MuScaRi_Area vs MuScaRi_Landcover_Area: t=38.112, p=0.0000 ***, rel_diff=-71.3%
+MuScaRi_Area vs MuScaRi_All: t=38.123, p=0.0000 ***, rel_diff=-72.2%
+MuScaRi_Area vs FFNN_All: t=36.146, p=0.0000 ***, rel_diff=-71.0%
+MuScaRi_Area vs FFNN_ClimateDEM_Area: t=34.873, p=0.0000 ***, rel_diff=-72.4%
+MuScaRi_ClimateDEM vs MuScaRi_Landcover: t=-1.338, p=0.2177 ns, rel_diff=+3.7%
+MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Landcover: t=-0.300, p=0.7719 ns, rel_diff=-0.1%
+MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Area: t=0.747, p=0.4765 ns, rel_diff=-3.0%
+MuScaRi_ClimateDEM vs MuScaRi_Landcover_Area: t=0.033, p=0.9744 ns, rel_diff=-1.9%
+MuScaRi_ClimateDEM vs MuScaRi_All: t=1.160, p=0.2796 ns, rel_diff=-5.1%
+MuScaRi_ClimateDEM vs FFNN_All: t=-0.307, p=0.7666 ns, rel_diff=-0.8%
+MuScaRi_ClimateDEM vs FFNN_ClimateDEM_Area: t=0.195, p=0.8501 ns, rel_diff=-5.7%
+MuScaRi_Landcover vs MuScaRi_ClimateDEM_Landcover: t=1.285, p=0.2346 ns, rel_diff=-3.6%
+MuScaRi_Landcover vs MuScaRi_ClimateDEM_Area: t=1.505, p=0.1708 ns, rel_diff=-6.4%
+MuScaRi_Landcover vs MuScaRi_Landcover_Area: t=1.358, p=0.2115 ns, rel_diff=-5.4%
+MuScaRi_Landcover vs MuScaRi_All: t=1.594, p=0.1495 ns, rel_diff=-8.5%
+MuScaRi_Landcover vs FFNN_All: t=1.256, p=0.2447 ns, rel_diff=-4.3%
+MuScaRi_Landcover vs FFNN_ClimateDEM_Area: t=1.375, p=0.2065 ns, rel_diff=-9.0%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_ClimateDEM_Area: t=1.296, p=0.2311 ns, rel_diff=-2.9%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_Landcover_Area: t=0.449, p=0.6657 ns, rel_diff=-1.8%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_All: t=1.783, p=0.1124 ns, rel_diff=-5.0%
+MuScaRi_ClimateDEM_Landcover vs FFNN_All: t=-0.071, p=0.9448 ns, rel_diff=-0.8%
+MuScaRi_ClimateDEM_Landcover vs FFNN_ClimateDEM_Area: t=0.441, p=0.6712 ns, rel_diff=-5.6%
+MuScaRi_ClimateDEM_Area vs MuScaRi_Landcover_Area: t=-0.969, p=0.3611 ns, rel_diff=+1.1%
+MuScaRi_ClimateDEM_Area vs MuScaRi_All: t=0.523, p=0.6151 ns, rel_diff=-2.2%
+MuScaRi_ClimateDEM_Area vs FFNN_All: t=-1.045, p=0.3266 ns, rel_diff=+2.2%
+MuScaRi_ClimateDEM_Area vs FFNN_ClimateDEM_Area: t=-0.351, p=0.7344 ns, rel_diff=-2.8%
+MuScaRi_Landcover_Area vs MuScaRi_All: t=1.506, p=0.1706 ns, rel_diff=-3.3%
+MuScaRi_Landcover_Area vs FFNN_All: t=-0.398, p=0.7008 ns, rel_diff=+1.1%
+MuScaRi_Landcover_Area vs FFNN_ClimateDEM_Area: t=0.196, p=0.8495 ns, rel_diff=-3.8%
+MuScaRi_All vs FFNN_All: t=-1.426, p=0.1917 ns, rel_diff=+4.5%
+MuScaRi_All vs FFNN_ClimateDEM_Area: t=-0.673, p=0.5200 ns, rel_diff=-0.6%
+FFNN_All vs FFNN_ClimateDEM_Area: t=0.439, p=0.6721 ns, rel_diff=-4.9%
+
+Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
+
+Extrapolation Dataset
+==================================================
+                  Experiment                 RMSE  N
+             chao2_estimator  1258.5335 ± 11.7187  5
+                MuScaRi_Area  9616.4861 ± 63.6394  5
+          MuScaRi_ClimateDEM 9223.2469 ± 153.9550  5
+           MuScaRi_Landcover 8925.2947 ± 267.8440  5
+MuScaRi_ClimateDEM_Landcover  9263.0887 ± 63.4806  5
+     MuScaRi_ClimateDEM_Area 9456.2029 ± 183.2219  5
+      MuScaRi_Landcover_Area 9301.7889 ± 175.0905  5
+                 MuScaRi_All 9484.1357 ± 125.7784  5
+                    FFNN_All 7664.1532 ± 270.7633  5
+        FFNN_ClimateDEM_Area 7733.5789 ± 568.7465  5
+
+Pairwise Statistical Significance Tests (Extrapolation)
+--------------------------------------------------
+chao2_estimator vs MuScaRi_Area: t=-258.323, p=0.0000 ***, rel_diff=+667.7%
+chao2_estimator vs MuScaRi_ClimateDEM: t=-103.170, p=0.0000 ***, rel_diff=+636.6%
+chao2_estimator vs MuScaRi_Landcover: t=-57.193, p=0.0000 ***, rel_diff=+611.6%
+chao2_estimator vs MuScaRi_ClimateDEM_Landcover: t=-247.999, p=0.0000 ***, rel_diff=+637.0%
+chao2_estimator vs MuScaRi_ClimateDEM_Area: t=-89.301, p=0.0000 ***, rel_diff=+658.1%
+chao2_estimator vs MuScaRi_Landcover_Area: t=-91.670, p=0.0000 ***, rel_diff=+637.7%
+chao2_estimator vs MuScaRi_All: t=-130.231, p=0.0000 ***, rel_diff=+659.5%
+chao2_estimator vs FFNN_All: t=-47.271, p=0.0000 ***, rel_diff=+502.5%
+chao2_estimator vs FFNN_ClimateDEM_Area: t=-22.765, p=0.0000 ***, rel_diff=+493.1%
+MuScaRi_Area vs MuScaRi_ClimateDEM: t=4.721, p=0.0015 **, rel_diff=-4.1%
+MuScaRi_Area vs MuScaRi_Landcover: t=5.021, p=0.0010 **, rel_diff=-7.3%
+MuScaRi_Area vs MuScaRi_ClimateDEM_Landcover: t=7.863, p=0.0000 ***, rel_diff=-4.0%
+MuScaRi_Area vs MuScaRi_ClimateDEM_Area: t=1.653, p=0.1370 ns, rel_diff=-1.2%
+MuScaRi_Area vs MuScaRi_Landcover_Area: t=3.378, p=0.0097 **, rel_diff=-3.9%
+MuScaRi_Area vs MuScaRi_All: t=1.878, p=0.0972 ns, rel_diff=-1.1%
+MuScaRi_Area vs FFNN_All: t=14.038, p=0.0000 ***, rel_diff=-21.5%
+MuScaRi_Area vs FFNN_ClimateDEM_Area: t=6.580, p=0.0002 ***, rel_diff=-22.7%
+MuScaRi_ClimateDEM vs MuScaRi_Landcover: t=1.929, p=0.0899 ns, rel_diff=-3.4%
+MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Landcover: t=-0.478, p=0.6451 ns, rel_diff=+0.1%
+MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Area: t=-1.947, p=0.0874 ns, rel_diff=+2.9%
+MuScaRi_ClimateDEM vs MuScaRi_Landcover_Area: t=-0.674, p=0.5195 ns, rel_diff=+0.2%
+MuScaRi_ClimateDEM vs MuScaRi_All: t=-2.625, p=0.0304 *, rel_diff=+3.1%
+MuScaRi_ClimateDEM vs FFNN_All: t=10.011, p=0.0000 ***, rel_diff=-18.2%
+MuScaRi_ClimateDEM vs FFNN_ClimateDEM_Area: t=5.056, p=0.0010 ***, rel_diff=-19.5%
+MuScaRi_Landcover vs MuScaRi_ClimateDEM_Landcover: t=-2.454, p=0.0397 *, rel_diff=+3.6%
+MuScaRi_Landcover vs MuScaRi_ClimateDEM_Area: t=-3.272, p=0.0113 *, rel_diff=+6.5%
+MuScaRi_Landcover vs MuScaRi_Landcover_Area: t=-2.353, p=0.0465 *, rel_diff=+3.7%
+MuScaRi_Landcover vs MuScaRi_All: t=-3.777, p=0.0054 **, rel_diff=+6.7%
+MuScaRi_Landcover vs FFNN_All: t=6.623, p=0.0002 ***, rel_diff=-15.3%
+MuScaRi_Landcover vs FFNN_ClimateDEM_Area: t=3.791, p=0.0053 **, rel_diff=-16.7%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_ClimateDEM_Area: t=-1.992, p=0.0815 ns, rel_diff=+2.9%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_Landcover_Area: t=-0.416, p=0.6886 ns, rel_diff=+0.1%
+MuScaRi_ClimateDEM_Landcover vs MuScaRi_All: t=-3.138, p=0.0138 *, rel_diff=+3.1%
+MuScaRi_ClimateDEM_Landcover vs FFNN_All: t=11.499, p=0.0000 ***, rel_diff=-18.2%
+MuScaRi_ClimateDEM_Landcover vs FFNN_ClimateDEM_Area: t=5.345, p=0.0007 ***, rel_diff=-19.5%
+MuScaRi_ClimateDEM_Area vs MuScaRi_Landcover_Area: t=1.219, p=0.2577 ns, rel_diff=-2.7%
+MuScaRi_ClimateDEM_Area vs MuScaRi_All: t=-0.251, p=0.8079 ns, rel_diff=+0.2%
+MuScaRi_ClimateDEM_Area vs FFNN_All: t=10.963, p=0.0000 ***, rel_diff=-20.5%
+MuScaRi_ClimateDEM_Area vs FFNN_ClimateDEM_Area: t=5.766, p=0.0004 ***, rel_diff=-21.8%
+MuScaRi_Landcover_Area vs MuScaRi_All: t=-1.692, p=0.1292 ns, rel_diff=+2.9%
+MuScaRi_Landcover_Area vs FFNN_All: t=10.158, p=0.0000 ***, rel_diff=-18.3%
+MuScaRi_Landcover_Area vs FFNN_ClimateDEM_Area: t=5.271, p=0.0008 ***, rel_diff=-19.6%
+MuScaRi_All vs FFNN_All: t=12.192, p=0.0000 ***, rel_diff=-20.7%
+MuScaRi_All vs FFNN_ClimateDEM_Area: t=6.011, p=0.0003 ***, rel_diff=-21.9%
+FFNN_All vs FFNN_ClimateDEM_Area: t=-0.220, p=0.8311 ns, rel_diff=-1.6%
+
+Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant

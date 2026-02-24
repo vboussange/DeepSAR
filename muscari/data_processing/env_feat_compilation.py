@@ -217,7 +217,13 @@ if __name__ == "__main__":
     
     
     env_features = EnvironmentalFeatureDataset()
-    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub(
+        chelsa_path=env_features.chelsa_path,
+        dem_path=env_features.dem_path,
+        lc_path=env_features.lc_path,
+        cache_dir=env_features.cache_dir,
+        use_cache=True,
+    )
 
     # Test single polygon stats
     bounds = test_gdf.geometry.iloc[1].bounds

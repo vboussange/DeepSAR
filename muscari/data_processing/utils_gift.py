@@ -164,59 +164,35 @@ class GIFTDataset:
         instance = cls(data_dir=data_dir, cache_dir=cache_dir)
         dest = instance.preprocessed_cache
 
-        if not use_cache:
-            return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=False)
-
-        if not dest.exists():
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            path_in_repo = "GIFT/species_matrix.parquet"
-            print(f"Downloading {path_in_repo} from {repo_id} …")
-            try:
-                downloaded = hf_hub_download(
-                    repo_id=repo_id,
-                    filename=path_in_repo,
-                    repo_type="dataset",
-                    token=token,
-                )
-                shutil.copy(downloaded, dest)
-                print(f"  ✓ Saved to {dest}")
-            except Exception as exc:
-                print(f"Could not download GIFT cache from Hugging Face: {exc}")
-
-        if dest.exists():
+        if use_cache and dest.exists():
             return cls._set_species_list_attr(gpd.read_parquet(dest))
 
-        return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=True)
-
-    def load(self, use_cache=True):
-        """
-        Return the species/plot matrix as a GeoDataFrame.
-
-        Loads from cache if available, otherwise builds the presence-absence
-        matrix from the raw parquet files and caches the result.
-
-        Args:
-            use_cache: Whether to use/write the local cache (default: True).
-
-        Returns:
-            gpd.GeoDataFrame: DataFrame containing:
-                - geometry: Polygon geometry of each plot
-                - area_m2: float32
-                - species columns: bool presence/absence for each species
-                - attrs['species_list']: ordered list of species column names
-        """
-        return GIFTDataset.from_hub(
-            repo_id=HF_DATASET_REPO,
-            data_dir=self.data_dir,
-            cache_dir=self.cache_dir,
-            use_cache=use_cache,
+        path_in_repo = "GIFT/species_matrix.parquet"
+        print(f"Downloading {path_in_repo} from {repo_id} …")
+        downloaded = hf_hub_download(
+            repo_id=repo_id,
+            filename=path_in_repo,
+            repo_type="dataset",
+            token=token,
         )
+        if use_cache:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(downloaded, dest)
+            print(f"  ✓ Saved to {dest}")
+            return cls._set_species_list_attr(gpd.read_parquet(dest))
+
+        return cls._set_species_list_attr(gpd.read_parquet(downloaded))
+
         
 if __name__ == "__main__":
     dataset = GIFTDataset()
     plot_data = dataset.read_plot_data()
     species_data = dataset.read_species_data()
-    df = dataset.load()
+    df = GIFTDataset.from_hub(
+        data_dir=dataset.data_dir,
+        cache_dir=dataset.cache_dir,
+        use_cache=True,
+    )
     
     obs_areas = df['area_m2'].values
     species_list = df.attrs['species_list']
