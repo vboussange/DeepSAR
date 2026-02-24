@@ -12,4 +12,4 @@ Sub-directories::
 
 from pathlib import Path
 
-MUSCARI_CACHE_DIR: Path = Path(__file__).parents[1] / ".cache"
+MUSCARI_CACHE_DIR: Path = Path(__file__).parents[2] / "data" / ".cache"
