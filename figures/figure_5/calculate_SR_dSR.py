@@ -133,7 +133,7 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
         SR01_list.append(np.concatenate(SR_list, axis=0))
 
 
-    mean_SR = np.mean(SR01_list[0], axis=1)
+    mean_SR = np.median(SR01_list[0], axis=1)
     # mean_SR = SR01_list[0][:, 2]
     std_SR = np.std(SR01_list[0], axis=1)
         
@@ -145,7 +145,7 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
 
 def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     env_features = EnvironmentalFeatureDataset()
-    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_ds, lc_ds = env_features.from_hub(use_cache=True)
     env_ds = env_ds.rio.write_crs("EPSG:3035")
     lc_ds = lc_ds.rio.write_crs("EPSG:3035")
 

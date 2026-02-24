@@ -15,11 +15,11 @@ from pyproj import Transformer
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
 
 def load_environmental_features(model):
     env_features = EnvironmentalFeatureDataset()
-    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_ds, lc_ds = env_features.from_hub(use_cache=True)
     env_ds = env_ds.rio.write_crs("EPSG:3035")
     lc_ds = lc_ds.rio.write_crs("EPSG:3035")
 

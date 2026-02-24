@@ -28,7 +28,7 @@ ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
 
 CONFIG = {
-    "model_name": f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars",
+    "model_name": f"{TRAINING_DATASET_SEED}",
     "sar_path": Path(__file__).parent / "SARs",
     "panels_dir": Path(__file__).parent / "panels",
     "rolling_kwargs": {"x": 2, "y": 2, "center": False, "min_periods": 2},

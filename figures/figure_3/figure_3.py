@@ -21,10 +21,10 @@ from muscari import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}_reduced_bioclim_vars.csv"
+BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars"
-GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/1cb3898/compiled_data.parquet"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
+GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
 PLOT_STYLE = {
     "axis_label": 12,
     "tick_label": 12,
@@ -325,14 +325,14 @@ if __name__ == "__main__":
     df_perf = load_benchmark_results()
     metric = "rmse"
     
-    # device = "cpu"
-    # best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
-    # ensemble_model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
+    device = "cpu"
+    best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
+    ensemble_model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
 
-    # eva_test_data = prepare_eva_test_data(best_test_df, best_model)
-    # gift_dataset = prepare_gift_data(ensemble_model)
+    eva_test_data = prepare_eva_test_data(best_test_df, best_model)
+    gift_dataset = prepare_gift_data(ensemble_model)
 
-    # report_model_performance(df_perf, metric)
+    report_model_performance(df_perf, metric)
     
     label_map = {
         "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
