@@ -325,14 +325,14 @@ if __name__ == "__main__":
     df_perf = load_benchmark_results()
     metric = "rmse"
     
-    device = "cpu"
-    best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
-    ensemble_model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
+    # device = "cpu"
+    # best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
+    # ensemble_model = MuScaRiEnsemble.from_folds(RUN_DIR, device=device)
 
-    eva_test_data = prepare_eva_test_data(best_test_df, best_model)
-    gift_dataset = prepare_gift_data(ensemble_model)
+    # eva_test_data = prepare_eva_test_data(best_test_df, best_model)
+    # gift_dataset = prepare_gift_data(ensemble_model)
 
-    report_model_performance(df_perf, metric)
+    # report_model_performance(df_perf, metric)
     
     label_map = {
         "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",

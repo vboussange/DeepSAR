@@ -17,7 +17,7 @@ from muscari.plotting import CMAP_BR
 
 ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}_no_lc_features_reduced_bioclim_vars"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()

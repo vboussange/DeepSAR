@@ -108,7 +108,7 @@ if __name__ == "__main__":
     
     # Load GIFT data (species matrix format)
     logging.info("Loading GIFT data...")
-    df = GIFTDataset().from_hub(use_cache=False)
+    df = GIFTDataset().from_hub(use_cache=True)
     # Filter valid plots
     # Keep plots larger than 2000m x 2000m
     df = df[df.area_m2 > 2e3**2]  
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     # Load environmental rasters
     logging.info("Loading environmental rasters...")
     env_features = EnvironmentalFeatureDataset()
-    chelsa_dem_ds, lc_ds = env_features.load()
+    chelsa_dem_ds, lc_ds = env_features.from_hub(use_cache=True)
 
     # Extract environmental features
     logging.info("Extracting environmental features...")

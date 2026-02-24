@@ -1,22 +1,5 @@
 """
 Push all MuScaRi datasets and the pretrained model to the Hugging Face Hub.
-
-Edit the constants below, then run::
-
-    python scripts/push_to_hub.py
-
-All three dataset caches and the model ensemble are uploaded to the same
-repositories using the sub-folder layout::
-
-    DATASET_REPO/
-        EVA/species_matrix.parquet
-        GIFT/species_matrix.parquet
-        environmental_features/chelsa_dem_cache.nc
-                               landcover_cache.nc
-
-    MODEL_REPO/
-        config.json          ← written by PyTorchModelHubMixin
-        model.safetensors    ← written by PyTorchModelHubMixin
 """
 
 from pathlib import Path

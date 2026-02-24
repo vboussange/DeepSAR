@@ -10,7 +10,7 @@ import json
 from muscari.plotting import CMAP_BR
 
 SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"
-GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "4d071c3" / "compiled_data.parquet"
+GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "da569da" / "compiled_data.parquet"
 
 FOLD_ID = 0
 

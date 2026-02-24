@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/1085825/compiled_data.parquet"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
 BIOCLIMATE_VARS = [
             "bio1",
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         results.append(res)
     
     df_results = pd.concat(results)
-    output_file = root_folder / f"benchmark_results_{SBCV_SAMPLES_PATH.name}_reduced_bioclim_vars.csv"
+    output_file = root_folder / f"benchmark_results_{SBCV_SAMPLES_PATH.name}.csv"
     df_results.to_csv(output_file, index=False)
     
     logger.info(f"Benchmark completed, output saved at {output_file}.")
