@@ -338,7 +338,7 @@ if __name__ == "__main__":
         "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
         "MuScaRi_Area": "MuScaRi\n(area only)",
         "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
-        "FFNNBatchNormExp_ClimateDEM_Area": "FFNN\n(env. + area)",
+        "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
     }
 

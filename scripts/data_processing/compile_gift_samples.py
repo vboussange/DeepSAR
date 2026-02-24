@@ -56,6 +56,7 @@ def calculate_species_richness(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     Returns:
         GeoDataFrame with added 'sr' column
     """
+    df_sr = df[["geometry"]].copy()
     logging.info("Calculating species richness from species matrix...")
     species_list = df.attrs.get('species_list', [])
     
@@ -64,11 +65,12 @@ def calculate_species_richness(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     
     # Calculate SR by summing species columns
     species_matrix = df[species_list].values
-    df['sr'] = species_matrix.sum(axis=1)
+    df_sr['sr'] = species_matrix.sum(axis=1)
+    df_sr["sp_unit_area"] = df["area_m2"]
+    df_sr["observed_area"] = df["area_m2"]  # Assuming observed area is the same as spatial unit area for GIFT
+    logging.info(f"Species richness range: {df_sr['sr'].min()} - {df_sr['sr'].max()}")
     
-    logging.info(f"Species richness range: {df['sr'].min()} - {df['sr'].max()}")
-    
-    return df
+    return df_sr
 
 def save_compiled_data(df: gpd.GeoDataFrame, output_path: Path) -> None:
     """
