@@ -202,8 +202,7 @@ if __name__ == "__main__":
     from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
     
     logging.info("Running tests for env_feat_compilation module...")
-    eva_dataset = EVADataset()
-    df = eva_dataset.load()
+    df = EVADataset.from_source()
 
     n_test_sp_units = 1000
     area_range = (100**2, 8e5**2)

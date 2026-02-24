@@ -7,6 +7,7 @@ from muscari.data_processing._cache import MUSCARI_CACHE_DIR
 # Default base paths with environment variable support
 EVA_DATA_DIR = Path(__file__).parents[2] / "data/processed/EVA/"
 HF_DATASET_REPO = "vboussange/muscari-data"
+EVA_CACHE_DIR = MUSCARI_CACHE_DIR / "EVA"
 COUNTRY_DATA = Path(__file__).parents[2] / "data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
 COUNTRY_LIST = [
     "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", 
@@ -47,12 +48,18 @@ class EVADataset:
     preprocessing for large-scale datasets (500k+ plots, 20k+ species).
     """
     
-    def __init__(self, data_dir=EVA_DATA_DIR, cache_dir=None):
+    def __init__(self, data_dir=EVA_DATA_DIR, cache_dir=EVA_CACHE_DIR):
         self.data_dir = Path(data_dir)
-        self.cache_dir = Path(cache_dir) if cache_dir is not None else MUSCARI_CACHE_DIR / "EVA"
+        self.cache_dir = Path(cache_dir)
 
         # Cache path for preprocessed species/plot matrix
         self.preprocessed_cache = self.cache_dir / "species_matrix.parquet"
+
+    @staticmethod
+    def _set_species_list_attr(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        species_list = [col for col in df.columns if col not in ["geometry", "area_m2"]]
+        df.attrs["species_list"] = species_list
+        return df
 
     def read_species_data(self):
         """Load anonymised EVA species data from parquet.
@@ -94,10 +101,9 @@ class EVADataset:
         """
         from huggingface_hub import HfApi
 
-        # Ensure the matrix cache exists
-        if not self.preprocessed_cache.exists():
-            print("Matrix cache not found — building it now…")
-            self.load()
+        # Always rebuild from source before upload
+        print("Building matrix from source before upload…")
+        EVADataset.from_source(data_dir=self.data_dir, cache_dir=self.cache_dir, use_cache=True)
 
         api = HfApi()
         api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True, token=token)
@@ -114,142 +120,128 @@ class EVADataset:
         print(f"  ✓ {path_in_repo} uploaded")
 
     @classmethod
-    def from_hub(cls, repo_id: str, local_dir=None, token: str = None):
-        """Download the EVA species/plot matrix from the Hugging Face Hub.
-
-        Downloads ``EVA/species_matrix.parquet`` directly into the local cache
-        so that ``load()`` returns it immediately without rebuilding.
+    def from_source(cls, data_dir=EVA_DATA_DIR, cache_dir=EVA_CACHE_DIR, use_cache: bool = True):
+        """Build and return the EVA species/plot matrix from source parquet files.
 
         Args:
-            repo_id: HF Hub repository id, e.g. ``"username/muscari-data"``.
-            local_dir: Base directory for the dataset. The matrix will be saved
-                to ``local_dir/anonymised/preprocessed_cache.parquet``.
-                Defaults to ``~/.cache/muscari/<repo_id_sanitised>``.
-            token: HF API token. Falls back to the cached login token when
-                ``None``.
+            data_dir: Base EVA data directory containing ``anonymised`` files.
+            cache_dir: Cache directory where ``species_matrix.parquet`` is stored.
+                Defaults to ``MUSCARI_CACHE_DIR / "EVA"`` when ``None``.
+            use_cache: If ``True``, read/write ``species_matrix.parquet``.
 
         Returns:
-            EVADataset: Instance whose ``load()`` immediately serves the
-                downloaded matrix from cache.
+            gpd.GeoDataFrame: Species presence/absence matrix with
+                ``attrs['species_list']``.
         """
-        import shutil
-        from huggingface_hub import hf_hub_download
+        instance = cls(data_dir=data_dir, cache_dir=cache_dir)
 
-        instance = cls(cache_dir=local_dir) if local_dir is not None else cls()
-        dest = instance.preprocessed_cache
+        if use_cache and instance.preprocessed_cache.exists():
+            return cls._set_species_list_attr(gpd.read_parquet(instance.preprocessed_cache))
 
-        if not dest.exists():
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            path_in_repo = "EVA/species_matrix.parquet"
-            print(f"Downloading {path_in_repo} from {repo_id} …")
-            downloaded = hf_hub_download(
-                repo_id=repo_id,
-                filename=path_in_repo,
-                repo_type="dataset",
-                token=token,
-            )
-            shutil.copy(downloaded, dest)
-        return instance
-
-    def load(self, use_cache=True):
-        """
-        Return the species/plot matrix as a GeoDataFrame.
-
-        Loads from cache if available, otherwise builds the presence-absence
-        matrix from the raw parquet files and caches the result.
-
-        Args:
-            use_cache: Whether to use/write the local cache (default: True).
-
-        Returns:
-            gpd.GeoDataFrame: DataFrame containing:
-                - geometry: Point geometry of each sampling site
-                - area_m2: float32
-                - species columns: bool presence/absence for each species
-                - attrs['species_list']: ordered list of species column names
-        """
-        if use_cache and not self.preprocessed_cache.exists():
-            print(
-                f"Local EVA cache not found at {self.preprocessed_cache}. "
-                f"Trying Hugging Face ({HF_DATASET_REPO})..."
-            )
-            try:
-                EVADataset.from_hub(HF_DATASET_REPO, local_dir=self.preprocessed_cache.parent)
-            except Exception as exc:
-                print(f"Could not download EVA cache from Hugging Face: {exc}")
-
-        # Check cache first
-        if use_cache and self.preprocessed_cache.exists():
-            df = gpd.read_parquet(self.preprocessed_cache)
-            
-            # Identify species columns (all columns except geometry and area_m2)
-            species_list = [col for col in df.columns if col not in ['geometry', 'area_m2']]
-            df.attrs['species_list'] = species_list
-            
-            return df
-        
         print("Loading plot and species data...")
-        plot_gdf = self.read_plot_data()
-        species_df = self.read_species_data()
-        
+        plot_gdf = instance.read_plot_data()
+        species_df = instance.read_species_data()
+
         coords = np.column_stack((
                 plot_gdf.geometry.x.values,
                 plot_gdf.geometry.y.values
             )).astype(np.float32)
-        
-        # 2. Extract observed areas
+
         if 'area_m2' in plot_gdf.columns:
             obs_areas = plot_gdf['area_m2'].values.astype(np.float32)
         else:
             raise KeyError("Column 'area_m2' not found in plot data.")
-        
-        # 3. Vectorize Species Data (One-Hot / Presence-Absence Matrix)
+
         print("Building species presence-absence matrix...")
-        
-        # Get all unique species (sorted for consistent ordering)
+
         all_species = sorted(species_df['anonymised_species_name'].unique().tolist())
         species_to_idx = {sp: i for i, sp in enumerate(all_species)}
-        
-        # Get record_id to row index mapping from plot_gdf
+
         record_ids = plot_gdf['record_id'].values
         record_id_to_row = {rid: i for i, rid in enumerate(record_ids)}
-        
-        # Initialize sparse-friendly approach: build COO-style indices
+
         n_plots = len(plot_gdf)
         n_species = len(all_species)
-        
-        # Filter species_df to only include records in plot_gdf
+
         species_df_filtered = species_df[species_df['record_id'].isin(record_id_to_row)]
-        
-        # Map record_ids and species to indices
+
         row_indices = species_df_filtered['record_id'].map(record_id_to_row).values
         col_indices = species_df_filtered['anonymised_species_name'].map(species_to_idx).values
-        
-        # Build presence-absence matrix efficiently using numpy advanced indexing
+
         species_matrix = np.zeros((n_plots, n_species), dtype=np.bool_)
         species_matrix[row_indices, col_indices] = True
-        
-        # Construct DataFrame
+
         df = pd.DataFrame({
             'area_m2': obs_areas,
         })
         df['geometry'] = gpd.points_from_xy(coords[:, 0], coords[:, 1])
         df = gpd.GeoDataFrame(df, geometry='geometry')
-        
-        # Add species columns
+
         species_df = pd.DataFrame(species_matrix, columns=all_species)
         df = pd.concat([df, species_df], axis=1)
-        
+
         df.attrs['species_list'] = all_species
-        
-        # Cache the preprocessed data
+
         if use_cache:
-            self.preprocessed_cache.parent.mkdir(parents=True, exist_ok=True)
-            print(f"Caching preprocessed data to {self.preprocessed_cache}")
-            df.to_parquet(self.preprocessed_cache, index=False)
-            print(f"Cache saved ({self.preprocessed_cache.stat().st_size / 1e6:.1f} MB)")
-        
+            instance.preprocessed_cache.parent.mkdir(parents=True, exist_ok=True)
+            print(f"Caching preprocessed data to {instance.preprocessed_cache}")
+            df.to_parquet(instance.preprocessed_cache, index=False)
+            print(f"Cache saved ({instance.preprocessed_cache.stat().st_size / 1e6:.1f} MB)")
+
         return df
+
+    @classmethod
+    def from_hub(
+        cls,
+        repo_id: str = HF_DATASET_REPO,
+        data_dir=EVA_DATA_DIR,
+        cache_dir=EVA_CACHE_DIR,
+        token: str = None,
+        use_cache: bool = True,
+    ):
+        """Return the EVA species/plot matrix, preferring Hugging Face cache.
+
+        Args:
+            repo_id: HF Hub dataset repository id.
+            data_dir: Base EVA data directory containing ``anonymised`` files.
+            cache_dir: Cache directory where ``species_matrix.parquet`` is stored.
+                Defaults to ``MUSCARI_CACHE_DIR / "EVA"`` when ``None``.
+            token: HF API token. Falls back to cached login token when ``None``.
+            use_cache: If ``True``, read/write ``species_matrix.parquet``.
+
+        Returns:
+            gpd.GeoDataFrame: Species presence/absence matrix with
+                ``attrs['species_list']``.
+        """
+        import shutil
+        from huggingface_hub import hf_hub_download
+
+        instance = cls(data_dir=data_dir, cache_dir=cache_dir)
+        dest = instance.preprocessed_cache
+
+        if not use_cache:
+            return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=False)
+
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            path_in_repo = "EVA/species_matrix.parquet"
+            print(f"Downloading {path_in_repo} from {repo_id} …")
+            try:
+                downloaded = hf_hub_download(
+                    repo_id=repo_id,
+                    filename=path_in_repo,
+                    repo_type="dataset",
+                    token=token,
+                )
+                shutil.copy(downloaded, dest)
+                print(f"  ✓ Saved to {dest}")
+            except Exception as exc:
+                print(f"Could not download EVA cache from Hugging Face: {exc}")
+
+        if dest.exists():
+            return cls._set_species_list_attr(gpd.read_parquet(dest))
+
+        return cls.from_source(data_dir=data_dir, cache_dir=cache_dir, use_cache=True)
 
 if __name__ == "__main__":
     # test `extract_habitat_lev1`
@@ -271,7 +263,7 @@ if __name__ == "__main__":
     dataset = EVADataset()
     df_sp = dataset.read_species_data()
     plot_data = dataset.read_plot_data()
-    df = dataset.load(use_cache=True)
+    df = EVADataset.from_source(use_cache=True)
     coords = np.column_stack((df.geometry.x, df.geometry.y))
     obs_areas = df['area_m2'].values
     species_list = df.attrs['species_list']

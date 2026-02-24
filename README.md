@@ -3,11 +3,8 @@
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb) 
 
 <p align="center">
-  <!-- <img src="logo.gif" width="300" alt="MuScaRi logo" /> -->
   <img src="logo/icon.png" width="100" alt="MuScaRi logo" />
 </p>
-
-<!-- # MuScaRi: deep learning-based species-area relationship model  -->
 
 Official implementation for `MuScaRi`, from
 
@@ -18,7 +15,6 @@ If you ❤️ the project, consider giving it a ⭐️.
 
 ## Quick Start
 
-### Inference
 
 Load the pretrained ensemble and inspect its required environmental features:
 
@@ -39,11 +35,6 @@ print("Available environmental variables:", list(env_dataset.data_vars))
 For a full end-to-end prediction walkthrough, see the self-contained Colab tutorial:  
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
 
-### Training
-To retrain the deep SAR model, follow these steps:
-
-1. Build training datasets (see [Build training datasets](#build-training-datasets)).
-2. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
 
 ## Project Overview
 
@@ -64,7 +55,7 @@ uv pip install -e .
 
 ## Data
 
-### Load datasets (recommended)
+### Load Datasets (Recommended)
 
 Use the built-in loaders to access the public MuScaRi data hosted on Hugging Face (`vboussange/muscari-data`).
 
@@ -73,51 +64,68 @@ from muscari.data_processing.utils_eva import EVADataset
 from muscari.data_processing.utils_gift import GIFTDataset
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 
-eva_df = EVADataset().load()
-gift_df = GIFTDataset().load()
-env_ds, lc_ds = EnvironmentalFeatureDataset().load()
+eva_df = EVADataset.from_hub()
+gift_df = GIFTDataset.from_hub()
+env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub()
 ```
 
-- **EVA**: sanitized and anonymized vegetation-plot dataset used for model development and training.
-- **GIFT**: independent regional checklist dataset used for external evaluation/extrapolation, aligned with the EVA dataset.
-- **Environmental Features**: CHELSA climate variables, DEM elevation, and landcover predictors.
+- **EVA**: Sanitized and anonymized vegetation-plot dataset used for model development and training.
+- **GIFT**: Independent regional checklist dataset used for external evaluation and extrapolation, aligned with the EVA dataset.
+- **Environmental Features**: CHELSA climate variables, DEM elevation, and land cover predictors.
 
 These datasets have been compiled from raw sources; see below for details.
 
-### Building training samples
-
-See `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`
-
-### Compile datasets from scratch (advanced / optional)
-
-#### 1) Download raw datasets
-
-For each dataset (EVA/GIFT/EnvironmentalFeatures), a specific instruction file is provided at:
-
-- `data/raw/DATASETNAME/readme.md`
-
-Follow these readmes to download and place raw files correctly.
-
-#### 2) Preprocess and anonymise EVA/GIFT
-
-Run the following scripts in order (from `scripts/data_processing/`):
-
-1. `eva_preprocessing.py`: sanitize EVA data.
-2. `gift_preprocessing.py`: sanitize GIFT data.
-3. `anonymise_gift_eva.py`: anonymise species names in both datasets.
-
-#### 3) Build training datasets
-
-- Spatial Block Cross-Validation (SBCV) EVA datasets:
-  - `compile_sbcv_eva_datasets.py`
 
 ### Pretrained Weights
 
 Pretrained weights for the ensembled MuScaRi model are available on Hugging Face. See [Quick Start: Inference](#inference) and `muscari_demo.ipynb` for usage instructions.
 
-# Citations
 
-If you use the anonymised data, please cite:
+### Compile Datasets from Scratch
+
+#### 1) Download Raw Datasets
+
+For each dataset (EVA, GIFT, and Environmental Features), specific instructions are provided in:
+
+- `data/raw/DATASETNAME/readme.md`
+
+Follow these instructions to download and place raw files correctly.
+
+#### 2) Preprocess and Anonymize EVA/GIFT
+
+Run the following scripts in order (from `scripts/data_processing/`):
+
+1. `eva_preprocessing.py`: Sanitize EVA data.
+2. `gift_preprocessing.py`: Sanitize GIFT data.
+3. `anonymise_gift_eva.py`: Anonymize species names in both datasets.
+
+#### 3) Build from source
+
+Once preprocessed, load the locally compiled datasets:
+
+```python
+from muscari.data_processing.utils_eva import EVADataset
+from muscari.data_processing.utils_gift import GIFTDataset
+from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+
+# Load from local data directory
+eva_df = EVADataset.from_source()
+gift_df = GIFTDataset.from_source()
+env_ds, lc_ds = EnvironmentalFeatureDataset.from_source()
+```
+
+
+## Training
+
+To retrain the `MuScaRi` models, follow these steps:
+
+1. Compile training and test samples with `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`.
+
+2. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
+
+## Citations
+
+If you use this work or the anonymized data, please cite:
 
 ```bibtex
 @misc{boussange2025,
