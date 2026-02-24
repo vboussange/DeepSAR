@@ -72,8 +72,7 @@ class GIFTDataset:
         from huggingface_hub import HfApi
 
         print("Building environmental caches from source before upload…")
-        df = GIFTDataset.from_source(
-            data_dir=self.data_dir,
+        df = self.from_source(
             use_cache=False,
         )
 
@@ -114,10 +113,7 @@ class GIFTDataset:
         print("Loading plot and species data...")
         plot_gdf = instance.read_plot_data()
         species_df = instance.read_species_data()
-
-        if 'area_m2' not in plot_gdf.columns:
-            plot_gdf['area_m2'] = plot_gdf.geometry.area
-
+        
         print("Building species presence-absence matrix...")
 
         all_species = sorted(species_df['anonymised_species_name'].unique().tolist())
@@ -136,12 +132,19 @@ class GIFTDataset:
 
         species_matrix = np.zeros((n_plots, n_species), dtype=np.bool_)
         species_matrix[row_indices, col_indices] = True
+        
+        assert plot_gdf.crs == "EPSG:3035", f"Expected plot_gdf CRS to be EPSG:3035, got {plot_gdf.crs}"
+        df = pd.DataFrame({
+            'area_m2': plot_gdf.geometry.area.values,
+            'geometry': plot_gdf.geometry.values,
+        })
+        df = gpd.GeoDataFrame(df, geometry='geometry')
 
         print(f"  Matrix shape: {species_matrix.shape} ({n_plots} plots × {n_species} species)")
         print(f"  Sparsity: {100 * (1 - species_matrix.sum() / species_matrix.size):.2f}%")
 
-        species_df_matrix = pd.DataFrame(species_matrix, columns=all_species, index=plot_gdf.index)
-        df = pd.concat([plot_gdf, species_df_matrix], axis=1)
+        species_df_matrix = pd.DataFrame(species_matrix, columns=all_species)
+        df = pd.concat([df, species_df_matrix], axis=1)
 
         df.attrs['species_list'] = all_species
 
