@@ -45,7 +45,8 @@ Together these components provide the inputs and ground-truth supervision to tra
 
 #### EVA: European Vegetation Archive
 
-The EVA component is derived from the **European Vegetation Archive** (Chytrý et al., 2016; version 2023-02-04, project 172), a coordinated repository of vegetation-plot records contributed by national databases. The raw dataset contains 502,724 vegetation plots; after filtering for plots with available area information, coordinate uncertainty < 1 km, land location, recording year ≥ 1972, and removing non-vascular taxa, approximately **352,000 plots** covering **~8,500 distinct vascular plant species** across 44 European countries are retained. Raw EVA data require a data-sharing agreement; the version released here has been:
+The EVA component is derived from the **European Vegetation Archive** (Chytrý et al., 2016; version 2023-02-04, project 172), a coordinated repository of vegetation-plot records contributed by national databases. The raw dataset contains 502,724 vegetation plots; after filtering for plots with available area information, coordinate uncertainty < 1 km, land location, recording year ≥ 1972, and removing non-vascular taxa, approximately **352,000 plots** covering **~8,500 distinct vascular plant species** across 44 European countries are retained. 
+The original dataset has restricted access; it is archived at DOI [10.58060/d1bp-fp47](https://doi.org/10.58060/d1bp-fp47) and is available upon request at the [EVA database](https://euroveg.org/eva-database). The version released here has been:
 
 1. **Sanitized**: plots with unreliable coordinates, missing metadata, or implausible species counts removed; non-vascular taxa and pre-1972 records excluded.
 2. **Anonymized**: original taxonomic names replaced with consistent anonymized tokens shared between EVA and GIFT, so that the dataset can be distributed freely without violating EVA data-sharing restrictions.
@@ -102,13 +103,9 @@ Species column names are anonymized tokens (e.g. `sp_00042`) that are consistent
 
 ### Data Splits
 
-> **Note:** The EVA and GIFT matrices cannot be used directly as training samples for species richness estimation. The MuScaRi training procedure generates triplets of (sampling effort, spatial-unit features, observed species richness) by randomly placing spatial units of varying area and pooling surveys within them. This sample-generation procedure is described in detail in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in `scripts/data_processing/compile_sbcv_eva_samples.py` and `scripts/data_processing/compile_gift_samples.py`.
+The EVA dataset cannot be used directly as training samples for species richness estimation. See the sample-generation procedure is described in detail in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in `scripts/data_processing/compile_sbcv_eva_samples.py` and `scripts/data_processing/compile_gift_samples.py`.
 
-The dataset does not ship with pre-defined train/test splits; these are constructed programmatically by the MuScaRi training pipeline using spatial block cross-validation. See the [paper](https://arxiv.org/abs/2507.06358) for details.
-
-- **Train / validation**: EVA-derived triplets, partitioned into spatial folds to minimize spatial autocorrelation leakage.
-- **Test (in-distribution)**: held-out EVA-derived triplets from the fold not seen during training.
-- **Test (out-of-distribution)**: 184 GIFT regional inventories, geographically and methodologically independent of EVA, used to evaluate total species richness prediction under asymptotic sampling effort.
+The GIFT dataset, consisting of exhaustive regional plant inventories, may serve as an independent out-of-distribution benchmark: the total species richness recorded for each entry — corresponding to a country or administrative region — can be treated as a ground-truth estimate of total species richness under asymptotic sampling effort.
 
 
 ## Quick Start
