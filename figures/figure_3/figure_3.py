@@ -159,12 +159,20 @@ def add_performance_panels(
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
 
         box_data = []
+        missing_rows = []
         experiments = list(label_map.keys())
         for experiment in experiments:
             exp_data = df_perf[df_perf["experiment"] == experiment]
             metric_col = f"{dataset}_{metric}"
             data = exp_data[metric_col].values
-            box_data.append(data)
+            finite_data = data[np.isfinite(data)]
+
+            if len(finite_data) == 0:
+                missing_rows.append(True)
+                box_data.append(np.array([np.nan]))
+            else:
+                missing_rows.append(False)
+                box_data.append(finite_data)
 
         bplot = ax.boxplot(
             box_data,
@@ -180,6 +188,8 @@ def add_performance_panels(
 
         color = colors[j]
         for i, data in enumerate(box_data):
+            if missing_rows[i]:
+                continue
             y = np.random.normal(i + 1, 0.06, size=len(data))
             ax.scatter(data, y, alpha=0.6, s=10, color=color, zorder=3)
 
@@ -200,6 +210,10 @@ def add_performance_panels(
         if j == 0:
             display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
             ax.set_yticklabels(display_labels, rotation=0, ha="right", fontsize=PLOT_STYLE["tick_label"])
+
+            for i, is_missing in enumerate(missing_rows):
+                if is_missing:
+                    ax.axhspan(i + 1 - 0.35, i + 1 + 0.35, color="lightgray", alpha=0.6, zorder=1)
         else:
             ax.set_yticklabels([])
             ax.tick_params(axis='y', length=0)
@@ -218,6 +232,8 @@ def add_performance_panels(
         flat_data = []
         group_labels = []
         for i, data in enumerate(box_data):
+            if missing_rows[i]:
+                continue
             flat_data.extend(data)
             group_labels.extend([experiments[i]] * len(data))
 
@@ -410,8 +426,8 @@ if __name__ == "__main__":
     # Add 1:1 line through plot corners
     ax4.plot([gift_min, gift_max], [gift_min, gift_max], linestyle='--', color="black", linewidth=1)
     
-    ax4.set_xlabel(r'Empirical species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
-    ax4.set_ylabel(r'Predicted species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_xlabel(r'Empirical total species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_ylabel(r'Predicted total species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
     ax4.set_yscale('log')
     ax4.set_xscale('log')
     

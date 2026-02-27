@@ -12,14 +12,14 @@ from captum.attr import ShapleyValueSampling
 from muscari import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0_no_lc_features_reduced_bioclim_vars"
+RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0"
 
 # Configuration
 DEVICE = "cuda:3" if torch.cuda.is_available() else "cpu"
 PLOT_CONFIG = [
-    ("Area", "#f72585", "o", "-"),
-    ("Environmental heterogeneity", "#4cc9f0", "s", "-"),
-    ("Mean environmental conditions", "#3a0ca3", "^", "-"),
+    ("Area", r"Spatial unit area, $A$", "#f72585", "o", "-"),
+    ("Environmental heterogeneity", "Environmental heterogeneity", "#4cc9f0", "s", "-"),
+    ("Mean environmental conditions", "Mean environmental conditions", "#3a0ca3", "^", "-"),
 ]
 
 class ShapleyAnalyzer:
@@ -95,7 +95,7 @@ def aggregate_shapley_features(df_shap):
 
 def plot_shapley_values(df_shap, ax, config_plot):
     """Plot Shapley values vs area."""
-    for var_name, color, marker, linestyle in config_plot:
+    for var_name, label, color, marker, linestyle in config_plot:
         df_shap['area_bins'] = pd.cut(df_shap['log_sp_unit_area_values'], bins=20, labels=False)
         grouped = df_shap.groupby('area_bins')
         mean_vals = grouped[var_name].mean()
@@ -109,7 +109,7 @@ def plot_shapley_values(df_shap, ax, config_plot):
             markersize=4,
             linestyle=linestyle,
             color=color,
-            label=var_name,
+            label=label,
             alpha=0.8,
         )
         ci_lower = mean_vals - std_vals 
@@ -132,8 +132,8 @@ if __name__ == "__main__":
     
     ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc='center')
     # ax.set_ylim(1e-2, 1.5)
-    fig.supxlabel("Area (km²)")
+    fig.supxlabel(r"Spatial unit area, $A$ (km²)")
     fig.tight_layout()
     ax.grid(True, alpha=0.3)
-    fig.savefig("figure_3.pdf", dpi=300, bbox_inches='tight')
+    fig.savefig("figure_4.pdf", dpi=300, bbox_inches='tight')
     plt.show()

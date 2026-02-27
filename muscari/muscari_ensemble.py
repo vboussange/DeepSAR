@@ -90,11 +90,13 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         feature_names: list,
         feature_scalers: Optional[list] = None,
         target_scalers: Optional[list] = None,
+        muscari_batchnorm: bool = False,
     ):
         super().__init__()
         self.n_models = n_models
         self.layer_sizes = layer_sizes
         self.feature_names = feature_names
+        self.muscari_batchnorm = muscari_batchnorm
         # Stored as list-of-dicts so config.json stays JSON-serializable
         self.feature_scalers = feature_scalers
         self.target_scalers = target_scalers
@@ -109,7 +111,13 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
             if target_scalers else [None] * n_models
         )
         self.models = nn.ModuleList([
-            MuScaRi(layer_sizes, feature_names, _fscalers[i], _tscalers[i])
+            MuScaRi(
+                layer_sizes,
+                feature_names,
+                _fscalers[i],
+                _tscalers[i],
+                ffnn_batchnorm=self.muscari_batchnorm,
+            )
             for i in range(n_models)
         ])
 
@@ -122,6 +130,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         """Build an ensemble from a list of already-trained :class:`MuScaRi` models."""
         assert models, "models list must not be empty"
         m0 = models[0]
+        muscari_batchnorm = getattr(m0, "ffnn_batchnorm", False)
 
         # Infer layer_sizes from the first model's architecture
         layer_sizes = [block.linear.out_features for block in m0.ffnn.fully_connected_layers]
@@ -144,6 +153,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
             feature_names=m0.feature_names,
             feature_scalers=feature_scalers,
             target_scalers=target_scalers,
+            muscari_batchnorm=muscari_batchnorm,
         )
         for src, dst in zip(models, ensemble.models):
             dst.load_state_dict(src.state_dict())
@@ -151,8 +161,12 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
 
     @classmethod
     def from_folds(cls, run_dir: Path, device: str = "cpu", return_config: bool = False):
-        """Build an ensemble by loading one :class:`MuScaRi` model per ``fold_*.pth`` checkpoint."""
-        import torch
+        """Build an ensemble from ``fold_*.pth`` checkpoints.
+
+        Checkpoints are first deserialized on CPU for portability and lower peak
+        GPU memory usage. The assembled ensemble is then moved once to ``device``.
+        """
+        target_device = torch.device(device)
         ckpt_paths = sorted(Path(run_dir).glob("fold_*.pth"))
         if not ckpt_paths:
             raise FileNotFoundError(f"No fold_*.pth files found in {run_dir}")
@@ -161,7 +175,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         feature_names_ref = None
         config_ref = None
         for ckpt_path in ckpt_paths:
-            checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
+            checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
             feature_names = checkpoint["feature_names"]
             if feature_names_ref is None:
                 feature_names_ref = feature_names
@@ -174,12 +188,13 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                 feature_names=feature_names,
                 feature_scaler=checkpoint["feature_scaler"],
                 target_scaler=checkpoint["target_scaler"],
+                ffnn_batchnorm=getattr(config, "muscari_batchnorm", False),
             )
             model.load_state_dict(checkpoint["model_state_dict"])
-            model.to(device).eval()
+            model.eval()
             models.append(model)
 
-        ensemble = cls.from_models(models).eval()
+        ensemble = cls.from_models(models).to(target_device).eval()
         if return_config:
             return ensemble, config_ref
         return ensemble

@@ -50,11 +50,12 @@ class MuScaRiInit():
     def __call__(self, **kwargs):
         return MuScaRi(layer_sizes=self.architecture,
                        feature_names=self.feature_names,
+                       ffnn_batchnorm=False,
                        **kwargs)
 
 class WrappedFFNNExp(FFNNExp):
-    def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None):
-        super().__init__(input_dim, layer_sizes)
+    def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None, batchnorm=True):
+        super().__init__(input_dim, layer_sizes, batchnorm=batchnorm)
         self.feature_names = feature_names
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
@@ -63,9 +64,10 @@ class WrappedFFNNExp(FFNNExp):
 class FFNNExpInit():
     feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=64, factor=4))
+    batchnorm: bool = True
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)
-        return WrappedFFNNExp(len(self.feature_names) + 1, self.architecture, **kwargs)
+        return WrappedFFNNExp(len(self.feature_names) + 1, self.architecture, batchnorm=self.batchnorm, **kwargs)
 
 if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path('results', 'benchmark')
@@ -173,14 +175,14 @@ if __name__ == "__main__":
     # FFNNExp (on All Env + Area)
     experiments.append({
         "name": "FFNN_All",
-        "model_init": FFNNExpInit(feature_names=all_env_feats + ["log_sp_unit_area"]),
+        "model_init": FFNNExpInit(feature_names=all_env_feats + ["log_sp_unit_area"], batchnorm=True),
         "feature_names": all_env_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })
     
     experiments.append({
         "name": "FFNN_ClimateDEM_Area",
-        "model_init": FFNNExpInit(feature_names=climate_dem_feats + ["log_sp_unit_area"]),
+        "model_init": FFNNExpInit(feature_names=climate_dem_feats + ["log_sp_unit_area"], batchnorm=True),
         "feature_names": climate_dem_feats + ["log_sp_unit_area"],
         "train_frac": 1.0
     })

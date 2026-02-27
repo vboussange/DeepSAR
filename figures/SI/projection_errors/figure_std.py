@@ -18,7 +18,7 @@ rcparams = {
 plt.rcParams.update(rcparams)
 
 
-MODEL_NAME = "ceacce0_no_lc_features_reduced_bioclim_vars"
+MODEL_NAME = "ceacce0"
 RESOLUTIONS_M = (5_000, 50_000)
 
 # Constants for file paths
@@ -112,8 +112,8 @@ if __name__ == '__main__':
         dsr_mean = preprocess_raster(get_raster(rast_dict, "dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
         dsr_std = preprocess_raster(get_raster(rast_dict, "std_dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
 
-        rsd_sr = relative_std(sr_std, sr_mean, denominator_abs=False)
-        rsd_dsr = relative_std(dsr_std, dsr_mean, denominator_abs=True)
+        std_sr = sr_std
+        std_dsr = dsr_std
 
         sr_ax = ax_sr_low if idx == 0 else ax_sr_high
         dsr_ax = ax_dsr_low if idx == 0 else ax_dsr_high
@@ -122,7 +122,7 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Rel. std. of\npredicted $S_T$ (%)',
+            'label': 'Std. of\npredicted $S_T$',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }
@@ -130,26 +130,26 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Rel. std. of species\nacc. rate $\\frac{dS_T}{d\\log A}$ (%)',
+            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{d\\log A}$',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }
 
         plot_raster(
             sr_ax,
-            rsd_sr,
+            std_sr,
             cmap=CMAP_BR,
             cbar_kwargs=sr_cbar_kwargs,
-            vmin=rsd_sr.quantile(0.01),
-            vmax=rsd_sr.quantile(0.99),
+            vmin=std_sr.quantile(0.01),
+            vmax=std_sr.quantile(0.99),
         )
         plot_raster(
             dsr_ax,
-            rsd_dsr,
+            std_dsr,
             cmap=CMAP_BR,
             cbar_kwargs=dsr_cbar_kwargs,
-            vmin=rsd_dsr.quantile(0.01),
-            vmax=rsd_dsr.quantile(0.99),
+            vmin=std_dsr.quantile(0.01),
+            vmax=std_dsr.quantile(0.99),
         )
 
         sr_ax.set_aspect('equal')

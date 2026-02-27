@@ -55,17 +55,17 @@ Geographic coverage: continental Europe and Iceland (~10°W – 40°E, 34°N –
 
 #### GIFT: Global Inventory of Floras and Traits
 
-The GIFT component is derived from **GIFT** (Weigelt et al., 2020), a global database of regional plant checklists and trait information. Inventories were filtered to those falling within the geographic range of the EVA plots, yielding **184 exhaustive species surveys**. GIFT polygons mostly correspond to countries or administrative regions (median area ~11,700 km²) and serve as an independent out-of-distribution benchmark for evaluating total species richness under asymptotic sampling effort. Species are aligned to the EVA taxonomic namespace via the same anonymization procedure, so that anonymized species tokens are consistent between the two matrices.
+The GIFT component is derived from **GIFT** (Weigelt et al., 2020), a global database of regional plant checklists and trait information. Inventories were filtered to those falling within the geographic range of the EVA plots, yielding **184 exhaustive species surveys**. GIFT polygons mostly correspond to countries or administrative regions (median area ~11,700 km²) and serve as an independent out-of-distribution benchmark for evaluating total species richness under asymptotic sampling effort. Species are aligned to the EVA taxonomic namespace via the same anonymization procedure, so that anonymized species tokens are consistent between the two matrices. Scripts for downloading the raw GIFT dataset are provided in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) under `data/raw`.
 
 #### Environmental Features
 
 | Source | Variables | Resolution | CRS |
 |--------|-----------|------------|-----|
 | [CHELSA v2](https://chelsa-climate.org/) | All available bioclimatic variables (incl. BIO1–BIO19, sfcWind, pet), 1981–2010 climatology | ~1 km | EPSG:3035 |
-| [EEA Digital Elevation Model (EU-DEM)](https://www.eea.europa.eu/data-and-maps/data/eu-dem) | Elevation | 1 km | EPSG:3035 |
+| [EEA Digital Elevation Model (EU-DEM)](https://ec.europa.eu/eurostat/web/gisco/geodata/digital-elevation-model/eu-dem) | Elevation | 30m → resampled to 1 km | EPSG:3035 |
 | [Corine Land Cover 2018](https://land.copernicus.eu/pan-european/corine-land-cover) | Land-cover class (remapped to consecutive integers) | 100 m → resampled to 1 km | EPSG:3035 |
 
-All rasters are reprojected and resampled to a common 1 km grid in the ETRS89-LAEA projection (EPSG:3035) before upload. The MuScaRi model uses the mean and standard deviation of four variables computed within each spatial unit (mean annual temperature `bio1`, annual precipitation `bio12`, near-surface wind speed `sfcWind`, and potential evapotranspiration `pet`), together with elevation, as its environmental features.
+All rasters are reprojected and resampled to a common 1 km grid in the ETRS89-LAEA projection (EPSG:3035) before upload. The MuScaRi model uses the mean and standard deviation of four variables computed within each spatial unit (mean annual temperature `bio1`, annual precipitation `bio12`, near-surface wind speed `sfcWind`, and potential evapotranspiration `pet`), together with elevation, as its environmental features. Scripts for downloading the original datasets are provided in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) under `data/raw`.
 
 ### Curation
 
@@ -103,7 +103,7 @@ Species column names are anonymized tokens (e.g. `sp_00042`) that are consistent
 
 ### Data Splits
 
-The EVA dataset cannot be used directly as training samples for species richness estimation. See the sample-generation procedure is described in detail in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in `scripts/data_processing/compile_sbcv_eva_samples.py` and `scripts/data_processing/compile_gift_samples.py`.
+The EVA dataset cannot be used directly as training samples for species richness estimation. A sample-generation procedure is described in detail in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) (`scripts/data_processing/compile_sbcv_eva_samples.py` and `scripts/data_processing/compile_gift_samples.py`).
 
 The GIFT dataset, consisting of exhaustive regional plant inventories, may serve as an independent out-of-distribution benchmark: the total species richness recorded for each entry — corresponding to a country or administrative region — can be treated as a ground-truth estimate of total species richness under asymptotic sampling effort.
 
@@ -177,4 +177,4 @@ If you use this dataset, please cite both the MuScaRi paper and the underlying d
 
 ## Contributions
 
-Dataset compiled and released by Victor Boussange (WSL / ETH Zürich) and co-authors. Raw EVA data are subject to the EVA data-sharing agreement; only the anonymized derivatives are distributed here. Raw GIFT data are publicly accessible at https://gift.uni-goettingen.de.
+Dataset compiled and released by Victor Boussange (WSL / ETH Zürich) and co-authors.

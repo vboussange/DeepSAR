@@ -11,13 +11,18 @@ class MuScaRi(nn.Module):
     Deep SAR model based on the 4-parameter Weibull function.
     """
 
-    def __init__(self, layer_sizes, feature_names, feature_scaler=None, target_scaler=None):
+    def __init__(self, layer_sizes, feature_names, feature_scaler=None, target_scaler=None, ffnn_batchnorm=False):
         super().__init__()
         self.feature_names = feature_names
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
-        sizes = [len(feature_names)] + layer_sizes
-        self.ffnn = FFNN(input_dim=len(feature_names), layer_sizes=layer_sizes, output_dim=4)
+        self.ffnn_batchnorm = ffnn_batchnorm
+        self.ffnn = FFNN(
+            input_dim=len(feature_names),
+            layer_sizes=layer_sizes,
+            output_dim=4,
+            batchnorm=ffnn_batchnorm,
+        )
 
     def _weibull_4p(self, x, b, c, d, log_e):
         """4-parameter Weibull: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - log_e)))"""
@@ -81,6 +86,7 @@ class MuScaRi(nn.Module):
             feature_names=checkpoint["feature_names"],
             feature_scaler=checkpoint["feature_scaler"],
             target_scaler=checkpoint["target_scaler"],
+            ffnn_batchnorm=getattr(config, "muscari_batchnorm", False),
         )
         model.load_state_dict(checkpoint["model_state_dict"])
         return model.to(device).eval()

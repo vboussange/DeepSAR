@@ -21,6 +21,7 @@ class TrainConfig:
     climate_variables: list = field(default_factory=lambda: [])
     run_folder: Path = None
     path_sbcv_data: Path = None
+    muscari_batchnorm: bool = False
     layer_sizes: list = field(
         default_factory=lambda: symmetric_arch(6, base=32, factor=4)
     )
@@ -74,22 +75,17 @@ class MuScaRiLitModule(pl.LightningModule):
 
 if __name__ == "__main__":
     # Test case for MuScaRiLitModule
-    from muscari.ffnn import FFNNBatchNormBlock
+    from muscari.ffnn import FFNN
     from muscari.utils import MSELogLoss
 
     # Create a simple test model
     class SimpleTestModel(torch.nn.Module):
         def __init__(self, input_dim=10, output_dim=1):
             super().__init__()
-            self.block1 = FFNNBatchNormBlock(input_dim, 32)
-            self.block2 = FFNNBatchNormBlock(32, 16)
-            self.output = torch.nn.Linear(16, output_dim)
+            self.backbone = FFNN(input_dim=input_dim, layer_sizes=[32, 16], output_dim=output_dim, batchnorm=True)
 
         def forward(self, x):
-            x = self.block1(x)
-            x = self.block2(x)
-            x = self.output(x)
-            return x
+            return self.backbone(x)
 
     # Create test config
     config = TrainConfig(

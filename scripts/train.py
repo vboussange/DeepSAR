@@ -22,15 +22,15 @@ from muscari.dataset import create_dataloader
 from muscari.utils import symmetric_arch
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}_full_clim_features"
+RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            "bio4",
-            "rsds_1981-2010_range_V.2.1",
+            # "bio4",
+            # "rsds_1981-2010_range_V.2.1",
             "bio12",
-            "bio15",
+            # "bio15",
         ]
 
 # Set up logging
@@ -103,7 +103,8 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     model = MuScaRi(config.layer_sizes, 
                     feature_names=feature_names,
                     feature_scaler=feature_scaler,
-                    target_scaler=target_scaler)
+                    target_scaler=target_scaler,
+                    ffnn_batchnorm=config.muscari_batchnorm)
     
     # Determine accelerator
     if torch.cuda.is_available():
@@ -164,6 +165,7 @@ if __name__ == "__main__":
     RUN_FOLDER.mkdir(parents=True, exist_ok=True)
     config = TrainConfig(path_sbcv_data=SBCV_SAMPLES_PATH,
                          num_workers=4,
+                         muscari_batchnorm=False,
                          layer_sizes=symmetric_arch(6, base=128, factor=4),
                          run_folder=RUN_FOLDER)
     
