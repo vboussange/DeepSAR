@@ -84,7 +84,7 @@ if __name__ == "__main__":
         cmap=CMAP_BR,
         alpha=0.6,
         norm=norm,
-        label="Train Dataset",
+        label="EVA-based dataset",
         s=10
     )
     # Add a colorbar to indicate log_observed_area
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         np.exp(gift_dataset["log_sr"]),
         color=colors[0],
         alpha=1,
-        label="GIFT Dataset",
+        label="GIFT-based test dataset",
         s=20,
         marker="x",  # Use a different marker
     )

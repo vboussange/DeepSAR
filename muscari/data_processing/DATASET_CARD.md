@@ -21,7 +21,7 @@ It bundles ~350k anonymized European vegetation plots (EVA), 184 independent reg
 
 Species names are fully anonymized; it is not possible to reconstruct the original taxonomy from the released files alone.
 
-- **Curated by:** Victor Boussange (WSL / ETH Zürich) and co-authors
+- **Curated by:** Victor Boussange (WSL / ETH Zürich)
 - **Repository:** https://github.com/vboussange/MuScaRi
 - **Paper:** [Multi-scale species richness estimation with deep learning](https://arxiv.org/abs/2507.06358)
 - **Pretrained model:** [vboussange/muscari](https://huggingface.co/vboussange/muscari)
@@ -55,7 +55,7 @@ Geographic coverage: continental Europe and Iceland (~10°W – 40°E, 34°N –
 
 #### GIFT: Global Inventory of Floras and Traits
 
-The GIFT component is derived from **GIFT** (Weigelt et al., 2020), a global database of regional plant checklists and trait information. Inventories were filtered to those falling within the geographic range of the EVA plots, yielding **184 exhaustive species surveys**. GIFT polygons mostly correspond to countries or administrative regions (median area ~11,700 km²) and serve as an independent out-of-distribution benchmark for evaluating total species richness under asymptotic sampling effort. Species are aligned to the EVA taxonomic namespace via the same anonymization procedure, so that anonymized species tokens are consistent between the two matrices. Scripts for downloading the raw GIFT dataset are provided in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) under `data/raw`.
+The GIFT component is derived from **GIFT** (Weigelt et al., 2020), a global database of regional plant checklists and trait information. Inventories were filtered to those falling within the geographic range of the EVA plots, yielding **184 exhaustive species surveys**. GIFT polygons mostly correspond to countries or administrative regions (median area ~11,700 km²) and serve as an independent out-of-distribution benchmark for evaluating total species richness under asymptotic sampling effort. Species are aligned to the EVA taxonomic namespace via the same anonymization procedure, so that anonymized species tokens are consistent between the two matrices. Scripts for downloading the raw GIFT dataset are provided in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) under `data/raw/GIFT`.
 
 #### Environmental Features
 
@@ -174,7 +174,3 @@ If you use this dataset, please cite both the MuScaRi paper and the underlying d
   doi     = {10.1111/jbi.13623},
 }
 ```
-
-## Contributions
-
-Dataset compiled and released by Victor Boussange (WSL / ETH Zürich) and co-authors.
