@@ -3,6 +3,7 @@
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
 [![Hugging Face Model](https://img.shields.io/badge/🤗%20Model-vboussange%2Fmuscari-yellow)](https://huggingface.co/vboussange/muscari)
 [![Hugging Face Dataset](https://img.shields.io/badge/🤗%20Dataset-vboussange%2Fmuscari--data-blue)](https://huggingface.co/datasets/vboussange/muscari-data)
+[![Hugging Face Space](https://img.shields.io/badge/🤗%20Space-vboussange%2FMuScaRi-orange)](https://huggingface.co/spaces/vboussange/MuScaRi)
 
 Official implementation for `MuScaRi`, from
 
@@ -26,6 +27,8 @@ model = MuScaRiEnsemble.from_pretrained("vboussange/muscari")
 print(f"Ensemble with {model.n_models} members")
 print("Required features:", model.feature_names)
 ```
+
+You can try the hosted Gradio app on Hugging Face Spaces: [![Hugging Face Space](https://img.shields.io/badge/🤗%20Space-vboussange%2FMuScaRi-orange)](https://huggingface.co/spaces/vboussange/MuScaRi).
 
 For a full end-to-end prediction walkthrough, see the self-contained Colab tutorial:  
 [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vboussange/MuScaRi/blob/master/muscari_demo.ipynb)
