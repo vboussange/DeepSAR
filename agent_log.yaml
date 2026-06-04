@@ -84,11 +84,30 @@ completed_experiments:
     key_finding: "BIOCLIMATE_VARS belongs to experiment scripts, while effort transforms, metrics, Lightning evaluation, feature-list helpers, and wandb setup are reusable utilities."
     outcome: "Smoke checks passed; committed on dev_3rd_rev."
 
-failed_experiments: []
+failed_experiments:
+  - name: "architecture_screen_ceacce0"
+    important_params:
+      status: "failed"
+      started: "2026-06-04T13:36:16Z"
+      failed_on: "2026-06-04"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "ec6cc1a"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      block_size: "1 km"
+      architecture_variants:
+        - "current_abs"
+        - "exp_abs"
+        - "current_rel"
+        - "exp_rel"
+      feature_set: "env + area"
+      wandb_group: "architecture_screen_ceacce0"
+      stdout_path: "stdout/third_rev_architecture_screen.out"
+      output_path: "scripts/results/architecture_screen/ceacce0"
+    reason: "Cancelled intentionally by user before completion so the full architecture screen can be run on another host."
 
 next_actions:
-  - "Ask the user to verify the cleaned refactor and approve or reject the commit."
-  - "After user approval and commit, launch or schedule the full architecture screen on ceacce0."
+  - "Run the full architecture screen on ceacce0 from commit ec6cc1a on the target host and summarize GIFT RMSE, interpolation RMSE, and residual-bias slopes."
   - "Generate the 100 km SBCV dataset from existing data-processing scripts or sync d0848f6 if it remains unavailable."
   - "Revise manuscript and reviewer response after experiment outputs are available."
 
@@ -101,3 +120,6 @@ notes:
   - "2026-06-04: Removed compile_sbcv_100km.py and moved revision helper functions into muscari/revision_utils.py."
   - "2026-06-04: Merged revision helper functions into muscari/utils.py and removed the temporary revision_utils module."
   - "2026-06-04: Moved BIOCLIMATE_VARS back to experiment scripts and consolidated duplicate helper usage across train, benchmark, Chao2, benchmarker, and architecture screen."
+  - "2026-06-04: Started full architecture screen architecture_screen_ceacce0 from commit ec6cc1a in screen session muscari_arch_screen."
+  - "2026-06-04: Checked local SBCV datasets; d0848f6 is not present, so the 100 km dataset must be synced or generated from scripts/data_processing/compile_sbcv_eva_samples.py."
+  - "2026-06-04: Cancelled local architecture_screen_ceacce0 run and terminated screen session muscari_arch_screen so it can be rerun on another host."
