@@ -1,17 +1,20 @@
-import random
 from dataclasses import dataclass, field
 from pathlib import Path
-import numpy as np
 import pandas as pd
 import geopandas as gpd
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
-from sklearn.metrics import (d2_absolute_error_score, root_mean_squared_error,
-                             r2_score, mean_absolute_percentage_error)
-from sklearn.model_selection import train_test_split
 from muscari.dataset import create_dataloader
 from muscari.trainer import MuScaRiLitModule
+from muscari.utils import (
+    add_effort_columns,
+    compute_metrics,
+    evaluate_lit_model,
+    finish_wandb,
+    log_wandb_metrics,
+    maybe_wandb_logger,
+)
 import torch.multiprocessing as mp
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -32,6 +35,12 @@ class BenchmarkConfig:
     )
     path_sbcv_data: Path = None
     path_gift_data: Path = None
+    effort_transform: str = "absolute"
+    use_wandb: bool = False
+    wandb_project: str = "muscari-third-revision"
+    wandb_group: str = "benchmark"
+    wandb_tags: list = field(default_factory=lambda: [])
+    fold_ids: list = field(default_factory=lambda: list(range(5)))
 
     def __post_init__(self):
         if not self.devices:
@@ -53,11 +62,31 @@ class Benchmarker:
         
         # Load GIFT once
         self.gift_df = gpd.read_parquet(self.gift_path)
-        self.gift_df["log_observed_area"] = np.log(self.gift_df["observed_area"])
-        self.gift_df["log_sp_unit_area"] = np.log(self.gift_df["sp_unit_area"])
+        self.gift_df = self._add_effort_columns(self.gift_df)
         self.gift_df.dropna(inplace=True)
 
-    def _train(self, model, train_loader, val_loader, loss_fn, device):
+    def _add_effort_columns(self, df):
+        return add_effort_columns(df, self.config.effort_transform)
+
+    def _make_wandb_logger(self, experiment_name, fold_id, feature_names, train_frac):
+        return maybe_wandb_logger(
+            use_wandb=self.config.use_wandb,
+            project=self.config.wandb_project,
+            group=self.config.wandb_group,
+            tags=self.config.wandb_tags + [experiment_name],
+            name=f"{experiment_name}_fold_{fold_id}",
+            config={
+                "experiment": experiment_name,
+                "fold": fold_id,
+                "feature_names": feature_names,
+                "train_frac": train_frac,
+                "path_sbcv_data": str(self.config.path_sbcv_data),
+                "path_gift_data": str(self.config.path_gift_data),
+                "effort_transform": self.config.effort_transform,
+            },
+        )
+
+    def _train(self, model, train_loader, val_loader, loss_fn, device, wandb_logger=False):
         lit_model = MuScaRiLitModule(model, self.config, loss_fn)
         
         # Determine accelerator and device
@@ -76,7 +105,7 @@ class Benchmarker:
             accelerator=accelerator,
             devices=devices,
             enable_checkpointing=False,
-            logger=False,
+            logger=wandb_logger if wandb_logger is not None else False,
             callbacks=[EarlyStopping(monitor="val_loss", patience=self.config.lr_scheduler_patience * 2)],
             enable_progress_bar=False,
         )
@@ -85,38 +114,10 @@ class Benchmarker:
         return lit_model
 
     def _evaluate(self, lit_model, test_loader, device):
-        lit_model.eval()
-        lit_model.to(device)
-        
-        preds = []
-        targets = []
-        with torch.no_grad():
-            for X, y in test_loader:
-                X = X.to(device)
-                y_pred = lit_model(X)
-                preds.append(y_pred.cpu())
-                targets.append(y.cpu())
-        
-        preds = torch.cat(preds).numpy()
-        targets = torch.cat(targets).numpy()
-        
-        # Inverse transform
-        if lit_model.model.target_scaler:
-            preds = lit_model.model.target_scaler.inverse_transform(preds)
-            targets = lit_model.model.target_scaler.inverse_transform(targets.reshape(-1, 1))
-            
-        return targets.flatten(), preds.flatten()
+        return evaluate_lit_model(lit_model, test_loader, device)
 
     def _compute_metrics(self, y_true, y_pred):
-        relative_bias = (y_pred - y_true) / y_true
-        return {
-            "r2": r2_score(y_true, y_pred),
-            "d2": d2_absolute_error_score(y_true, y_pred),
-            "rmse": root_mean_squared_error(y_true, y_pred),
-            "mape": mean_absolute_percentage_error(y_true, y_pred),
-            "mean_relative_bias": np.mean(relative_bias),
-            "median_relative_bias": np.median(relative_bias),
-        }
+        return compute_metrics(y_true, y_pred)
 
     def _train_fold(self, fold_id, device, experiment_name, model_init, feature_names, train_frac):
         """Train and evaluate a single fold on a specific device."""
@@ -142,9 +143,10 @@ class Benchmarker:
                 train_df = train_df.sample(frac=train_frac, random_state=self.config.seed)
             
             # Preprocess (log area)
+            train_df = self._add_effort_columns(train_df)
+            val_df = self._add_effort_columns(val_df)
+            test_df = self._add_effort_columns(test_df)
             for df in [train_df, val_df, test_df]:
-                df["log_observed_area"] = np.log(df["observed_area"])
-                df["log_sp_unit_area"] = np.log(df["sp_unit_area"])
                 # Ensure feature columns exist and handle NaNs
                 df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
                 
@@ -172,9 +174,15 @@ class Benchmarker:
             # Initialize model
             model = model_init(feature_scaler=feature_scaler, target_scaler=target_scaler)
             loss_fn = torch.nn.MSELoss() # Default loss
+            wandb_logger = self._make_wandb_logger(
+                experiment_name,
+                fold_id,
+                feature_names,
+                train_frac,
+            )
             
             # Train
-            lit_model = self._train(model, train_loader, val_loader, loss_fn, device)
+            lit_model = self._train(model, train_loader, val_loader, loss_fn, device, wandb_logger)
             
             # Evaluate (Interpolation)
             y_true_interp, y_pred_interp = self._evaluate(lit_model, test_loader_interp, device)
@@ -198,6 +206,9 @@ class Benchmarker:
                 combined_metrics[f"interp_{k}"] = v
             for k, v in metrics_extrap.items():
                 combined_metrics[f"extrap_{k}"] = v
+            if wandb_logger is not None:
+                log_wandb_metrics(wandb_logger, combined_metrics)
+                finish_wandb(wandb_logger)
             
             logging.info(f"Completed fold {fold_id} on device {device}")
             return combined_metrics
@@ -212,7 +223,7 @@ class Benchmarker:
         
         # Prepare fold configurations
         fold_configs = []
-        for fold_id in range(5):
+        for fold_id in self.config.fold_ids:
             device = self.devices[fold_id % len(self.devices)]
             fold_configs.append((fold_id, device))
         
@@ -228,7 +239,7 @@ class Benchmarker:
             logging.info(f"Multiple devices detected ({len(self.devices)}). Running folds in parallel.")
             
             # Use ProcessPoolExecutor to train folds in parallel
-            max_workers = min(len(self.devices), 5)  # Max 5 workers for 5 folds
+            max_workers = min(len(self.devices), len(fold_configs))
             with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp.get_context('spawn')) as executor:
                 # Submit all fold training jobs
                 future_to_fold = {

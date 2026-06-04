@@ -1,0 +1,103 @@
+active_experiments: []
+
+completed_experiments:
+  - name: "third_revision_agent_setup"
+    important_params:
+      phase: "agent_and_logging_files"
+      files:
+        - "AGENT.md"
+        - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "No prior agent guide or log file existed in the root project."
+    outcome: "Created shared guidance and initialized the revision workflow log."
+  - name: "third_revision_experiment_scripts_initial"
+    important_params:
+      phase: "experiments"
+      task: "initial optional wandb support and lightweight revision experiment scripts before user cleanup request"
+      wandb_project: "muscari-third-revision"
+      smoke_tests:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py scripts/experiments/*.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments/architecture_screen.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments/final_revision_runs.py"
+    completed_on: "2026-06-04"
+    key_finding: "The initial smoke paths worked, but the user requested a branch cleanup and a simpler script layout before any new commit."
+    outcome: "Superseded by third_revision_refactor_cleanup."
+  - name: "third_revision_refactor_cleanup"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "move work off master, rename experiment folder, remove duplicate revision scripts, and use benchmark.py/train.py as manuscript entrypoints"
+      smoke_tests:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py muscari/benchmarker.py scripts/benchmark.py scripts/train.py scripts/experiments_3rd_rev/*.py"
+        - "git diff --check"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/train.py"
+    completed_on: "2026-06-04"
+    key_finding: "Cleaned disabled-wandb smoke paths passed. benchmark.py now owns the manuscript benchmark smoke path, train.py can retrain the selected ensemble, and d0848f6 is still missing locally."
+    outcome: "Awaiting user verification before committing."
+  - name: "third_revision_experiment_utility_cleanup"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "remove dedicated 100 km compilation script and move shared revision helpers into the source package"
+      files:
+        removed:
+          - "scripts/experiments_3rd_rev/compile_sbcv_100km.py"
+        moved:
+          - "scripts/experiments_3rd_rev/revision_utils.py -> muscari/revision_utils.py"
+        updated:
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "The 100 km data can be generated from existing data-processing scripts, and shared helper code belongs in muscari/ rather than the experiment-script directory."
+    outcome: "Focused smoke checks passed; awaiting user verification before committing."
+  - name: "third_revision_utils_merge"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "merge third-revision helper functions into the existing muscari/utils.py module"
+      files:
+        removed:
+          - "muscari/revision_utils.py"
+        updated:
+          - "muscari/utils.py"
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "The temporary revision utility module duplicated the role of muscari/utils.py and imported back into it for git metadata."
+    outcome: "Smoke checks passed; awaiting user verification before committing."
+  - name: "third_revision_utils_consolidation"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "keep experiment-specific feature constants in scripts and reuse muscari/utils.py helpers across benchmark and train paths"
+      files:
+        updated:
+          - "muscari/utils.py"
+          - "muscari/benchmarker.py"
+          - "scripts/benchmark.py"
+          - "scripts/chao2_estimator.py"
+          - "scripts/train.py"
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "BIOCLIMATE_VARS belongs to experiment scripts, while effort transforms, metrics, Lightning evaluation, feature-list helpers, and wandb setup are reusable utilities."
+    outcome: "Smoke checks passed; committed on dev_3rd_rev."
+
+failed_experiments: []
+
+next_actions:
+  - "Ask the user to verify the cleaned refactor and approve or reject the commit."
+  - "After user approval and commit, launch or schedule the full architecture screen on ceacce0."
+  - "Generate the 100 km SBCV dataset from existing data-processing scripts or sync d0848f6 if it remains unavailable."
+  - "Revise manuscript and reviewer response after experiment outputs are available."
+
+notes:
+  - "2026-06-04: Initialized shared agent guidance and logging for the third-revision workflow."
+  - "2026-06-04: Added wandb to pyproject.toml and refreshed uv.lock."
+  - "2026-06-04: Added commit-and-pause protocol to AGENT.md per user instruction."
+  - "2026-06-04: Removed commit 620acf0 from master by moving master back to 0842ba0 and created branch dev_3rd_rev."
+  - "2026-06-04: Removed duplicate chao2_revision.py and final_revision_runs.py; benchmark.py is now the manuscript benchmark entrypoint."
+  - "2026-06-04: Removed compile_sbcv_100km.py and moved revision helper functions into muscari/revision_utils.py."
+  - "2026-06-04: Merged revision helper functions into muscari/utils.py and removed the temporary revision_utils module."
+  - "2026-06-04: Moved BIOCLIMATE_VARS back to experiment scripts and consolidated duplicate helper usage across train, benchmark, Chao2, benchmarker, and architecture screen."

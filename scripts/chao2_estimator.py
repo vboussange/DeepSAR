@@ -10,15 +10,10 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from tqdm import tqdm
-from sklearn.metrics import (
-    d2_absolute_error_score,
-    root_mean_squared_error,
-    r2_score,
-    mean_absolute_percentage_error,
-)
 
 from muscari.data_processing.utils_eva import EVADataset
 from muscari.data_processing.spatial_folds import assign_checkerboard_folds
+from muscari.utils import compute_metrics
 # Initialize logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -142,19 +137,12 @@ for fold_id in range(n_folds):
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
 
-    relative_bias = (y_pred - y_true) / y_true
-    median_relative_bias = np.median(relative_bias)
-    mean_relative_bias = np.mean(relative_bias)
+    extrap_metrics = compute_metrics(y_true, y_pred)
 
     metrics = {
         "experiment": "chao2_estimator",
         "fold": fold_id,
-        "extrap_r2": r2_score(y_true, y_pred),
-        "extrap_d2": d2_absolute_error_score(y_true, y_pred),
-        "extrap_rmse": root_mean_squared_error(y_true, y_pred),
-        "extrap_mape": mean_absolute_percentage_error(y_true, y_pred),
-        "extrap_median_relative_bias": median_relative_bias,
-        "extrap_mean_relative_bias": mean_relative_bias,
+        **{f"extrap_{k}": v for k, v in extrap_metrics.items()},
     }
     results.append(metrics)
 

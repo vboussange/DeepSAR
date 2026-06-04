@@ -91,12 +91,14 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         feature_scalers: Optional[list] = None,
         target_scalers: Optional[list] = None,
         muscari_batchnorm: bool = False,
+        asymptote_transform: str = "identity",
     ):
         super().__init__()
         self.n_models = n_models
         self.layer_sizes = layer_sizes
         self.feature_names = feature_names
         self.muscari_batchnorm = muscari_batchnorm
+        self.asymptote_transform = asymptote_transform
         # Stored as list-of-dicts so config.json stays JSON-serializable
         self.feature_scalers = feature_scalers
         self.target_scalers = target_scalers
@@ -117,6 +119,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                 _fscalers[i],
                 _tscalers[i],
                 ffnn_batchnorm=self.muscari_batchnorm,
+                asymptote_transform=self.asymptote_transform,
             )
             for i in range(n_models)
         ])
@@ -131,6 +134,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         assert models, "models list must not be empty"
         m0 = models[0]
         muscari_batchnorm = getattr(m0, "ffnn_batchnorm", False)
+        asymptote_transform = getattr(m0, "asymptote_transform", "identity")
 
         # Infer layer_sizes from the first model's architecture
         layer_sizes = [block.linear.out_features for block in m0.ffnn.fully_connected_layers]
@@ -154,6 +158,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
             feature_scalers=feature_scalers,
             target_scalers=target_scalers,
             muscari_batchnorm=muscari_batchnorm,
+            asymptote_transform=asymptote_transform,
         )
         for src, dst in zip(models, ensemble.models):
             dst.load_state_dict(src.state_dict())
@@ -189,6 +194,11 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                 feature_scaler=checkpoint["feature_scaler"],
                 target_scaler=checkpoint["target_scaler"],
                 ffnn_batchnorm=getattr(config, "muscari_batchnorm", False),
+                asymptote_transform=getattr(
+                    config,
+                    "muscari_asymptote_transform",
+                    checkpoint.get("asymptote_transform", "identity"),
+                ),
             )
             model.load_state_dict(checkpoint["model_state_dict"])
             model.eval()
@@ -218,4 +228,3 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
     def get_std_sr_tot(self, df: pd.DataFrame) -> np.ndarray:
         """Standard deviation of asymptotic species-richness predictions."""
         return np.std([m.predict_sr_tot(df) for m in self.models], axis=0).squeeze()
-
