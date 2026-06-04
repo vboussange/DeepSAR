@@ -1,0 +1,6 @@
+[submodule "paper"]
+	path = paper
+	url = https://github.com/vboussange/MuScaRi_manuscript
+[submodule "widget"]
+	path = widget
+	url = git@hf.co:spaces/vboussange/MuScaRi
