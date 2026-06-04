@@ -4,6 +4,7 @@ import pandas as pd
 import geopandas as gpd
 import torch
 import pytorch_lightning as pl
+import numpy as np
 from pytorch_lightning.callbacks import EarlyStopping
 from muscari.dataset import create_dataloader
 from muscari.trainer import MuScaRiLitModule
@@ -14,6 +15,7 @@ from muscari.utils import (
     finish_wandb,
     log_wandb_metrics,
     maybe_wandb_logger,
+    residual_bias_slope,
 )
 import torch.multiprocessing as mp
 import logging
@@ -40,6 +42,7 @@ class BenchmarkConfig:
     wandb_project: str = "muscari-third-revision"
     wandb_group: str = "benchmark"
     wandb_tags: list = field(default_factory=lambda: [])
+    wandb_config: dict = field(default_factory=lambda: {})
     fold_ids: list = field(default_factory=lambda: list(range(5)))
 
     def __post_init__(self):
@@ -63,6 +66,7 @@ class Benchmarker:
         # Load GIFT once
         self.gift_df = gpd.read_parquet(self.gift_path)
         self.gift_df = self._add_effort_columns(self.gift_df)
+        self.gift_df = self.gift_df.replace([np.inf, -np.inf], np.nan)
         self.gift_df.dropna(inplace=True)
 
     def _add_effort_columns(self, df):
@@ -83,6 +87,7 @@ class Benchmarker:
                 "path_sbcv_data": str(self.config.path_sbcv_data),
                 "path_gift_data": str(self.config.path_gift_data),
                 "effort_transform": self.config.effort_transform,
+                **self.config.wandb_config,
             },
         )
 
@@ -146,6 +151,9 @@ class Benchmarker:
             train_df = self._add_effort_columns(train_df)
             val_df = self._add_effort_columns(val_df)
             test_df = self._add_effort_columns(test_df)
+            train_df = train_df.replace([np.inf, -np.inf], np.nan)
+            val_df = val_df.replace([np.inf, -np.inf], np.nan)
+            test_df = test_df.replace([np.inf, -np.inf], np.nan)
             for df in [train_df, val_df, test_df]:
                 # Ensure feature columns exist and handle NaNs
                 df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
@@ -206,6 +214,16 @@ class Benchmarker:
                 combined_metrics[f"interp_{k}"] = v
             for k, v in metrics_extrap.items():
                 combined_metrics[f"extrap_{k}"] = v
+            combined_metrics["interp_bias_slope_log_area"] = residual_bias_slope(
+                y_true_interp,
+                y_pred_interp,
+                test_df["log_sp_unit_area"].to_numpy(),
+            )
+            combined_metrics["extrap_bias_slope_log_area"] = residual_bias_slope(
+                y_true_extrap,
+                y_pred_extrap,
+                gift_df["log_sp_unit_area"].to_numpy(),
+            )
             if wandb_logger is not None:
                 log_wandb_metrics(wandb_logger, combined_metrics)
                 finish_wandb(wandb_logger)
