@@ -27,11 +27,11 @@ class BenchmarkConfig:
     seed: int = 1
     batch_size: int = 1024
     num_workers: int = 0
-    n_epochs: int = 100
+    n_epochs: int = 500
     lr: float = 1e-3
     weight_decay: float = 1e-4
     lr_scheduler_factor: float = 0.5
-    lr_scheduler_patience: int = 5
+    lr_scheduler_patience: int = 10
     climate_variables: list = field(
         default_factory=lambda: []
     )
@@ -43,6 +43,7 @@ class BenchmarkConfig:
     wandb_group: str = "benchmark"
     wandb_tags: list = field(default_factory=lambda: [])
     wandb_config: dict = field(default_factory=lambda: {})
+    torch_num_threads: int | None = None
     fold_ids: list = field(default_factory=lambda: list(range(5)))
 
     def __post_init__(self):
@@ -113,6 +114,8 @@ class Benchmarker:
             logger=wandb_logger if wandb_logger is not None else False,
             callbacks=[EarlyStopping(monitor="val_loss", patience=self.config.lr_scheduler_patience * 2)],
             enable_progress_bar=False,
+            enable_model_summary=False,
+            num_sanity_val_steps=0,
         )
         
         trainer.fit(lit_model, train_loader, val_loader)
@@ -127,6 +130,11 @@ class Benchmarker:
     def _train_fold(self, fold_id, device, experiment_name, model_init, feature_names, train_frac):
         """Train and evaluate a single fold on a specific device."""
         try:
+            if self.config.torch_num_threads is not None:
+                torch.set_num_threads(self.config.torch_num_threads)
+            if "cuda" in device:
+                torch.set_float32_matmul_precision("high")
+
             # Set seed for reproducibility
             pl.seed_everything(self.config.seed + fold_id)
             
@@ -163,20 +171,25 @@ class Benchmarker:
             gift_df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
             
             # Create dataloaders
+            pin_memory = "cuda" in device
             train_loader, feature_scaler, target_scaler = create_dataloader(
-                train_df, feature_names, self.config.batch_size, self.config.num_workers
+                train_df,
+                feature_names,
+                self.config.batch_size,
+                self.config.num_workers,
+                pin_memory=pin_memory,
             )
             val_loader, _, _ = create_dataloader(
                 val_df, feature_names, self.config.batch_size, self.config.num_workers, 
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
             )
             test_loader_interp, _, _ = create_dataloader(
                 test_df, feature_names, self.config.batch_size, self.config.num_workers,
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
             )
             test_loader_extrap, _, _ = create_dataloader(
                 gift_df, feature_names, self.config.batch_size, self.config.num_workers,
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
             )
             
             # Initialize model

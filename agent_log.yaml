@@ -1,6 +1,27 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "architecture_screen_speedup"
+    important_params:
+      task: "reduce architecture screen CPU/DataLoader overhead and improve GPU utilization"
+      hostname: "gpunode04"
+      git_hash: "b5eaa18"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      observed_issue: "Full run spawned five fold workers plus four DataLoader workers per fold; GPU use was sporadic."
+      changes:
+        - "Set architecture screen batch size to 8192."
+        - "Set architecture screen DataLoader workers to 0 because datasets are already materialized tensors."
+        - "Pinned CUDA DataLoader memory and used non-blocking evaluation transfers."
+        - "Enabled high float32 matmul precision for CUDA fold workers."
+        - "Disabled Lightning sanity validation and per-process model summaries."
+      smoke_tests:
+        - "uv run python -m py_compile muscari/dataset.py muscari/benchmarker.py muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git --no-pager diff --check"
+    completed_on: "2026-06-04"
+    key_finding: "The run had been CPU/process-management heavy, with DataLoader subprocesses under each GPU fold worker. The optimized smoke run completed with four result rows and no leftover architecture-screen processes."
+    outcome: "Ready to relaunch the full architecture screen."
   - name: "architecture_screen_benchmarker_revamp"
     important_params:
       task: "revamp scripts/experiments_3rd_rev/architecture_screen.py to use BenchmarkConfig and Benchmarker for multi-GPU fold scheduling"

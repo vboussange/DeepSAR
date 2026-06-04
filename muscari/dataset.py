@@ -29,8 +29,28 @@ def scale_features_targets(gdf, feature_names, feature_scaler=None, target_scale
         
     return torch.tensor(features, dtype=torch.float32), torch.tensor(target, dtype=torch.float32), feature_scaler, target_scaler
 
-def create_dataloader(gdf, feature_names, batch_size, num_workers, feature_scaler=None, target_scaler=None, shuffle=True):
+def create_dataloader(
+    gdf,
+    feature_names,
+    batch_size,
+    num_workers,
+    feature_scaler=None,
+    target_scaler=None,
+    shuffle=True,
+    pin_memory=None,
+):
     X, y, feature_scaler, target_scaler = scale_features_targets(gdf, feature_names, feature_scaler, target_scaler)
     dataset = CustomDataLoader(X, y)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+    if pin_memory is None:
+        pin_memory = torch.cuda.is_available()
+    loader_kwargs = {
+        "batch_size": batch_size,
+        "shuffle": shuffle,
+        "num_workers": num_workers,
+        "pin_memory": pin_memory,
+    }
+    if num_workers > 0:
+        loader_kwargs["persistent_workers"] = True
+        loader_kwargs["prefetch_factor"] = 2
+    loader = DataLoader(dataset, **loader_kwargs)
     return loader, feature_scaler, target_scaler

@@ -1,8 +1,6 @@
 """
 Private architecture screen for the third MuScaRi revision.
 
-Keep constants in this file explicit. This screen is not intended to generate
-paper-facing figures; it selects the architecture used by later scripts.
 """
 from __future__ import annotations
 
@@ -37,14 +35,14 @@ BIOCLIMATE_VARS = [
     "bio12",
 ]
 
-USE_WANDB = False
+USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
 WANDB_GROUP = f"architecture_screen_{SBCV_DATASET_ID}"
 WANDB_TAGS = ["architecture-screen", SBCV_DATASET_ID]
 
 SMOKE_TEST = os.environ.get("MUSCARI_SMOKE_TEST", "0") == "1"
 FOLD_IDS = [0] if SMOKE_TEST else list(range(5))
-N_EPOCHS = 1 if SMOKE_TEST else 100
+N_EPOCHS = 1 if SMOKE_TEST else 500
 TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 BATCH_SIZE = 1024
 LR = 1e-3
@@ -101,11 +99,12 @@ def discover_devices() -> list[str]:
 
 
 def default_num_workers(devices: list[str]) -> int:
-    if SMOKE_TEST:
-        return 0
+    return 0
+
+
+def torch_threads_per_fold(devices: list[str]) -> int:
     worker_budget = os.cpu_count() or 1
-    workers_per_fold = worker_budget // max(1, len(devices)) - 1
-    return max(0, min(4, workers_per_fold))
+    return max(1, min(4, worker_budget // max(1, len(devices))))
 
 
 def build_config(variant: dict, feature_names: list[str], devices: list[str]) -> BenchmarkConfig:
@@ -117,6 +116,7 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         batch_size=BATCH_SIZE,
         n_epochs=N_EPOCHS,
         lr=LR,
+        torch_num_threads=torch_threads_per_fold(devices),
         effort_transform=variant["effort_transform"],
         use_wandb=USE_WANDB,
         wandb_project=WANDB_PROJECT,
@@ -173,6 +173,8 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
 
 if __name__ == "__main__":
     RUN_FOLDER.mkdir(parents=True, exist_ok=True)
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("high")
     sample_df = gpd.read_parquet(next(SBCV_SAMPLES_PATH.glob("*_train.parquet")))
     feature_names = feature_sets(sample_df, BIOCLIMATE_VARS)["env_area"]
     logger.info("Architecture screen features: %s", feature_names)

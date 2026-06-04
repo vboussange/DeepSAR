@@ -129,7 +129,7 @@ def evaluate_lit_model(lit_model, data_loader, device: str) -> tuple[np.ndarray,
     targets = []
     with torch.no_grad():
         for x, y in data_loader:
-            x = x.to(device)
+            x = x.to(device, non_blocking=True)
             y_pred = lit_model(x)
             preds.append(y_pred.cpu())
             targets.append(y.cpu())

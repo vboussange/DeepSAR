@@ -31,6 +31,7 @@ reports/*
 *.svg
 benchmark_results*.tex
 *.json
+wandb/*
 
 
 ## Core latex/pdflatex auxiliary files:
