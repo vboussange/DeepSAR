@@ -68,6 +68,49 @@ CONFIG = {
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 
+
+def json_ready(value):
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): json_ready(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_ready(v) for v in value]
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def write_dataset_metadata(output_path: Path, dataset_id: str, df: gpd.GeoDataFrame) -> None:
+    spatial_split_counts = (
+        df["spatial_split"].value_counts().sort_index().astype(int).to_dict()
+    )
+    metadata = {
+        "dataset_id": dataset_id,
+        "generated_by": str(Path(__file__)),
+        "git_hash": get_git_hash(),
+        "n_source_plots": int(len(df)),
+        "crs": str(df.crs),
+        "bounds": [float(x) for x in df.total_bounds],
+        "spatial_folds": {
+            "method": "checkerboard",
+            "n_splits": CONFIG["n_splits"],
+            "block_size_m": CONFIG["block_size"],
+            "spatial_split_counts": spatial_split_counts,
+            "columns": ["grid_x", "grid_y", "spatial_split"],
+        },
+        "sample_generation": {
+            "ratio_samples_plots": CONFIG["ratio_samples_plots"],
+            "spunit_area_range_train_m2": CONFIG["spunit_area_range_train"],
+            "spunit_area_range_test_m2": CONFIG["spunit_area_range_test"],
+            "random_state": CONFIG["random_state"],
+        },
+        "environmental_variables": CONFIG["env_vars"],
+    }
+    with open(output_path / "metadata.json", "w") as f:
+        json.dump(json_ready(metadata), f, indent=2)
+
+
 def run_sp_unit_compilation(
     df: gpd.GeoDataFrame,
     env_raster: xr.Dataset,
@@ -116,6 +159,8 @@ def save_compiled_data(
     summary_path = output_path / f"{filename}_summary.json"
     summary = {
         "ratio_samples_plots": CONFIG["ratio_samples_plots"],
+        "spatial_block_size_m": CONFIG["block_size"],
+        "n_spatial_folds": CONFIG["n_splits"],
         "environmental_variables": CONFIG["env_vars"],
         "n_samples": len(sp_unit_data),
         "columns": list(sp_unit_data.columns),
@@ -221,6 +266,7 @@ if __name__ == "__main__":
         n_splits=CONFIG["n_splits"], 
         block_size=CONFIG["block_size"]
     )
+    write_dataset_metadata(output_file_path, sha, df)
     
     # Load environmental rasters
     logging.info("Loading environmental rasters...")
@@ -240,5 +286,5 @@ if __name__ == "__main__":
             pass
 
     with open(output_file_path / "config_used.json", 'w') as f:
-        json.dump({k: str(v) if isinstance(v, Path) else v for k, v in CONFIG.items()}, f, indent=2)
+        json.dump(json_ready(CONFIG), f, indent=2)
     logging.info("Done!")

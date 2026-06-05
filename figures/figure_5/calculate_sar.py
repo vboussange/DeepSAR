@@ -92,22 +92,20 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
     for name in label_map.keys():
         data = locations[name]
         lat, lon = data["coords"]
-        srs = data["SRs"]
-        sr_low = srs[idx_low]
-        sr_high = srs[idx_high]
-
-        slope_low = (np.log(srs[idx_low + 1]) - np.log(srs[idx_low])) / (np.log(area_km2[idx_low + 1]) - np.log(area_km2[idx_low]))
-        slope_high = (np.log(srs[idx_high + 1]) - np.log(srs[idx_high])) / (np.log(area_km2[idx_high + 1]) - np.log(area_km2[idx_high]))
+        sr = data["SR"]
+        std_sr = data["std_SR"]
+        slope = data["slope"]
+        std_slope = data["std_slope"]
 
         rows.append(
             {
                 "Location": label_map.get(name, name),
                 "Lat": lat,
                 "Lon": lon,
-                "SR_low": format_mean_std(float(np.mean(sr_low)), float(np.std(sr_low))),
-                "SR_high": format_mean_std(float(np.mean(sr_high)), float(np.std(sr_high))),
-                "Slope_low": format_mean_std(float(np.mean(slope_low)), float(np.std(slope_low))),
-                "Slope_high": format_mean_std(float(np.mean(slope_high)), float(np.std(slope_high))),
+                "SR_low": format_mean_std(float(sr[idx_low]), float(std_sr[idx_low])),
+                "SR_high": format_mean_std(float(sr[idx_high]), float(std_sr[idx_high])),
+                "Slope_low": format_mean_std(float(slope[idx_low]), float(std_slope[idx_low])),
+                "Slope_high": format_mean_std(float(slope[idx_high]), float(std_slope[idx_high])),
             }
         )
 
@@ -118,7 +116,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
         "    \\setlength{\\tabcolsep}{5pt}\n"
         "    \\begin{tabularx}{\\textwidth}{l r r >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Location & Lat & Lon & $S_T$ at 25km$^2$ & $S_T$ at 2500km$^2$ & $\\frac{d \log(S_T)}{d \log(A)}$ at 25km$^2$ &  $\\frac{d \log(S_T)}{d \log(A)}$ at 2500km$^2$ \\\\\n"
+        "    Location & Lat & Lon & $S_T$ at 25km$^2$ & $S_T$ at 2500km$^2$ & $\\frac{d \\log(S_T)}{d \\log(A)}$ at 25km$^2$ &  $\\frac{d \\log(S_T)}{d \\log(A)}$ at 2500km$^2$ \\\\\n"
         "    \\midrule\n"
     )
 
@@ -131,7 +129,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{Pointwise estimate of species richness and rate of species accumulation obtained for nested spatial units at sampling areas of 25km$^2$ and 2500km$^2$. Values are mean ± standard deviation across ensemble members.}\n"
+        "    \\caption{Pointwise estimate of species richness and rate of species accumulation obtained for nested spatial units at sampling areas of 25km$^2$ and 2500km$^2$. Values are validation-weighted ensemble estimates ± weighted ensemble dispersion.}\n"
         "    \\label{tab:sar_summary}\n"
         "\\end{table}\n"
     )
@@ -169,6 +167,7 @@ if __name__ == "__main__":
     
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3035")
     window_sizes = np.logspace(np.log10(2e3), np.log10(1e6), 100)
+    log_area = np.log(window_sizes**2)
     for loc in dict_SAR:
         print(loc)
         y, x = transformer.transform(*dict_SAR[loc]["coords"])
@@ -186,7 +185,7 @@ if __name__ == "__main__":
             )
 
             # predictions
-            SRs = np.concatenate([m.predict_sr_tot(features) for m in model.models], axis=1)
+            SRs = model.predict_members_sr_tot(features).T
             dict_SAR[loc]["SRs"].append(SRs)
             
             ## predictions FIXME: legacy code
@@ -202,21 +201,28 @@ if __name__ == "__main__":
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
         dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
+        dict_SAR[loc]["SR"] = model.aggregate_member_predictions(dict_SAR[loc]["SRs"].T)
+        dict_SAR[loc]["std_SR"] = model.get_member_prediction_dispersion(dict_SAR[loc]["SRs"].T)
+        slope_members = np.diff(np.log(dict_SAR[loc]["SRs"]), axis=0) / np.diff(log_area)[:, None]
+        dict_SAR[loc]["slope"] = model.aggregate_member_predictions(slope_members.T)
+        dict_SAR[loc]["std_slope"] = model.get_member_prediction_dispersion(slope_members.T)
         # dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"]) # FIXME: legacy code
             
-    dict_SAR["log_area"] = np.log(window_sizes**2)
-    
+    dict_SAR["log_area"] = log_area
+
     fig, ax = plt.subplots()
     dict_plot = {"loc1": {"c":"tab:blue"}, "loc2": {"c":"tab:red"}, "loc3": {"c":"tab:purple"}}
     for loc in dict_plot:
         d = dict_SAR[loc]
         arg_plot = dict_plot[loc]
-        ax.plot(np.exp(dict_SAR["log_area"]), d["SRs"], c=arg_plot["c"])
-        # ax.fill_between(np.exp(dict_SAR["log_area"]), 
-        #     np.array(d["SR"]) - np.array(d["std_SR"]), 
-        #     np.array(d["SR"]) + np.array(d["std_SR"]), 
-        #     color=arg_plot["c"],
-        #     alpha=0.4)
+        ax.plot(np.exp(dict_SAR["log_area"]), d["SR"], c=arg_plot["c"])
+        ax.fill_between(
+            np.exp(dict_SAR["log_area"]),
+            np.array(d["SR"]) - np.array(d["std_SR"]),
+            np.array(d["SR"]) + np.array(d["std_SR"]),
+            color=arg_plot["c"],
+            alpha=0.4,
+        )
     ax.set_xscale("log")
     # ax.set_yscale("log")
     fig.savefig(output_dir / "SARs.pdf", dpi=300, bbox_inches="tight")

@@ -186,20 +186,19 @@ if __name__ == "__main__":
         sar_data = dict_sar[loc]
         color = loc_info['c']
         
-        # Calculate median and quantiles
-        median_sr = np.median(sar_data["SRs"], axis=1)
-        q05_sr = np.quantile(sar_data["SRs"], 0.05, axis=1)
-        q95_sr = np.quantile(sar_data["SRs"], 0.95, axis=1)
-        
+        central_sr = np.asarray(sar_data["SR"])
+        q05_sr = central_sr - np.asarray(sar_data["std_SR"])
+        q95_sr = central_sr + np.asarray(sar_data["std_SR"])
+    
         # Apply rolling window for smoothness
         window_size = CONFIG["sar_window"]
         kernel = np.ones(window_size) / window_size
-        median_sr_smooth = np.convolve(median_sr, kernel, mode="valid")
+        central_sr_smooth = np.convolve(central_sr, kernel, mode="valid")
         q05_sr_smooth = np.convolve(q05_sr, kernel, mode="valid")
         q95_sr_smooth = np.convolve(q95_sr, kernel, mode="valid")
         area_smooth = area[window_size-1:] / 1e6  # Convert area to km² for plotting
         
-        ax.plot(area_smooth, median_sr_smooth, color=color, linewidth=2)
+        ax.plot(area_smooth, central_sr_smooth, color=color, linewidth=2)
         ax.fill_between(area_smooth, q05_sr_smooth, q95_sr_smooth, color=color, alpha=0.2)
         
         # Add vertical lines

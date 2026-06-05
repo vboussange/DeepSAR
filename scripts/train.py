@@ -1,8 +1,10 @@
 """
 Training MuScaRi models on CV folds.
 """
+import json
 import logging
 import os
+import socket
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
@@ -19,6 +21,7 @@ from muscari.utils import (
     compute_metrics,
     evaluate_lit_model,
     finish_wandb,
+    get_git_hash,
     log_wandb_metrics,
     make_trainer,
     maybe_wandb_logger,
@@ -37,9 +40,9 @@ BIOCLIMATE_VARS = [
             # "bio15",
         ]
 
-SELECTED_ARCHITECTURE_NAME = "current_abs"
+SELECTED_ARCHITECTURE_NAME = "softplus_abs"
 EFFORT_TRANSFORM = "absolute"
-ASYMPTOTE_TRANSFORM = "identity"
+ASYMPTOTE_TRANSFORM = "softplus"
 
 USE_WANDB = False
 WANDB_PROJECT = "muscari-third-revision"
@@ -54,6 +57,98 @@ TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# TODO: move to utils.py
+def json_ready(value):
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): json_ready(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_ready(v) for v in value]
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def fold_files(config, fold_ids):
+    return {
+        str(fold_id): {
+            split: str(config.path_sbcv_data / f"fold_{fold_id}_{split}.parquet")
+            for split in ["train", "val", "test"]
+        }
+        for fold_id in fold_ids
+    }
+
+
+def training_config_payload(config, feature_names, fold_summaries):
+    metadata_files = [
+        str(path)
+        for path in [
+            config.path_sbcv_data / "metadata.json",
+            config.path_sbcv_data / "config_used.json",
+        ]
+        if path.exists()
+    ]
+    return json_ready({
+        "run": {
+            "script": str(Path(__file__)),
+            "hostname": socket.gethostname(),
+            "git_hash": get_git_hash(),
+            "smoke_test": SMOKE_TEST,
+            "run_folder": config.run_folder,
+            "checkpoint_pattern": str(config.run_folder / "fold_<fold_id>.pth"),
+        },
+        "dataset": {
+            "sbcv_dataset_id": config.path_sbcv_data.name,
+            "sbcv_path": config.path_sbcv_data,
+            "metadata_files": metadata_files,
+            "fold_files": fold_files(config, FOLD_IDS),
+        },
+        "model": {
+            "model_family": "MuScaRi",
+            "architecture_variant": SELECTED_ARCHITECTURE_NAME,
+            "layer_sizes": config.layer_sizes,
+            "batchnorm": config.muscari_batchnorm,
+            "asymptote_transform": ASYMPTOTE_TRANSFORM,
+            "effort_transform": EFFORT_TRANSFORM,
+        },
+        "training": {
+            "train_config": vars(config),
+            "seed": config.seed,
+            "fold_ids": FOLD_IDS,
+            "n_epochs": config.n_epochs,
+            "batch_size": config.batch_size,
+            "num_workers": config.num_workers,
+            "learning_rate": config.lr,
+            "weight_decay": config.weight_decay,
+            "lr_scheduler_factor": config.lr_scheduler_factor,
+            "lr_scheduler_patience": config.lr_scheduler_patience,
+            "train_frac": TRAIN_FRAC,
+            "loss": "MSELoss",
+        },
+        "features_and_labels": {
+            "bioclimate_variables": BIOCLIMATE_VARS,
+            "feature_columns": feature_names,
+            "model_input_columns": ["log_observed_area"] + feature_names,
+            "target_column": "sr",
+            "derived_effort_column": "log_observed_area",
+        },
+        "wandb": {
+            "enabled": USE_WANDB,
+            "project": WANDB_PROJECT,
+            "group": WANDB_GROUP,
+            "tags": WANDB_TAGS,
+        },
+        "fold_summaries": fold_summaries,
+    })
+
+
+def write_training_config(config, feature_names, fold_summaries):
+    config_path = config.run_folder / "config.json"
+    with open(config_path, "w") as f:
+        json.dump(training_config_payload(config, feature_names, fold_summaries), f, indent=2)
+    logger.info(f"Wrote training config to {config_path}")
 
 
 def make_wandb_logger(fold_id, feature_names, config):
@@ -93,14 +188,29 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     train_df = gpd.read_parquet(train_path)
     val_df = gpd.read_parquet(val_path)
     test_df = gpd.read_parquet(test_path)
+    raw_rows = {
+        "train": len(train_df),
+        "val": len(val_df),
+        "test": len(test_df),
+    }
     if TRAIN_FRAC < 1.0:
         train_df = train_df.sample(frac=TRAIN_FRAC, random_state=config.seed + fold_id)
+    sampled_rows = {
+        "train": len(train_df),
+        "val": len(val_df),
+        "test": len(test_df),
+    }
     
     train_df = add_effort_columns(train_df, EFFORT_TRANSFORM)
     val_df = add_effort_columns(val_df, EFFORT_TRANSFORM)
     test_df = add_effort_columns(test_df, EFFORT_TRANSFORM)
     for df in [train_df, val_df, test_df]:
         df.dropna(subset=["log_observed_area"] + feature_names, inplace=True)
+    filtered_rows = {
+        "train": len(train_df),
+        "val": len(val_df),
+        "test": len(test_df),
+    }
         
     # Create dataloaders
     train_loader, feature_scaler, target_scaler = create_dataloader(
@@ -160,6 +270,21 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
         "config": config,
         "metrics": metrics,
     }, save_path)
+    return {
+        "fold": fold_id,
+        "checkpoint_path": str(save_path),
+        "split_paths": {
+            "train": str(train_path),
+            "val": str(val_path),
+            "test": str(test_path),
+        },
+        "rows": {
+            "raw": raw_rows,
+            "after_train_frac": sampled_rows,
+            "after_dropna": filtered_rows,
+        },
+        "metrics": metrics,
+    }
 
 if __name__ == "__main__":
     RUN_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -177,6 +302,11 @@ if __name__ == "__main__":
     
     feature_names = climate_dem_features(df, BIOCLIMATE_VARS) + ["log_sp_unit_area"]
     logger.info(f"Training with features: {feature_names}")
-        
+
+    fold_summaries = []
+    write_training_config(config, feature_names, fold_summaries)
     for fold_id in FOLD_IDS:
-        train_fold(config, fold_id, feature_names)
+        fold_summary = train_fold(config, fold_id, feature_names)
+        if fold_summary is not None:
+            fold_summaries.append(fold_summary)
+            write_training_config(config, feature_names, fold_summaries)

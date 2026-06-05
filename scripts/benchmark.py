@@ -48,9 +48,9 @@ INCLUDE_LANDCOVER_EXPERIMENTS = False
 
 # TODO(agent): update these constants once the full architecture screen selects
 # the final architecture.
-SELECTED_ARCHITECTURE_NAME = "current_abs"
+SELECTED_ARCHITECTURE_NAME = "softplus_abs"
 EFFORT_TRANSFORM = "absolute"
-ASYMPTOTE_TRANSFORM = "identity"
+ASYMPTOTE_TRANSFORM = "softplus"
 
 USE_WANDB = False
 WANDB_PROJECT = "muscari-third-revision"

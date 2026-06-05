@@ -50,9 +50,9 @@ LAYER_SIZES = symmetric_arch(6, base=128, factor=4)
 
 VARIANTS = [
     {
-        "name": "current_abs",
+        "name": "softplus_abs",
         "effort_transform": "absolute",
-        "asymptote_transform": "identity",
+        "asymptote_transform": "softplus",
     },
     {
         "name": "exp_abs",
@@ -60,9 +60,9 @@ VARIANTS = [
         "asymptote_transform": "exp",
     },
     {
-        "name": "current_rel",
+        "name": "softplus_rel",
         "effort_transform": "relative",
-        "asymptote_transform": "identity",
+        "asymptote_transform": "softplus",
     },
     {
         "name": "exp_rel",

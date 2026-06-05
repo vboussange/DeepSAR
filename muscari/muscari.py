@@ -10,6 +10,7 @@ class MuScaRi(nn.Module):
     """
     Deep SAR model based on the 4-parameter Weibull function.
     """
+    _PARAMETER_EPS = 1e-6
 
     def __init__(
         self,
@@ -18,9 +19,13 @@ class MuScaRi(nn.Module):
         feature_scaler=None,
         target_scaler=None,
         ffnn_batchnorm=False,
-        asymptote_transform="identity",
+        asymptote_transform="softplus",
     ):
         super().__init__()
+        if asymptote_transform not in {"softplus", "exp"}:
+            raise ValueError(
+                "asymptote_transform must be one of {'softplus', 'exp'}"
+            )
         self.feature_names = feature_names
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
@@ -32,10 +37,6 @@ class MuScaRi(nn.Module):
             output_dim=4,
             batchnorm=ffnn_batchnorm,
         )
-        if asymptote_transform not in {"identity", "exp"}:
-            raise ValueError(
-                "asymptote_transform must be one of {'identity', 'exp'}"
-            )
 
     def _weibull_4p(self, x, b, c, d, log_e):
         """4-parameter Weibull: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - log_e)))"""
@@ -46,13 +47,13 @@ class MuScaRi(nn.Module):
 
     def _predict_b_c_d_e(self, x):
         x = self.ffnn(x)
-        b = x[:, 0:1]
+        b = F.softplus(x[:, 0:1]) + self._PARAMETER_EPS
         raw_c = x[:, 1:2]
         if self.asymptote_transform == "exp":
-            c = torch.exp(torch.clamp(raw_c, min=-20, max=20))
+            c = torch.exp(torch.clamp(raw_c, min=-20, max=20)) + self._PARAMETER_EPS
         else:
-            c = raw_c
-        d = c - F.softplus(x[:, 2:3])  # ensure d < c
+            c = F.softplus(raw_c) + self._PARAMETER_EPS
+        d = c * torch.sigmoid(x[:, 2:3])  # ensure 0 < d < c
         log_e = x[:, 3:4]
         return b, c, d, log_e
 
@@ -107,7 +108,7 @@ class MuScaRi(nn.Module):
             asymptote_transform=getattr(
                 config,
                 "muscari_asymptote_transform",
-                checkpoint.get("asymptote_transform", "identity"),
+                checkpoint.get("asymptote_transform", "softplus"),
             ),
         )
         model.load_state_dict(checkpoint["model_state_dict"])

@@ -128,18 +128,16 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
                 X = features.iloc[i:i+current_batch_size,:]
                 if X.empty:
                     continue
-                SRs = [m.predict_sr_tot(X) for m in model.models]
-                SR_list.append(np.concatenate(SRs, axis=1))
+                SR_list.append(model.predict_members_sr_tot(X).T)
         SR01_list.append(np.concatenate(SR_list, axis=0))
 
 
-    mean_SR = np.median(SR01_list[0], axis=1)
-    # mean_SR = SR01_list[0][:, 2]
-    std_SR = np.std(SR01_list[0], axis=1)
+    mean_SR = model.aggregate_member_predictions(SR01_list[0].T)
+    std_SR = model.get_member_prediction_dispersion(SR01_list[0].T)
         
     dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
-    mean_dSR_dlogA = np.nanmean(dSR_dlogA, axis=1)
-    std_dSR_dlogA = np.std(dSR_dlogA, axis=1)
+    mean_dSR_dlogA = model.aggregate_member_predictions(dSR_dlogA.T)
+    std_dSR_dlogA = model.get_member_prediction_dispersion(dSR_dlogA.T)
     return features0_df, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
 
 

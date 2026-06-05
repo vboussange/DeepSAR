@@ -41,6 +41,7 @@ large frameworks, hidden configuration layers, or clever abstractions.
 
 - Make minimal, local changes. Do not introduce a complex CLI, global experiment
   framework, or broad refactor unless the user explicitly asks for it.
+- Apply the YAGNI principle
 - Prefer small scripts copied or adapted from existing scripts over generic
   runners.
 - Keep in-place hyperparameters visible near the top of each experiment script.
@@ -108,3 +109,5 @@ Before starting and after finishing any substantial task, update
 - wandb group/run links when used,
 - key finding, outcome, failure reason if any,
 - next actions.
+
+Substantial tasks consist in large code modification, breaking changes, large experiments, etc...

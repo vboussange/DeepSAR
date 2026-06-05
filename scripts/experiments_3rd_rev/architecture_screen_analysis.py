@@ -13,11 +13,16 @@ SBCV_DATASET_ID = "ceacce0"
 RESULTS_DIR = ROOT / "scripts/results/architecture_screen" / SBCV_DATASET_ID
 RESULTS_PATH = RESULTS_DIR / f"architecture_screen_results_{SBCV_DATASET_ID}.csv"
 
-VARIANT_ORDER = ["current_abs", "exp_abs", "current_rel", "exp_rel"]
+VARIANT_ORDER = [
+    "softplus_abs",
+    "exp_abs",
+    "softplus_rel",
+    "exp_rel",
+]
 LABEL_MAP = {
-    "current_abs": "Current + absolute effort",
+    "softplus_abs": "Softplus asymptote + absolute effort",
     "exp_abs": "Exp asymptote + absolute effort",
-    "current_rel": "Current + relative effort",
+    "softplus_rel": "Softplus asymptote + relative effort",
     "exp_rel": "Exp asymptote + relative effort",
 }
 EFFORT_LABELS = {
@@ -25,7 +30,7 @@ EFFORT_LABELS = {
     "relative": "Relative",
 }
 ASYMPTOTE_LABELS = {
-    "identity": "Identity",
+    "softplus": "Softplus",
     "exp": "Exponential",
 }
 METRICS = ["rmse", "mape", "median_relative_bias", "r2", "d2", "bias_slope_log_area"]
@@ -36,9 +41,9 @@ PLOT_METRICS = [
     ("extrap_bias_slope_log_area", "GIFT residual-bias slope", True),
 ]
 COLORS = {
-    "current_abs": "#1f77b4",
+    "softplus_abs": "#1f77b4",
     "exp_abs": "#ff7f0e",
-    "current_rel": "#2a9d8f",
+    "softplus_rel": "#2a9d8f",
     "exp_rel": "#e76f51",
 }
 
