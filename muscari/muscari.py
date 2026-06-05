@@ -24,9 +24,9 @@ class MuScaRi(nn.Module):
         asymptote_transform: str = "softplus",
     ):
         super().__init__()
-        if asymptote_transform not in {"softplus", "exp"}:
+        if asymptote_transform not in {"softplus", "exp", "identity"}:
             raise ValueError(
-                "asymptote_transform must be one of {'softplus', 'exp'}"
+                "asymptote_transform must be one of {'softplus', 'exp', 'identity'}"
             )
         self.layer_sizes = list(layer_sizes)
         self.feature_names = list(feature_names)
@@ -54,8 +54,10 @@ class MuScaRi(nn.Module):
         raw_c = x[:, 1:2]
         if self.asymptote_transform == "exp":
             c = torch.exp(torch.clamp(raw_c, min=-20, max=20)) + self._PARAMETER_EPS
-        else:
+        elif self.asymptote_transform == "softplus":
             c = F.softplus(raw_c) + self._PARAMETER_EPS
+        else:  # identity
+            c = raw_c
         d = c * torch.sigmoid(x[:, 2:3])  # ensure 0 < d < c
         log_e = x[:, 3:4]
         return b, c, d, log_e

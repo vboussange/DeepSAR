@@ -42,9 +42,9 @@ BIOCLIMATE_VARS = [
             # "bio15",
         ]
 
-SELECTED_ARCHITECTURE_NAME = "softplus_abs"
 EFFORT_TRANSFORM = "absolute"
-ASYMPTOTE_TRANSFORM = "softplus"
+ASYMPTOTE_TRANSFORM = "identity"
+SELECTED_ARCHITECTURE_NAME = f"{ASYMPTOTE_TRANSFORM}_{EFFORT_TRANSFORM}"
 
 USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
