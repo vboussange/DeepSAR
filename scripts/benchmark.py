@@ -66,7 +66,7 @@ logger = setup_logger("benchmark")
 @dataclass
 class MuScaRiInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=128, factor=4))
+    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     asymptote_transform: str = ASYMPTOTE_TRANSFORM
     def __call__(self, **kwargs):
         return MuScaRi(layer_sizes=self.architecture,
@@ -85,7 +85,7 @@ class WrappedFFNNExp(FFNNExp):
 @dataclass
 class FFNNExpInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=64, factor=4))
+    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     batchnorm: bool = True
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)

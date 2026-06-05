@@ -13,11 +13,11 @@ class TrainConfig:
     seed: int = 1
     batch_size: int = 1024
     num_workers: int = 0
-    n_epochs: int = 100
+    n_epochs: int = 500
     lr: float = 1e-3
     weight_decay: float = 1e-4
     lr_scheduler_factor: float = 0.5
-    lr_scheduler_patience: int = 5
+    lr_scheduler_patience: int = 10
     climate_variables: list = field(default_factory=lambda: [])
     run_folder: Path = None
     path_sbcv_data: Path = None

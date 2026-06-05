@@ -11,6 +11,7 @@ import pytorch_lightning as pl
 import geopandas as gpd
 from pathlib import Path
 
+from muscari.muscari_ensemble import MuScaRiEnsemble
 from muscari.muscari import MuScaRi
 from muscari.trainer import MuScaRiLitModule, TrainConfig
 from muscari.dataset import create_dataloader
@@ -29,7 +30,8 @@ from muscari.utils import (
 )
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
-RUN_FOLDER = Path(__file__).parent / f"results/train/{SBCV_SAMPLES_PATH.name}"
+RUN_ID = get_git_hash(short=True)
+RUN_FOLDER = Path(__file__).parent / f"results/train/{RUN_ID}"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
@@ -44,10 +46,10 @@ SELECTED_ARCHITECTURE_NAME = "softplus_abs"
 EFFORT_TRANSFORM = "absolute"
 ASYMPTOTE_TRANSFORM = "softplus"
 
-USE_WANDB = False
+USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
-WANDB_GROUP = f"train_{SBCV_SAMPLES_PATH.name}"
-WANDB_TAGS = ["train", "third-revision", SBCV_SAMPLES_PATH.name]
+WANDB_GROUP = f"train_{RUN_ID}"
+WANDB_TAGS = ["train", "third-revision", RUN_ID]
 
 SMOKE_TEST = os.environ.get("MUSCARI_SMOKE_TEST", "0") == "1"
 FOLD_IDS = [0] if SMOKE_TEST else list(range(5))
@@ -98,6 +100,7 @@ def training_config_payload(config, feature_names, fold_summaries):
             "smoke_test": SMOKE_TEST,
             "run_folder": config.run_folder,
             "checkpoint_pattern": str(config.run_folder / "fold_<fold_id>.pth"),
+            "ensemble_pretrained_path": str(config.run_folder / "ensemble_pretrained"),
         },
         "dataset": {
             "sbcv_dataset_id": config.path_sbcv_data.name,
@@ -171,6 +174,15 @@ def make_wandb_logger(fold_id, feature_names, config):
             "run_folder": str(config.run_folder),
         },
     )
+
+
+def save_ensemble_pretrained(run_folder: Path):
+    ensemble_path = run_folder / "ensemble_pretrained"
+    logger.info(f"Building ensemble from checkpoints in {run_folder}")
+    ensemble = MuScaRiEnsemble.from_folds(run_folder, device="cpu")
+    logger.info(f"Saving ensemble pretrained model to {ensemble_path}")
+    ensemble.save_pretrained(ensemble_path)
+    return ensemble_path
 
 
 def train_fold(config: TrainConfig, fold_id, feature_names):
@@ -294,7 +306,7 @@ if __name__ == "__main__":
                          muscari_batchnorm=False,
                          muscari_asymptote_transform=ASYMPTOTE_TRANSFORM,
                          effort_transform=EFFORT_TRANSFORM,
-                         layer_sizes=symmetric_arch(6, base=128, factor=4),
+                         layer_sizes=symmetric_arch(6, base=32, factor=4),
                          run_folder=RUN_FOLDER)
     
     sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
@@ -310,3 +322,6 @@ if __name__ == "__main__":
         if fold_summary is not None:
             fold_summaries.append(fold_summary)
             write_training_config(config, feature_names, fold_summaries)
+
+    if fold_summaries:
+        save_ensemble_pretrained(config.run_folder)

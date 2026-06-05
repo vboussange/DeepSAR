@@ -10,56 +10,7 @@ from torch import nn
 from huggingface_hub import PyTorchModelHubMixin
 
 from muscari.muscari import MuScaRi
-
-
-# ---------------------------------------------------------------------------
-# Scaler helpers
-# ---------------------------------------------------------------------------
-
-def _scaler_to_dict(scaler) -> dict:
-    """Serialize a fitted sklearn scaler to a JSON-compatible dict."""
-    cls_name = type(scaler).__name__
-    d = {"cls": cls_name, "n_features_in_": int(scaler.n_features_in_)}
-    if cls_name == "MinMaxScaler":
-        d["min_"] = scaler.min_.tolist()
-        d["scale_"] = scaler.scale_.tolist()
-        d["data_min_"] = scaler.data_min_.tolist()
-        d["data_max_"] = scaler.data_max_.tolist()
-        d["data_range_"] = scaler.data_range_.tolist()
-    elif cls_name == "MaxAbsScaler":
-        d["scale_"] = scaler.scale_.tolist()
-        d["max_abs_"] = scaler.max_abs_.tolist()
-    elif cls_name == "StandardScaler":
-        d["mean_"] = scaler.mean_.tolist()
-        d["scale_"] = scaler.scale_.tolist()
-    else:
-        raise TypeError(f"Unsupported scaler type: {cls_name}")
-    return d
-
-
-def _dict_to_scaler(d: dict):
-    """Reconstruct a scaler from a serialized dict."""
-    from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, StandardScaler
-    cls_name = d["cls"]
-    if cls_name == "MinMaxScaler":
-        scaler = MinMaxScaler()
-        scaler.min_ = np.array(d["min_"])
-        scaler.scale_ = np.array(d["scale_"])
-        scaler.data_min_ = np.array(d["data_min_"])
-        scaler.data_max_ = np.array(d["data_max_"])
-        scaler.data_range_ = np.array(d["data_range_"])
-    elif cls_name == "MaxAbsScaler":
-        scaler = MaxAbsScaler()
-        scaler.scale_ = np.array(d["scale_"])
-        scaler.max_abs_ = np.array(d["max_abs_"])
-    elif cls_name == "StandardScaler":
-        scaler = StandardScaler()
-        scaler.mean_ = np.array(d["mean_"])
-        scaler.scale_ = np.array(d["scale_"])
-    else:
-        raise TypeError(f"Unsupported scaler type: {cls_name}")
-    scaler.n_features_in_ = d["n_features_in_"]
-    return scaler
+from muscari.scaler_serialization import dict_to_scaler, scaler_to_dict
 
 
 def _normalize_weights(weights: Optional[list], n_models: int) -> list[float]:
@@ -151,11 +102,11 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
 
         # Convert dicts → sklearn scalers for the sub-models
         _fscalers = (
-            [_dict_to_scaler(d) if d is not None else None for d in feature_scalers]
+            [dict_to_scaler(d) if d is not None else None for d in feature_scalers]
             if feature_scalers else [None] * n_models
         )
         _tscalers = (
-            [_dict_to_scaler(d) if d is not None else None for d in target_scalers]
+            [dict_to_scaler(d) if d is not None else None for d in target_scalers]
             if target_scalers else [None] * n_models
         )
         self.models = nn.ModuleList([
@@ -192,7 +143,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         layer_sizes = [block.linear.out_features for block in m0.ffnn.fully_connected_layers]
 
         def _to_dict(scaler):
-            return _scaler_to_dict(scaler) if scaler is not None else None
+            return scaler_to_dict(scaler) if scaler is not None else None
 
         feature_scalers = [_to_dict(m.feature_scaler) for m in models]
         target_scalers  = [_to_dict(m.target_scaler)  for m in models]

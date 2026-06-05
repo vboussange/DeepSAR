@@ -1,6 +1,72 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "ensemble_pretrained_export"
+    important_params:
+      task: "remove single-model mixin export and save one ensemble pretrained artifact after training"
+      status: "completed"
+      started: "2026-06-05T10:34:00Z"
+      completed_on: "2026-06-05T10:38:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/train.py"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/muscari_ensemble.py scripts/train.py"
+        - "uv run python - <<'PY' ... synthetic fold checkpoints -> MuScaRiEnsemble.from_folds -> save_pretrained/from_pretrained smoke check"
+        - "git diff --check"
+    key_finding: "The pretrained export should belong to the trained ensemble rather than individual MuScaRi fold models, so the fold loop should only write raw checkpoints and the final export should happen once all folds are available."
+    outcome: "MuScaRi no longer inherits PyTorchModelHubMixin; scripts/train.py now writes fold checkpoints during training and then saves a single `ensemble_pretrained` artifact via MuScaRiEnsemble.save_pretrained after training completes."
+    next_actions:
+      - "Rerun training to materialize the ensemble_pretrained directory in the current run folder."
+  - name: "mixin_pretrained_export_revision"
+    important_params:
+      task: "revise pretrained export to use PyTorchModelHubMixin and commit-scoped run directories"
+      status: "completed"
+      started: "2026-06-05T10:15:00Z"
+      completed_on: "2026-06-05T10:21:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "muscari/muscari_ensemble.py"
+        - "muscari/scaler_serialization.py"
+        - "scripts/train.py"
+        - "scripts/data_processing/push_to_hub.py"
+      checks:
+        - "uv run python -m py_compile muscari/scaler_serialization.py muscari/muscari.py muscari/muscari_ensemble.py scripts/train.py scripts/data_processing/push_to_hub.py"
+        - "uv run python - <<'PY' ... MuScaRi save_pretrained/from_pretrained round-trip smoke check via PyTorchModelHubMixin"
+        - "git diff --check"
+    key_finding: "The correct clean integration point is to let MuScaRi inherit PyTorchModelHubMixin and make scaler state JSON-serializable in config.json, rather than maintaining a separate local pretrained format."
+    outcome: "MuScaRi now uses the mixin-provided save_pretrained/from_pretrained path with shared scaler serialization helpers, and train outputs are written under results/train/<dataset_id>/<git_hash>."
+    next_actions:
+      - "Rerun training to materialize mixin-based pretrained directories in the new commit-scoped run folder."
+  - name: "save_pretrained_export"
+    important_params:
+      task: "export additional per-fold pretrained artifacts from scripts/train.py"
+      status: "completed"
+      started: "2026-06-05T10:05:00Z"
+      completed_on: "2026-06-05T10:09:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/train.py"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py scripts/train.py"
+        - "uv run python - <<'PY' ... direct save_pretrained/from_pretrained round-trip smoke check"
+        - "git diff --check"
+    key_finding: "The training script only emitted raw .pth checkpoints, so downstream code had no directory-form pretrained bundle that could be loaded with a model-level from_pretrained API."
+    outcome: "MuScaRi now implements save_pretrained/from_pretrained using a config.json + pytorch_model.bin + preprocessors.pkl bundle, and scripts/train.py writes one fold_<id>_pretrained artifact next to each existing checkpoint."
+    next_actions:
+      - "Rerun training to materialize pretrained bundles for the current run directory."
   - name: "ensemble_config_and_sbcv_metadata"
     important_params:
       task: "add unweighted ensemble option, export train config metadata, and record SBCV block size for future datasets"

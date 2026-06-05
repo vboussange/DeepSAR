@@ -3,7 +3,9 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import pandas as pd
+
 from muscari.ffnn import FFNN
+from muscari.scaler_serialization import decode_scaler
 
 
 class MuScaRi(nn.Module):
@@ -14,26 +16,27 @@ class MuScaRi(nn.Module):
 
     def __init__(
         self,
-        layer_sizes,
-        feature_names,
+        layer_sizes: list,
+        feature_names: list,
         feature_scaler=None,
         target_scaler=None,
-        ffnn_batchnorm=False,
-        asymptote_transform="softplus",
+        ffnn_batchnorm: bool = False,
+        asymptote_transform: str = "softplus",
     ):
         super().__init__()
         if asymptote_transform not in {"softplus", "exp"}:
             raise ValueError(
                 "asymptote_transform must be one of {'softplus', 'exp'}"
             )
-        self.feature_names = feature_names
-        self.feature_scaler = feature_scaler
-        self.target_scaler = target_scaler
+        self.layer_sizes = list(layer_sizes)
+        self.feature_names = list(feature_names)
+        self.feature_scaler = decode_scaler(feature_scaler)
+        self.target_scaler = decode_scaler(target_scaler)
         self.ffnn_batchnorm = ffnn_batchnorm
         self.asymptote_transform = asymptote_transform
         self.ffnn = FFNN(
-            input_dim=len(feature_names),
-            layer_sizes=layer_sizes,
+            input_dim=len(self.feature_names),
+            layer_sizes=self.layer_sizes,
             output_dim=4,
             batchnorm=ffnn_batchnorm,
         )
