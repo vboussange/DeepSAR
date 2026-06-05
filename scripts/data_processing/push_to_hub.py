@@ -35,8 +35,8 @@ if __name__ == "__main__":
     print("=" * 60)
     if not EXPORT_DIR.exists():
         raise FileNotFoundError(
-            f"Missing exported model at {EXPORT_DIR}. Run the unified Trainer with "
-            "export_pretrained=True before pushing."
+            f"Missing exported model at {EXPORT_DIR}. Run scripts/project.py for "
+            "the target run directory before pushing."
         )
     ensemble = MuScaRiEnsemble.from_pretrained(EXPORT_DIR)
     print(f"Pushing ensemble ({ensemble.n_models} models) to {MODEL_REPO} …")

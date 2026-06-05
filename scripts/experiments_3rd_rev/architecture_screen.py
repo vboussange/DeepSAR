@@ -216,7 +216,6 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         },
         save_checkpoints=False,
         write_summary=False,
-        export_pretrained=False,
         fold_ids=FOLD_IDS,
     )
 

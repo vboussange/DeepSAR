@@ -28,7 +28,7 @@ from muscari.data_processing.spatial_folds import assign_checkerboard_folds
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
 from muscari.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
-from muscari.utils import get_git_hash
+from muscari.utils import get_git_hash, json_ready
 
 # Initialize logging
 logging.basicConfig(
@@ -67,19 +67,6 @@ CONFIG = {
     "block_size": 500_000, # Block size in meters (e.g., 20km x 20km)
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
-
-
-def json_ready(value):
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        return {str(k): json_ready(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [json_ready(v) for v in value]
-    if hasattr(value, "item"):
-        return value.item()
-    return value
-
 
 def write_dataset_metadata(output_path: Path, dataset_id: str, df: gpd.GeoDataFrame) -> None:
     spatial_split_counts = (

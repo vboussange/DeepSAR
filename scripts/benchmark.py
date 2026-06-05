@@ -52,13 +52,13 @@ INCLUDE_LANDCOVER_EXPERIMENTS = False
 
 # TODO(agent): update these constants once the full architecture screen selects
 # the final architecture.
-SELECTED_ARCHITECTURE_NAME = "stable"
+SELECTED_ARCHITECTURE_NAME = "stable_maxabs_softplus"
 EFFORT_TRANSFORM = "absolute"
 ASYMPTOTE_TRANSFORM = "softplus"
 WEIBULL_PARAMETERIZATION = "stable"
 TARGET_TRANSFORM = "maxabs"
 
-USE_WANDB = False
+USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
 WANDB_TAGS = ["benchmark", "third-revision"]
 
@@ -252,9 +252,11 @@ def build_experiments(climate_dem_feats, landcover_feats, all_env_feats):
 if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path("results", "benchmark")
     root_folder.mkdir(parents=True, exist_ok=True)
+    artifact_root = root_folder / "artifacts"
 
     dataset_id = SBCV_ID
     config = TrainConfig(
+        run_root=artifact_root,
         path_gift_data=GIFT_SAMPLES_PATH,
         path_sbcv_data=SBCV_SAMPLES_PATH,
         n_epochs=N_EPOCHS,
@@ -268,9 +270,9 @@ if __name__ == "__main__":
         architecture_variant=SELECTED_ARCHITECTURE_NAME,
         muscari_asymptote_transform=ASYMPTOTE_TRANSFORM,
         muscari_weibull_parameterization=WEIBULL_PARAMETERIZATION,
-        save_checkpoints=False,
-        write_summary=False,
-        export_pretrained=False,
+        save_checkpoints=True,
+        write_summary=True,
+        overwrite=SMOKE_TEST,
         metadata={
             "script": str(Path(__file__)),
             "dataset_id": dataset_id,
@@ -297,6 +299,7 @@ if __name__ == "__main__":
     for exp in experiments:
         logger.info("Running experiment: %s", exp["name"])
         model_family = "FFNN" if exp["name"].startswith("FFNN") else "MuScaRi"
+        config.run_root = artifact_root / exp["name"]
         results.append(
             trainer.run(
                 exp["name"],

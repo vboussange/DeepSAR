@@ -5,7 +5,7 @@ import json
 import logging
 import socket
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,13 +21,13 @@ from pytorch_lightning.callbacks import EarlyStopping
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from muscari.dataset import create_dataloader
-from muscari.muscari_ensemble import MuScaRiEnsemble
 from muscari.utils import (
     add_effort_columns,
     compute_metrics,
     evaluate_lit_model,
     finish_wandb,
     get_git_hash,
+    json_ready,
     log_wandb_metrics,
     maybe_wandb_logger,
     residual_bias_slope,
@@ -46,33 +46,8 @@ def _discover_devices() -> list[str]:
     return ["cpu"]
 
 
-def _json_ready(value: Any) -> Any:
-    if isinstance(value, Path):
-        return str(value)
-    if is_dataclass(value):
-        return _json_ready(asdict(value))
-    if isinstance(value, dict):
-        return {str(key): _json_ready(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_ready(item) for item in value]
-    if isinstance(value, np.ndarray):
-        return value.tolist()
-    if isinstance(value, np.generic):
-        return value.item()
-    if hasattr(value, "item"):
-        try:
-            return value.item()
-        except (TypeError, ValueError):
-            pass
-    try:
-        json.dumps(value)
-        return value
-    except TypeError:
-        return repr(value)
-
-
 def _config_hash(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(_json_ready(payload), sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(json_ready(payload), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
@@ -123,7 +98,6 @@ class TrainConfig:
     wandb_config: dict[str, Any] = field(default_factory=dict)
     save_checkpoints: bool = False
     write_summary: bool = False
-    export_pretrained: bool = False
     use_validation_weights: bool = True
     overwrite: bool = False
     model_family: str = "MuScaRi"
@@ -195,6 +169,7 @@ class Trainer:
         self.sbcv_path = config.path_sbcv_data
         self.gift_path = config.path_gift_data
         self.gift_df = self._load_gift()
+        self._configured_run_folder = config.run_folder
 
     def _load_gift(self):
         if self.gift_path is None:
@@ -291,15 +266,16 @@ class Trainer:
         return (
             self.config.save_checkpoints
             or self.config.write_summary
-            or self.config.export_pretrained
         )
 
     def _resolve_run_folder(self, config_hash: str) -> Path | None:
         if not self._artifact_enabled():
             return None
-        if self.config.run_folder is None:
+        if self._configured_run_folder is None:
             run_root = self.config.run_root or Path("scripts/results/train")
             self.config.run_folder = Path(run_root) / config_hash
+        else:
+            self.config.run_folder = self._configured_run_folder
         self.config.run_folder = Path(self.config.run_folder)
         self.config.run_folder.mkdir(parents=True, exist_ok=True)
         return self.config.run_folder
@@ -312,8 +288,6 @@ class Trainer:
             blockers.extend(run_folder.glob("fold_*.pth"))
         if self.config.write_summary and (run_folder / "config.json").exists():
             blockers.append(run_folder / "config.json")
-        if self.config.export_pretrained and (run_folder / "ensemble_pretrained").exists():
-            blockers.append(run_folder / "ensemble_pretrained")
         if blockers:
             listed = ", ".join(str(path) for path in blockers[:5])
             raise FileExistsError(
@@ -348,7 +322,6 @@ class Trainer:
         self,
         run_context: dict[str, Any],
         fold_summaries: list[dict[str, Any]],
-        export_info: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         run_folder = self.config.run_folder
         payload = {
@@ -360,9 +333,6 @@ class Trainer:
                 "run_folder": run_folder,
                 "checkpoint_pattern": (
                     run_folder / "fold_<fold_id>.pth" if run_folder else None
-                ),
-                "ensemble_pretrained_path": (
-                    run_folder / "ensemble_pretrained" if run_folder else None
                 ),
                 "metadata": self.config.metadata,
             },
@@ -409,22 +379,19 @@ class Trainer:
             },
             "fold_summaries": fold_summaries,
         }
-        if export_info is not None:
-            payload["pretrained_export"] = export_info
-        return _json_ready(payload)
+        return json_ready(payload)
 
     def _write_summary(
         self,
         run_context: dict[str, Any],
         fold_summaries: list[dict[str, Any]],
-        export_info: dict[str, Any] | None = None,
     ):
         if not self.config.write_summary or self.config.run_folder is None:
             return
         summary_path = self.config.run_folder / "config.json"
         with open(summary_path, "w") as handle:
             json.dump(
-                self._summary_payload(run_context, fold_summaries, export_info),
+                self._summary_payload(run_context, fold_summaries),
                 handle,
                 indent=2,
             )
@@ -774,7 +741,7 @@ class Trainer:
             }
             fold_summary = {
                 "fold": fold_id,
-                "split_paths": _json_ready(split_paths),
+                "split_paths": json_ready(split_paths),
                 "rows": {
                     "raw": raw_rows,
                     "after_train_frac": sampled_rows,
@@ -803,72 +770,10 @@ class Trainer:
                 log_wandb_metrics(wandb_logger, result_row)
                 finish_wandb(wandb_logger)
             logger.info("Completed fold %s on device %s", fold_id, device)
-            return {"row": result_row, "fold_summary": _json_ready(fold_summary)}
+            return {"row": result_row, "fold_summary": json_ready(fold_summary)}
         except Exception as exc:
             logger.error("Error processing fold %s on device %s: %s", fold_id, device, exc)
             return None
-
-    def export_ensemble_pretrained(
-        self,
-        run_folder: Path | None = None,
-        export_dir: Path | None = None,
-        run_context: dict[str, Any] | None = None,
-        fold_summaries: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        run_folder = Path(run_folder or self.config.run_folder)
-        export_dir = Path(export_dir or run_folder / "ensemble_pretrained")
-        if export_dir.exists() and any(export_dir.iterdir()) and not self.config.overwrite:
-            raise FileExistsError(
-                f"Export directory already exists: {export_dir}. Set overwrite=True to replace it."
-            )
-        export_dir.mkdir(parents=True, exist_ok=True)
-        ensemble = MuScaRiEnsemble.from_folds(
-            run_folder,
-            device="cpu",
-            use_validation_weights=self.config.use_validation_weights,
-        )
-        try:
-            ensemble.save_pretrained(export_dir, safe_serialization=True)
-        except TypeError:
-            ensemble.save_pretrained(export_dir)
-
-        safe_files = sorted(export_dir.glob("*.safetensors"))
-        if not safe_files:
-            from safetensors.torch import save_file
-
-            safe_path = export_dir / "model.safetensors"
-            safe_state_dict = {
-                key: value.detach().cpu().contiguous()
-                for key, value in ensemble.state_dict().items()
-            }
-            save_file(safe_state_dict, safe_path)
-            safe_files = [safe_path]
-
-        export_files = sorted(path.name for path in export_dir.iterdir())
-        export_info = {
-            "export_dir": export_dir,
-            "run_folder": run_folder,
-            "config_hash": self.config.config_hash,
-            "safe_tensor_files": [path.name for path in safe_files],
-            "export_files": export_files,
-            "n_models": ensemble.n_models,
-            "ensemble_weights": ensemble.ensemble_weights,
-            "use_validation_weights": self.config.use_validation_weights,
-        }
-        metadata_path = export_dir / "metadata.json"
-        metadata = {
-            "export": export_info,
-            "summary": self._summary_payload(
-                run_context,
-                fold_summaries or [],
-                export_info,
-            ) if run_context is not None else None,
-        }
-        with open(metadata_path, "w") as handle:
-            json.dump(_json_ready(metadata), handle, indent=2)
-        export_info["metadata_path"] = metadata_path
-        logger.info("Saved ensemble pretrained artifact to %s", export_dir)
-        return _json_ready(export_info)
 
     def run(
         self,
@@ -947,12 +852,5 @@ class Trainer:
                         fold_summaries.append(result["fold_summary"])
                         self._write_summary(run_context, fold_summaries)
 
-        export_info = None
-        if self.config.export_pretrained and rows:
-            export_info = self.export_ensemble_pretrained(
-                run_folder=self.config.run_folder,
-                run_context=run_context,
-                fold_summaries=fold_summaries,
-            )
-        self._write_summary(run_context, fold_summaries, export_info)
+        self._write_summary(run_context, fold_summaries)
         return pd.DataFrame(rows)

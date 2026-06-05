@@ -1,6 +1,77 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "trainer_export_to_project"
+    important_params:
+      task: "remove Trainer export_pretrained option and move ensemble_pretrained export into project.py"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/project.py"
+        - "scripts/benchmark.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/data_processing/push_to_hub.py"
+        - "README.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/benchmark.py scripts/experiments_3rd_rev/architecture_screen.py scripts/project.py scripts/data_processing/push_to_hub.py"
+        - "MUSCARI_PROJECT_SMOKE=1 MUSCARI_PROJECT_RUN_DIR=/tmp/muscari_project_export_smoke.* uv run python scripts/project.py"
+        - "MUSCARI_SMOKE_TEST=1 WANDB_MODE=offline uv run python scripts/benchmark.py"
+        - "grep search found no export_pretrained/export_ensemble_pretrained in live Python or README files"
+    key_finding: "The Trainer export flag duplicated project/publishing concerns and forced benchmark-specific exceptions for non-MuScaRi checkpoints."
+    outcome: "Trainer now only owns fold training, checkpoints, and internal summaries. scripts/project.py creates or refreshes ensemble_pretrained from fold checkpoints, removes generated README.md, writes public-safe metadata, and then loads the exported ensemble for projection."
+  - name: "benchmark_artifact_hash_fix"
+    important_params:
+      task: "fix benchmark artifact collisions across model experiments"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_root: "scripts/results/benchmark/artifacts/<experiment_name>"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/benchmark.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/benchmark.py"
+        - "MUSCARI_SMOKE_TEST=1 WANDB_MODE=offline uv run python scripts/benchmark.py"
+        - "uv run python - <<'PY' ... MuScaRiEnsemble.from_pretrained('scripts/results/benchmark/artifacts/88ff58dbbca2/ensemble_pretrained') returned one model"
+        - "git diff --check"
+    key_finding: "The config hashes differed by experiment, but Trainer._resolve_run_folder cached the first derived hash folder in the shared TrainConfig, so later benchmark experiments collided with the first experiment's artifacts. The smoke run also showed that FFNN checkpoints cannot be exported through MuScaRiEnsemble.from_folds."
+    outcome: "Trainer now recomputes derived artifact folders per run unless an explicit run_folder was provided. Benchmark artifacts are written under scripts/results/benchmark/artifacts/<experiment_name>/<config_hash>, smoke runs can overwrite their own artifacts, and pretrained export is handled by scripts/project.py."
+  - name: "public_export_metadata_scrub"
+    important_params:
+      task: "strip public ensemble_pretrained exports of README and confidential metadata"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_path: "scripts/results/train/53584e40b98a/ensemble_pretrained"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/results/train/53584e40b98a/ensemble_pretrained/metadata.json"
+        - "scripts/results/train/53584e40b98a/ensemble_pretrained/README.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py"
+        - "grep -nE 'home/boussang|hostname|wandb|cuda|mps|cpu|checkpoint|run_folder|export_dir|path_|split_paths|rows|bias_slopes|flat_metrics|run_id|group|devices|README' scripts/results/train/53584e40b98a/ensemble_pretrained/metadata.json || true"
+    key_finding: "PyTorchModelHubMixin creates a README.md by default and the previous metadata.json embedded the full internal training summary, including local paths, hostname, device list, W&B IDs, checkpoint paths, and fold split details."
+    outcome: "Trainer export now deletes README.md and writes a public-only metadata.json containing dataset IDs, model/training/feature metadata, ensemble weights, safe tensor filenames, and per-fold metrics only. The existing 53584e40b98a export was refreshed with the scrubbed metadata."
   - name: "unified_trainer_refactor"
     important_params:
       task: "replace split Benchmarker/train.py paths with a unified Trainer, checkpoint metadata, and ensemble pretrained export"
@@ -41,7 +112,7 @@ completed_experiments:
     key_finding: "Training and benchmarking had diverged: Benchmarker owned parallel fold execution and GIFT/interpolation evaluation, while scripts/train.py owned final checkpoints and ensemble export. The unified Trainer now owns both behaviors and exposes artifact export through config-hash run metadata."
     outcome: "Added muscari.trainer.Trainer with parallel/sequential fold scheduling, train/val/test/GIFT metrics, checkpoint summaries, config-hash metadata, and ensemble_pretrained safetensors export. Architecture and benchmark scripts now use Trainer; project.py and push_to_hub.py load existing exported artifacts; scripts/train.py and muscari/benchmarker.py were removed."
     next_actions:
-      - "Run the full final training with export_pretrained=True for the selected config, then point scripts/project.py at that config-hash run directory."
+      - "Run the full final training for the selected config, then point scripts/project.py at that config-hash run directory to build ensemble_pretrained and projections."
   - name: "train_script_feature_config_alignment"
     important_params:
       task: "align scripts/train.py with the feature-config abstraction and current MuScaRi training hooks"

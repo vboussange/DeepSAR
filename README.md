@@ -118,7 +118,7 @@ env_ds, lc_ds = EnvironmentalFeatureDataset.from_source()
 To retrain the `MuScaRi` models, follow these steps:
 
 1. Compile training and test samples with `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`.
-2. Train fold models with `muscari.trainer.Trainer`, using `export_pretrained=True` to save the ensemble artifact under `ensemble_pretrained/`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
+2. Train fold models with `muscari.trainer.Trainer`; checkpoints and the internal training summary are written under the config-hash run directory. Run `scripts/project.py` for that run directory to build the public `ensemble_pretrained/` artifact and generate projections. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
 
 ## Citations
 

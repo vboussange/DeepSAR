@@ -1,6 +1,6 @@
 """
 Projecting spatially the predictions of the ensembled `MuScaRi` model, and saving to geotiff files.
-The ensemble must already be exported by `muscari.trainer.Trainer`.
+The script exports an `ensemble_pretrained` artifact from fold checkpoints if needed.
 """
 import json
 import os
@@ -9,11 +9,12 @@ import numpy as np
 import xarray as xr
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Any
 
 from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.plotting import CMAP_BR
-from muscari.utils import get_git_hash
+from muscari.utils import get_git_hash, json_ready
 import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
@@ -29,6 +30,151 @@ PROJECTION_PATH = Path(__file__).parents[1] / "data/processed/projections" / MOD
 RESOLUTIONS_M = [r * 1e3 for r in [2, 2**3, 2**6, 2**7]]
 PLOTTING = True
 SMOKE_TEST = os.environ.get("MUSCARI_PROJECT_SMOKE", "0") == "1"
+EXPORT_OVERWRITE = os.environ.get("MUSCARI_PROJECT_EXPORT_OVERWRITE", "0") == "1"
+
+
+def load_training_summary(run_dir: Path) -> dict[str, Any]:
+    summary_path = run_dir / "config.json"
+    if not summary_path.exists():
+        return {}
+    with open(summary_path) as handle:
+        return json.load(handle)
+
+
+def public_export_metadata(
+    run_dir: Path,
+    export_dir: Path,
+    ensemble: MuScaRiEnsemble,
+    safe_files: list[Path],
+    summary: dict[str, Any],
+) -> dict[str, Any]:
+    training = summary.get("training", {})
+    features = summary.get("features_and_labels", {})
+    dataset = summary.get("dataset", {})
+    model = summary.get("model") or {
+        "model_family": "MuScaRi",
+        "layer_sizes": ensemble.layer_sizes,
+        "batchnorm": ensemble.muscari_batchnorm,
+        "asymptote_transform": ensemble.asymptote_transform,
+        "weibull_parameterization": ensemble.weibull_parameterization,
+    }
+    export_info = {
+        "config_hash": summary.get("run", {}).get("config_hash", run_dir.name),
+        "safe_tensor_files": [path.name for path in safe_files],
+        "export_files": sorted(
+            [path.name for path in export_dir.iterdir() if path.name != "metadata.json"]
+            + ["metadata.json"]
+        ),
+        "n_models": ensemble.n_models,
+        "ensemble_weights": ensemble.ensemble_weights,
+        "use_validation_weights": training.get("use_validation_weights", True),
+    }
+    return {
+        "export": export_info,
+        "dataset": {
+            "sbcv_dataset_id": dataset.get("sbcv_dataset_id"),
+            "gift_dataset_id": dataset.get("gift_dataset_id"),
+        },
+        "model": model,
+        "training": {
+            "seed": training.get("seed"),
+            "fold_ids": training.get("fold_ids"),
+            "n_epochs": training.get("n_epochs"),
+            "batch_size": training.get("batch_size"),
+            "num_workers": training.get("num_workers"),
+            "learning_rate": training.get("learning_rate"),
+            "weight_decay": training.get("weight_decay"),
+            "lr_scheduler_factor": training.get("lr_scheduler_factor"),
+            "lr_scheduler_patience": training.get("lr_scheduler_patience"),
+            "train_frac": training.get("train_frac"),
+            "loss": training.get("loss"),
+            "effort_transform": model.get("effort_transform"),
+            "target_transform": training.get("target_transform") or model.get("target_transform"),
+            "use_validation_weights": training.get("use_validation_weights", True),
+        },
+        "features_and_labels": {
+            "feature_set": features.get("feature_set"),
+            "feature_config": features.get("feature_config"),
+            "feature_columns": features.get("feature_columns", ensemble.feature_names),
+            "model_input_columns": features.get(
+                "model_input_columns",
+                ["log_observed_area"] + list(ensemble.feature_names),
+            ),
+            "target_column": features.get("target_column", "sr"),
+            "derived_effort_column": features.get("derived_effort_column", "log_observed_area"),
+        },
+        "fold_summaries": [
+            {"metrics": fold_summary.get("metrics", {})}
+            for fold_summary in summary.get("fold_summaries", [])
+        ],
+    }
+
+
+def save_public_export_metadata(
+    run_dir: Path,
+    export_dir: Path,
+    ensemble: MuScaRiEnsemble,
+    safe_files: list[Path],
+    summary: dict[str, Any] | None = None,
+):
+    summary = summary or load_training_summary(run_dir)
+    metadata_path = export_dir / "metadata.json"
+    metadata = public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
+    with open(metadata_path, "w") as handle:
+        json.dump(json_ready(metadata), handle, indent=2)
+
+
+def ensure_safe_tensors(ensemble: MuScaRiEnsemble, export_dir: Path) -> list[Path]:
+    safe_files = sorted(export_dir.glob("*.safetensors"))
+    if safe_files:
+        return safe_files
+
+    from safetensors.torch import save_file
+
+    safe_path = export_dir / "model.safetensors"
+    safe_state_dict = {
+        key: value.detach().cpu().contiguous()
+        for key, value in ensemble.state_dict().items()
+    }
+    save_file(safe_state_dict, safe_path)
+    return [safe_path]
+
+
+def ensure_model_artifact(
+    run_dir: Path,
+    export_dir: Path,
+    overwrite: bool = False,
+) -> Path:
+    summary = load_training_summary(run_dir)
+    if export_dir.exists() and any(export_dir.iterdir()) and not overwrite:
+        readme_path = export_dir / "README.md"
+        if readme_path.exists():
+            readme_path.unlink()
+        ensemble = MuScaRiEnsemble.from_pretrained(export_dir)
+        safe_files = ensure_safe_tensors(ensemble, export_dir)
+        save_public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
+        return export_dir
+
+    export_dir.mkdir(parents=True, exist_ok=True)
+    use_validation_weights = summary.get("training", {}).get("use_validation_weights", True)
+    ensemble = MuScaRiEnsemble.from_folds(
+        run_dir,
+        device="cpu",
+        use_validation_weights=use_validation_weights,
+    )
+    try:
+        ensemble.save_pretrained(export_dir, safe_serialization=True)
+    except TypeError:
+        ensemble.save_pretrained(export_dir)
+
+    readme_path = export_dir / "README.md"
+    if readme_path.exists():
+        readme_path.unlink()
+
+    safe_files = ensure_safe_tensors(ensemble, export_dir)
+    save_public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
+    return export_dir
+
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -135,12 +281,8 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     return env_ds, lc_ds
 
 
-def load_exported_model(export_dir: Path, device: str) -> MuScaRiEnsemble:
-    if not export_dir.exists():
-        raise FileNotFoundError(
-            f"Missing exported model at {export_dir}. Run the unified Trainer with "
-            "export_pretrained=True before projecting."
-        )
+def load_exported_model(run_dir: Path, export_dir: Path, device: str) -> MuScaRiEnsemble:
+    ensure_model_artifact(run_dir, export_dir, overwrite=EXPORT_OVERWRITE)
     model = MuScaRiEnsemble.from_pretrained(export_dir)
     return model.to(device).eval()
 
@@ -161,7 +303,7 @@ def write_projection_metadata(projection_path: Path, device: str):
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = load_exported_model(EXPORT_DIR, device)
+    model = load_exported_model(RUN_DIR, EXPORT_DIR, device)
     PROJECTION_PATH.mkdir(parents=True, exist_ok=True)
     write_projection_metadata(PROJECTION_PATH, device)
     if SMOKE_TEST:
