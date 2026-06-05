@@ -85,6 +85,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         target_scalers: Optional[list] = None,
         muscari_batchnorm: bool = False,
         asymptote_transform: str = "softplus",
+        weibull_parameterization: str = "legacy",
         ensemble_weights: Optional[list] = None,
     ):
         super().__init__()
@@ -95,6 +96,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         self.feature_names = feature_names
         self.muscari_batchnorm = muscari_batchnorm
         self.asymptote_transform = asymptote_transform
+        self.weibull_parameterization = weibull_parameterization
         self.ensemble_weights = _normalize_weights(ensemble_weights, n_models)
         # Stored as list-of-dicts so config.json stays JSON-serializable
         self.feature_scalers = feature_scalers
@@ -117,6 +119,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                 _tscalers[i],
                 ffnn_batchnorm=self.muscari_batchnorm,
                 asymptote_transform=self.asymptote_transform,
+                weibull_parameterization=self.weibull_parameterization,
             )
             for i in range(n_models)
         ])
@@ -138,6 +141,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         m0 = models[0]
         muscari_batchnorm = getattr(m0, "ffnn_batchnorm", False)
         asymptote_transform = getattr(m0, "asymptote_transform", "softplus")
+        weibull_parameterization = getattr(m0, "weibull_parameterization", "legacy")
 
         # Infer layer_sizes from the first model's architecture
         layer_sizes = [block.linear.out_features for block in m0.ffnn.fully_connected_layers]
@@ -166,6 +170,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
             target_scalers=target_scalers,
             muscari_batchnorm=muscari_batchnorm,
             asymptote_transform=asymptote_transform,
+            weibull_parameterization=weibull_parameterization,
             ensemble_weights=ensemble_weights,
         )
         for src, dst in zip(models, ensemble.models):
@@ -213,6 +218,11 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                     config,
                     "muscari_asymptote_transform",
                     checkpoint.get("asymptote_transform", "softplus"),
+                ),
+                weibull_parameterization=getattr(
+                    config,
+                    "muscari_weibull_parameterization",
+                    checkpoint.get("weibull_parameterization", "legacy"),
                 ),
             )
             model.load_state_dict(checkpoint["model_state_dict"])

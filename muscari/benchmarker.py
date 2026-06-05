@@ -45,6 +45,7 @@ class BenchmarkConfig:
     wandb_config: dict = field(default_factory=lambda: {})
     torch_num_threads: int | None = None
     fold_ids: list = field(default_factory=lambda: list(range(5)))
+    target_transform: str = "maxabs"
 
     def __post_init__(self):
         if not self.devices:
@@ -177,19 +178,20 @@ class Benchmarker:
                 feature_names,
                 self.config.batch_size,
                 self.config.num_workers,
+                target_transform=self.config.target_transform,
                 pin_memory=pin_memory,
             )
             val_loader, _, _ = create_dataloader(
                 val_df, feature_names, self.config.batch_size, self.config.num_workers, 
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
+                feature_scaler=feature_scaler, target_scaler=target_scaler, target_transform=self.config.target_transform, shuffle=False, pin_memory=pin_memory
             )
             test_loader_interp, _, _ = create_dataloader(
                 test_df, feature_names, self.config.batch_size, self.config.num_workers,
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
+                feature_scaler=feature_scaler, target_scaler=target_scaler, target_transform=self.config.target_transform, shuffle=False, pin_memory=pin_memory
             )
             test_loader_extrap, _, _ = create_dataloader(
                 gift_df, feature_names, self.config.batch_size, self.config.num_workers,
-                feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False, pin_memory=pin_memory
+                feature_scaler=feature_scaler, target_scaler=target_scaler, target_transform=self.config.target_transform, shuffle=False, pin_memory=pin_memory
             )
             
             # Initialize model

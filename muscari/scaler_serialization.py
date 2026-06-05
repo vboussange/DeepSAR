@@ -4,7 +4,36 @@ import numpy as np
 from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler, StandardScaler
 
 
-SUPPORTED_SCALER_TYPES = (MinMaxScaler, MaxAbsScaler, StandardScaler)
+class Log1pMaxScaler:
+    """Scale positive richness values by max log1p richness."""
+
+    def fit(self, x, y=None):
+        x = np.asarray(x, dtype=float)
+        if np.any(x < 0):
+            raise ValueError("Log1pMaxScaler expects non-negative values")
+        if x.ndim == 1:
+            x = x.reshape(-1, 1)
+        self.n_features_in_ = x.shape[1]
+        self.scale_ = np.maximum(np.nanmax(np.log1p(x), axis=0), 1e-12)
+        return self
+
+    def transform(self, x):
+        x = np.asarray(x, dtype=float)
+        if x.ndim == 1:
+            x = x.reshape(-1, 1)
+        return np.log1p(np.maximum(x, 0.0)) / self.scale_
+
+    def fit_transform(self, x, y=None):
+        return self.fit(x).transform(x)
+
+    def inverse_transform(self, x):
+        x = np.asarray(x, dtype=float)
+        if x.ndim == 1:
+            x = x.reshape(-1, 1)
+        return np.expm1(x * self.scale_)
+
+
+SUPPORTED_SCALER_TYPES = (MinMaxScaler, MaxAbsScaler, StandardScaler, Log1pMaxScaler)
 
 
 def scaler_to_dict(scaler) -> dict:
@@ -22,6 +51,8 @@ def scaler_to_dict(scaler) -> dict:
         data["max_abs_"] = scaler.max_abs_.tolist()
     elif cls_name == "StandardScaler":
         data["mean_"] = scaler.mean_.tolist()
+        data["scale_"] = scaler.scale_.tolist()
+    elif cls_name == "Log1pMaxScaler":
         data["scale_"] = scaler.scale_.tolist()
     else:
         raise TypeError(f"Unsupported scaler type: {cls_name}")
@@ -46,6 +77,9 @@ def dict_to_scaler(data: dict):
         scaler = StandardScaler()
         scaler.mean_ = np.array(data["mean_"])
         scaler.scale_ = np.array(data["scale_"])
+    elif cls_name == "Log1pMaxScaler":
+        scaler = Log1pMaxScaler()
+        scaler.scale_ = np.array(data["scale_"])
     else:
         raise TypeError(f"Unsupported scaler type: {cls_name}")
     scaler.n_features_in_ = data["n_features_in_"]
@@ -64,4 +98,5 @@ SCALER_CODERS = {
     MinMaxScaler: (scaler_to_dict, dict_to_scaler),
     MaxAbsScaler: (scaler_to_dict, dict_to_scaler),
     StandardScaler: (scaler_to_dict, dict_to_scaler),
+    Log1pMaxScaler: (scaler_to_dict, dict_to_scaler),
 }

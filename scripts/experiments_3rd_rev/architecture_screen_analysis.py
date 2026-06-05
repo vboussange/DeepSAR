@@ -10,7 +10,7 @@ import pandas as pd
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
-RESULTS_DIR = ROOT / "scripts/results/architecture_screen" / SBCV_DATASET_ID
+RESULTS_DIR = ROOT / "scripts/results/architecture_screen_stable_small" / SBCV_DATASET_ID
 RESULTS_PATH = RESULTS_DIR / f"architecture_screen_results_{SBCV_DATASET_ID}.csv"
 
 VARIANT_ORDER = [
@@ -18,16 +18,21 @@ VARIANT_ORDER = [
     "exp_abs",
     "softplus_rel",
     "exp_rel",
+    "stable_abs",
+    "stable_coverage",
 ]
 LABEL_MAP = {
     "softplus_abs": "Softplus asymptote + absolute effort",
     "exp_abs": "Exp asymptote + absolute effort",
     "softplus_rel": "Softplus asymptote + relative effort",
     "exp_rel": "Exp asymptote + relative effort",
+    "stable_abs": "Stable Weibull + absolute effort + log target",
+    "stable_coverage": "Stable Weibull + log coverage + log target",
 }
 EFFORT_LABELS = {
     "absolute": "Absolute",
     "relative": "Relative",
+    "coverage": "Log coverage",
 }
 ASYMPTOTE_LABELS = {
     "softplus": "Softplus",
@@ -45,7 +50,15 @@ COLORS = {
     "exp_abs": "#ff7f0e",
     "softplus_rel": "#2a9d8f",
     "exp_rel": "#e76f51",
+    "stable_abs": "#6a4c93",
+    "stable_coverage": "#8ac926",
 }
+
+
+def asymptote_label(exp_data: pd.DataFrame) -> str:
+    if exp_data.get("weibull_parameterization", pd.Series(["legacy"])).iloc[0] == "stable":
+        return "Stable span"
+    return ASYMPTOTE_LABELS[exp_data["asymptote_transform"].iloc[0]]
 
 
 def load_results() -> pd.DataFrame:
@@ -80,7 +93,7 @@ def build_dataset_table(df: pd.DataFrame, dataset: str) -> pd.DataFrame:
             "_experiment": experiment,
             "Architecture": LABEL_MAP[experiment],
             "Effort": EFFORT_LABELS[exp_data["effort_transform"].iloc[0]],
-            "Asymptote": ASYMPTOTE_LABELS[exp_data["asymptote_transform"].iloc[0]],
+            "Asymptote": asymptote_label(exp_data),
             "Folds": int(exp_data["fold"].nunique()),
         }
         for metric in METRICS:

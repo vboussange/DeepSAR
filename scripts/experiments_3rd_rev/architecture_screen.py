@@ -26,19 +26,22 @@ SBCV_DATASET_ID = "ceacce0"
 GIFT_DATASET_ID = "418c563"
 SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
-RUN_FOLDER = ROOT / "scripts/results/architecture_screen" / SBCV_DATASET_ID
+RUN_FOLDER = ROOT / "scripts/results/architecture_screen_stable_small_full_covariates" / SBCV_DATASET_ID
 
 BIOCLIMATE_VARS = [
-    "bio1",
-    "pet_penman_mean",
-    "sfcWind_mean",
-    "bio12",
-]
+            "bio1",
+            "pet_penman_mean",
+            "sfcWind_mean",
+            "bio4",
+            "rsds_1981-2010_range_V.2.1",
+            "bio12",
+            "bio15",
+        ]
 
 USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
-WANDB_GROUP = f"architecture_screen_{SBCV_DATASET_ID}"
-WANDB_TAGS = ["architecture-screen", SBCV_DATASET_ID]
+WANDB_GROUP = f"architecture_screen_stable_small_full_covariates_{SBCV_DATASET_ID}"
+WANDB_TAGS = ["architecture-screen-stable-small-full-covariates", SBCV_DATASET_ID]
 
 SMOKE_TEST = os.environ.get("MUSCARI_SMOKE_TEST", "0") == "1"
 FOLD_IDS = [0] if SMOKE_TEST else list(range(5))
@@ -46,28 +49,36 @@ N_EPOCHS = 1 if SMOKE_TEST else 500
 TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 BATCH_SIZE = 1024
 LR = 1e-3
-LAYER_SIZES = symmetric_arch(6, base=128, factor=4)
+LAYER_SIZES = symmetric_arch(6, base=32, factor=4)
 
 VARIANTS = [
+    # {
+    #     "name": "softplus_abs",
+    #     "effort_transform": "absolute",
+    #     "asymptote_transform": "softplus",
+    #     "weibull_parameterization": "legacy",
+    #     "target_transform": "maxabs",
+    # },
+    # {
+    #     "name": "exp_abs",
+    #     "effort_transform": "absolute",
+    #     "asymptote_transform": "exp",
+    #     "weibull_parameterization": "legacy",
+    #     "target_transform": "maxabs",
+    # },
     {
-        "name": "softplus_abs",
+        "name": "stable_abs",
         "effort_transform": "absolute",
         "asymptote_transform": "softplus",
+        "weibull_parameterization": "stable",
+        "target_transform": "log1p_max",
     },
     {
-        "name": "exp_abs",
-        "effort_transform": "absolute",
-        "asymptote_transform": "exp",
-    },
-    {
-        "name": "softplus_rel",
-        "effort_transform": "relative",
+        "name": "stable_coverage",
+        "effort_transform": "coverage",
         "asymptote_transform": "softplus",
-    },
-    {
-        "name": "exp_rel",
-        "effort_transform": "relative",
-        "asymptote_transform": "exp",
+        "weibull_parameterization": "stable",
+        "target_transform": "log1p_max",
     },
 ]
 
@@ -78,6 +89,7 @@ logger = setup_logger("architecture_screen")
 class MuScaRiArchitectureInit:
     feature_names: list[str]
     asymptote_transform: str
+    weibull_parameterization: str = "legacy"
     architecture: list[int] = field(default_factory=lambda: LAYER_SIZES.copy())
 
     def __call__(self, **kwargs):
@@ -86,6 +98,7 @@ class MuScaRiArchitectureInit:
             feature_names=self.feature_names,
             ffnn_batchnorm=False,
             asymptote_transform=self.asymptote_transform,
+            weibull_parameterization=self.weibull_parameterization,
             **kwargs,
         )
 
@@ -122,6 +135,7 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         wandb_project=WANDB_PROJECT,
         wandb_group=WANDB_GROUP,
         wandb_tags=WANDB_TAGS + [SBCV_DATASET_ID, variant["name"]],
+        target_transform=variant["target_transform"],
         wandb_config={
             "dataset_id": SBCV_DATASET_ID,
             "gift_dataset_id": GIFT_DATASET_ID,
@@ -129,6 +143,8 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
             "feature_names": feature_names,
             "architecture_variant": variant["name"],
             "asymptote_transform": variant["asymptote_transform"],
+            "weibull_parameterization": variant["weibull_parameterization"],
+            "target_transform": variant["target_transform"],
             "model_family": "MuScaRi",
             "batch_size": BATCH_SIZE,
             "learning_rate": LR,
@@ -144,6 +160,7 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
     model_init = MuScaRiArchitectureInit(
         feature_names=feature_names,
         asymptote_transform=variant["asymptote_transform"],
+        weibull_parameterization=variant["weibull_parameterization"],
     )
     bench = Benchmarker(config)
     logger.info(
@@ -164,6 +181,8 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
     results["architecture_variant"] = variant["name"]
     results["effort_transform"] = variant["effort_transform"]
     results["asymptote_transform"] = variant["asymptote_transform"]
+    results["weibull_parameterization"] = variant["weibull_parameterization"]
+    results["target_transform"] = variant["target_transform"]
     results["feature_set"] = "env_area"
     results["model_family"] = "MuScaRi"
     results["n_epochs"] = N_EPOCHS

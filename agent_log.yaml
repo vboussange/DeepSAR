@@ -1,6 +1,63 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "stable_weibull_log_target_normalization"
+    important_params:
+      task: "add optional log-target normalization for stable Weibull architecture-screen variants"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/scaler_serialization.py"
+        - "muscari/dataset.py"
+        - "muscari/benchmarker.py"
+        - "muscari/muscari.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      normalization: "stable variants use Log1pMaxScaler; legacy variants keep MaxAbsScaler"
+      checks:
+        - "uv run python -m py_compile muscari/scaler_serialization.py muscari/dataset.py muscari/muscari.py muscari/benchmarker.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... Log1pMaxScaler serialization, inverse-transform, and stable-head initialization smoke check"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "MaxAbs target scaling maps the fold-0 median richness to about 0.025, whereas log1p scaling maps it to about 0.565. The smoke run completed and stable_abs improved from near-zero underprediction to finite one-epoch GIFT metrics with median relative bias around 0.023."
+    outcome: "Added a serializable Log1pMaxScaler and wired target_transform='log1p_max' only into stable_abs and stable_coverage architecture-screen variants."
+    next_actions:
+      - "Run the full architecture screen to judge convergence under log-target normalization."
+  - name: "weibull_reparameterization_screen"
+    important_params:
+      task: "add a compact stable Weibull parameterization to the architecture screen"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "74e2b842fc243e3e3f07cd39510422134b0fd375"
+      branch: "dev_3rd_rev_reparametrization"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "muscari/utils.py"
+        - "muscari/trainer.py"
+        - "muscari/muscari_ensemble.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      variants_added:
+        - "stable_abs"
+        - "stable_coverage"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/utils.py muscari/trainer.py muscari/muscari_ensemble.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... synthetic stable Weibull positivity, monotonicity, asymptote, and coverage-coordinate smoke check"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "The stable head runs end-to-end and avoids the legacy log-of-MinMax effort coordinate. One-epoch smoke metrics are numerically finite but underpredict GIFT strongly, so full training is needed to judge convergence and calibration."
+    outcome: "Created branch dev_3rd_rev_reparametrization and added stable_abs/stable_coverage architecture-screen variants with explicit Weibull parameterization metadata."
+    next_actions:
+      - "Run the full architecture screen and compare convergence, finite-effort EVA metrics, GIFT finite-full-area metrics, and true asymptote diagnostics."
   - name: "ensemble_pretrained_export"
     important_params:
       task: "remove single-model mixin export and save one ensemble pretrained artifact after training"
