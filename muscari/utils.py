@@ -66,14 +66,51 @@ def add_effort_columns(df: pd.DataFrame, effort_transform: str) -> pd.DataFrame:
     return df
 
 
-def climate_dem_features(df: pd.DataFrame, bioclimate_vars: list[str]) -> list[str]:
+def climate_features(df: pd.DataFrame, bioclimate_vars: list[str]) -> list[str]:
     climate_feats = list(bioclimate_vars) + [f"std_{v}" for v in bioclimate_vars]
-    dem_feats = ["elevation", "std_elevation"]
-    return [c for c in climate_feats + dem_feats if c in df.columns]
+    return [c for c in climate_feats if c in df.columns]
 
 
-def feature_sets(df: pd.DataFrame, bioclimate_vars: list[str]) -> dict[str, list[str]]:
-    env = climate_dem_features(df, bioclimate_vars)
+def elevation_features(df: pd.DataFrame) -> list[str]:
+    return [c for c in ["elevation", "std_elevation"] if c in df.columns]
+
+
+def landcover_fraction_features(df: pd.DataFrame) -> list[str]:
+    def _landcover_index(name: str) -> int:
+        return int(name.split("_")[-1])
+
+    return sorted(
+        [c for c in df.columns if c.startswith("lc_frac_")],
+        key=_landcover_index,
+    )
+
+
+def environmental_features(
+    df: pd.DataFrame,
+    bioclimate_vars: list[str],
+    include_elevation: bool = True,
+    include_landcover: bool = False,
+) -> list[str]:
+    env = climate_features(df, bioclimate_vars)
+    if include_elevation:
+        env = env + elevation_features(df)
+    if include_landcover:
+        env = env + landcover_fraction_features(df)
+    return env
+
+
+def feature_sets(
+    df: pd.DataFrame,
+    bioclimate_vars: list[str],
+    include_elevation: bool = True,
+    include_landcover: bool = False,
+) -> dict[str, list[str]]:
+    env = environmental_features(
+        df,
+        bioclimate_vars,
+        include_elevation=include_elevation,
+        include_landcover=include_landcover,
+    )
     return {
         "area": ["log_sp_unit_area"],
         "env": env,

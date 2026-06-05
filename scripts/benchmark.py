@@ -32,9 +32,12 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 ROOT = Path(__file__).parents[1]
-GIFT_DATASET_ID = "418c563"
+GIFT_DATASET_ID = "da569da"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
-SBCV_DATASET_IDS = ["ceacce0", "d0848f6"]
+
+SBCV_ID = "ceacce0"
+SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_ID
+
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
@@ -48,7 +51,7 @@ INCLUDE_LANDCOVER_EXPERIMENTS = False
 
 # TODO(agent): update these constants once the full architecture screen selects
 # the final architecture.
-SELECTED_ARCHITECTURE_NAME = "softplus_abs"
+SELECTED_ARCHITECTURE_NAME = "stable"
 EFFORT_TRANSFORM = "absolute"
 ASYMPTOTE_TRANSFORM = "softplus"
 
@@ -244,15 +247,6 @@ def build_experiments(climate_dem_feats, landcover_feats, all_env_feats):
 if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path("results", "benchmark")
     root_folder.mkdir(parents=True, exist_ok=True)
-
-    for dataset_id in SBCV_DATASET_IDS:
-        sbcv_samples_path = ROOT / "data/processed/training_samples/sbcv" / dataset_id
-        if not sbcv_samples_path.exists():
-            logger.warning(
-                "Dataset %s is missing. Compile or sync it before the final benchmark.",
-                dataset_id,
-            )
-            continue
 
         config = BenchmarkConfig(
             path_gift_data=GIFT_SAMPLES_PATH,

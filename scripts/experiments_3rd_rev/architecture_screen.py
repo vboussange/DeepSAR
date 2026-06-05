@@ -23,25 +23,56 @@ from muscari.utils import (
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
-GIFT_DATASET_ID = "418c563"
+GIFT_DATASET_ID = "da569da"
 SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
-RUN_FOLDER = ROOT / "scripts/results/architecture_screen_stable_small_full_covariates" / SBCV_DATASET_ID
+SCREEN_NAME = "architecture_screen_stable_maxabs_large"
+RUN_FOLDER = ROOT / "scripts/results" / SCREEN_NAME / SBCV_DATASET_ID
+FEATURE_GROUP = "env_area"
 
 BIOCLIMATE_VARS = [
+    "bio1",
+    "pet_penman_mean",
+    "sfcWind_mean",
+    "bio4",
+    "rsds_1981-2010_range_V.2.1",
+    "bio12",
+    "bio15",
+]
+
+FEATURE_CONFIGS = {
+    "env_area": {
+        "bioclimate_vars": [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            "bio4",
-            "rsds_1981-2010_range_V.2.1",
             "bio12",
-            "bio15",
-        ]
+        ],
+        "include_elevation": True,
+        "include_landcover": False,
+    },
+    # "env_area_full_lc": {
+    #     "bioclimate_vars": BIOCLIMATE_VARS,
+    #     "include_elevation": True,
+    #     "include_landcover": True,
+    # },
+    # "env_area_full_no_lc": {
+    #     "bioclimate_vars": BIOCLIMATE_VARS,
+    #     "include_elevation": True,
+    #     "include_landcover": False,
+    # },
+    # "env_area_full_lc_no_dem": {
+    #     "bioclimate_vars": BIOCLIMATE_VARS,
+    #     "include_elevation": False,
+    #     "include_landcover": True,
+    # },
+}
+SELECTED_FEATURE_CONFIG = "env_area"
 
 USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
-WANDB_GROUP = f"architecture_screen_stable_small_full_covariates_{SBCV_DATASET_ID}"
-WANDB_TAGS = ["architecture-screen-stable-small-full-covariates", SBCV_DATASET_ID]
+WANDB_GROUP = f"{SCREEN_NAME}_{SBCV_DATASET_ID}"
+WANDB_TAGS = [SCREEN_NAME, SBCV_DATASET_ID, SELECTED_FEATURE_CONFIG]
 
 SMOKE_TEST = os.environ.get("MUSCARI_SMOKE_TEST", "0") == "1"
 FOLD_IDS = [0] if SMOKE_TEST else list(range(5))
@@ -49,9 +80,16 @@ N_EPOCHS = 1 if SMOKE_TEST else 500
 TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 BATCH_SIZE = 1024
 LR = 1e-3
-LAYER_SIZES = symmetric_arch(6, base=32, factor=4)
+LAYER_SIZES = symmetric_arch(6, base=128, factor=4)
 
 VARIANTS = [
+    # {
+    #     "name": "legacy_abs",
+    #     "effort_transform": "absolute",
+    #     "asymptote_transform": "identity",
+    #     "weibull_parameterization": "legacy",
+    #     "target_transform": "maxabs",
+    # },
     # {
     #     "name": "softplus_abs",
     #     "effort_transform": "absolute",
@@ -66,23 +104,40 @@ VARIANTS = [
     #     "weibull_parameterization": "legacy",
     #     "target_transform": "maxabs",
     # },
+    # {
+    #     "name": "stable_abs",
+    #     "effort_transform": "absolute",
+    #     "asymptote_transform": "softplus",
+    #     "weibull_parameterization": "stable",
+    #     "target_transform": "log1p_max",
+    # },
     {
-        "name": "stable_abs",
+        "name": "stable_abs_maxabs",
         "effort_transform": "absolute",
         "asymptote_transform": "softplus",
         "weibull_parameterization": "stable",
-        "target_transform": "log1p_max",
+        "target_transform": "maxabs",
     },
-    {
-        "name": "stable_coverage",
-        "effort_transform": "coverage",
-        "asymptote_transform": "softplus",
-        "weibull_parameterization": "stable",
-        "target_transform": "log1p_max",
-    },
+    # {
+    #     "name": "stable_coverage",
+    #     "effort_transform": "coverage",
+    #     "asymptote_transform": "softplus",
+    #     "weibull_parameterization": "stable",
+    #     "target_transform": "log1p_max",
+    # },
 ]
 
 logger = setup_logger("architecture_screen")
+
+
+def resolve_feature_config() -> dict:
+    try:
+        return FEATURE_CONFIGS[SELECTED_FEATURE_CONFIG]
+    except KeyError as exc:
+        valid = ", ".join(sorted(FEATURE_CONFIGS))
+        raise ValueError(
+            f"Unknown feature config '{SELECTED_FEATURE_CONFIG}'. Expected one of: {valid}"
+        ) from exc
 
 
 @dataclass
@@ -139,7 +194,7 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         wandb_config={
             "dataset_id": SBCV_DATASET_ID,
             "gift_dataset_id": GIFT_DATASET_ID,
-            "feature_set": "env_area",
+            "feature_set": SELECTED_FEATURE_CONFIG,
             "feature_names": feature_names,
             "architecture_variant": variant["name"],
             "asymptote_transform": variant["asymptote_transform"],
@@ -183,7 +238,7 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
     results["asymptote_transform"] = variant["asymptote_transform"]
     results["weibull_parameterization"] = variant["weibull_parameterization"]
     results["target_transform"] = variant["target_transform"]
-    results["feature_set"] = "env_area"
+    results["feature_set"] = SELECTED_FEATURE_CONFIG
     results["model_family"] = "MuScaRi"
     results["n_epochs"] = N_EPOCHS
     results["batch_size"] = BATCH_SIZE
@@ -195,8 +250,19 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         torch.set_float32_matmul_precision("high")
     sample_df = gpd.read_parquet(next(SBCV_SAMPLES_PATH.glob("*_train.parquet")))
-    feature_names = feature_sets(sample_df, BIOCLIMATE_VARS)["env_area"]
-    logger.info("Architecture screen features: %s", feature_names)
+    feature_config = resolve_feature_config()
+    feature_names = feature_sets(
+        sample_df,
+        feature_config["bioclimate_vars"],
+        include_elevation=feature_config["include_elevation"],
+        include_landcover=feature_config["include_landcover"],
+    )[FEATURE_GROUP]
+    logger.info(
+        "Architecture screen feature config %s (%d features): %s",
+        SELECTED_FEATURE_CONFIG,
+        len(feature_names),
+        feature_names,
+    )
     devices = discover_devices()
     logger.info("Architecture screen devices: %s", devices)
 

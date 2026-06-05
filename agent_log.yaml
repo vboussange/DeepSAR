@@ -1,6 +1,72 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "train_script_feature_config_alignment"
+    important_params:
+      task: "align scripts/train.py with the feature-config abstraction and current MuScaRi training hooks"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "76fddc5"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "scripts/train.py"
+        - "agent_log.yaml"
+      selected_feature_config: "env_area_full_lc"
+      selected_feature_count: 63
+      checks:
+        - "uv run python -m py_compile scripts/train.py"
+        - "uv run python - <<'PY' ... resolved env_area_full_lc against real SBCV parquet data and verified 63 selected features including landcover fractions and elevation"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/train.py"
+        - "git diff --check"
+    key_finding: "The training script had drifted behind the architecture-screen path: feature selection was still hardcoded to the older climate+DEM helper and the newer target-transform / Weibull-parameterization hooks were not threaded through training."
+    outcome: "scripts/train.py now selects predictors through the same small FEATURE_CONFIGS pattern as the architecture screen, defaults to the requested full-covariate configuration, records the feature config in run metadata, and forwards target_transform plus weibull_parameterization into training and evaluation dataloaders."
+  - name: "feature_config_cleanup"
+    important_params:
+      task: "simplify architecture screen feature configs and add explicit elevation toggle"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/utils.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+      checks:
+        - "uv run python -m py_compile muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... resolved FEATURE_CONFIGS against real parquet data and verified elevation/landcover toggles"
+    key_finding: "The feature config only needs bioclimate vars plus boolean include_elevation/include_landcover switches; a separate feature_set_name field was redundant."
+    outcome: "Removed feature_set_name metadata, kept a single FEATURE_GROUP selector, and added explicit include_elevation support in the utility feature path and architecture screen configs."
+  - name: "architecture_screen_full_covariates"
+    important_params:
+      task: "extend the architecture screen feature selection to support full bioclimate, elevation, and landcover predictors"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/utils.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      selected_feature_config: "env_area_full_lc"
+      selected_feature_count: 63
+      checks:
+        - "uv run python -m py_compile muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... resolved env_area_full_lc to 63 features including 46 lc_frac_* columns"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "The dataset exposes 46 landcover fraction predictors in addition to the full bioclimate and elevation summaries. A small named feature-config layer is enough to make swapping feature sets easy without changing the training code."
+    outcome: "Architecture screen now selects predictors through FEATURE_CONFIGS, with env_area_full_lc using all requested bioclimate variables, elevation features, landcover fractions, and log_sp_unit_area."
+    next_actions:
+      - "Run the full covariate screen and compare against the smaller stable screen if needed."
   - name: "stable_weibull_log_target_normalization"
     important_params:
       task: "add optional log-target normalization for stable Weibull architecture-screen variants"

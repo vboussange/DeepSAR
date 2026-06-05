@@ -18,9 +18,9 @@ from muscari.dataset import create_dataloader
 from muscari.utils import (
     add_effort_columns,
     choose_accelerator,
-    climate_dem_features,
     compute_metrics,
     evaluate_lit_model,
+    feature_sets,
     finish_wandb,
     get_git_hash,
     log_wandb_metrics,
@@ -30,21 +30,56 @@ from muscari.utils import (
 )
 
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
-RUN_ID = get_git_hash(short=True)
-RUN_FOLDER = Path(__file__).parent / f"results/train/{RUN_ID}"
 BIOCLIMATE_VARS = [
+    "bio1",
+    "pet_penman_mean",
+    "sfcWind_mean",
+    "bio4",
+    "rsds_1981-2010_range_V.2.1",
+    "bio12",
+    "bio15",
+]
+
+FEATURE_GROUP = "env_area"
+FEATURE_CONFIGS = {
+    "env_area": {
+        "bioclimate_vars": [
             "bio1",
             "pet_penman_mean",
             "sfcWind_mean",
-            # "bio4",
-            # "rsds_1981-2010_range_V.2.1",
             "bio12",
-            # "bio15",
-        ]
+        ],
+        "include_elevation": True,
+        "include_landcover": False,
+    },
+    "env_area_full_lc": {
+        "bioclimate_vars": BIOCLIMATE_VARS,
+        "include_elevation": True,
+        "include_landcover": True,
+    },
+    "env_area_full_no_lc": {
+        "bioclimate_vars": BIOCLIMATE_VARS,
+        "include_elevation": True,
+        "include_landcover": False,
+    },
+    "env_area_full_lc_no_dem": {
+        "bioclimate_vars": BIOCLIMATE_VARS,
+        "include_elevation": False,
+        "include_landcover": True,
+    },
+}
+SELECTED_FEATURE_CONFIG = "env_area"
 
 EFFORT_TRANSFORM = "absolute"
 ASYMPTOTE_TRANSFORM = "identity"
-SELECTED_ARCHITECTURE_NAME = f"{ASYMPTOTE_TRANSFORM}_{EFFORT_TRANSFORM}"
+WEIBULL_PARAMETERIZATION = "legacy"
+TARGET_TRANSFORM = "maxabs"
+SELECTED_ARCHITECTURE_NAME = (
+    f"{WEIBULL_PARAMETERIZATION}_{ASYMPTOTE_TRANSFORM}_{EFFORT_TRANSFORM}"
+)
+TRAIN_NAME = f"{SELECTED_FEATURE_CONFIG}_{SELECTED_ARCHITECTURE_NAME}"
+RUN_ID = get_git_hash(short=True)
+RUN_FOLDER = Path(__file__).parent / f"results/train/{TRAIN_NAME}/{RUN_ID}"
 
 USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
@@ -83,6 +118,16 @@ def fold_files(config, fold_ids):
     }
 
 
+def resolve_feature_config() -> dict:
+    try:
+        return FEATURE_CONFIGS[SELECTED_FEATURE_CONFIG]
+    except KeyError as exc:
+        valid = ", ".join(sorted(FEATURE_CONFIGS))
+        raise ValueError(
+            f"Unknown feature config '{SELECTED_FEATURE_CONFIG}'. Expected one of: {valid}"
+        ) from exc
+
+
 def training_config_payload(config, feature_names, fold_summaries):
     metadata_files = [
         str(path)
@@ -114,7 +159,9 @@ def training_config_payload(config, feature_names, fold_summaries):
             "layer_sizes": config.layer_sizes,
             "batchnorm": config.muscari_batchnorm,
             "asymptote_transform": ASYMPTOTE_TRANSFORM,
+            "weibull_parameterization": WEIBULL_PARAMETERIZATION,
             "effort_transform": EFFORT_TRANSFORM,
+            "target_transform": TARGET_TRANSFORM,
         },
         "training": {
             "train_config": vars(config),
@@ -131,7 +178,9 @@ def training_config_payload(config, feature_names, fold_summaries):
             "loss": "MSELoss",
         },
         "features_and_labels": {
-            "bioclimate_variables": BIOCLIMATE_VARS,
+            "feature_group": FEATURE_GROUP,
+            "selected_feature_config": SELECTED_FEATURE_CONFIG,
+            "feature_config": resolve_feature_config(),
             "feature_columns": feature_names,
             "model_input_columns": ["log_observed_area"] + feature_names,
             "target_column": "sr",
@@ -168,6 +217,9 @@ def make_wandb_logger(fold_id, feature_names, config):
             "architecture_variant": SELECTED_ARCHITECTURE_NAME,
             "effort_transform": EFFORT_TRANSFORM,
             "asymptote_transform": ASYMPTOTE_TRANSFORM,
+            "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+            "target_transform": TARGET_TRANSFORM,
+            "feature_set": SELECTED_FEATURE_CONFIG,
             "n_epochs": config.n_epochs,
             "batch_size": config.batch_size,
             "train_frac": TRAIN_FRAC,
@@ -226,11 +278,21 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
         
     # Create dataloaders
     train_loader, feature_scaler, target_scaler = create_dataloader(
-        train_df, feature_names, config.batch_size, config.num_workers
+        train_df,
+        feature_names,
+        config.batch_size,
+        config.num_workers,
+        target_transform=TARGET_TRANSFORM,
     )
     val_loader, _, _ = create_dataloader(
-        val_df, feature_names, config.batch_size, config.num_workers,
-        feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+        val_df,
+        feature_names,
+        config.batch_size,
+        config.num_workers,
+        feature_scaler=feature_scaler,
+        target_scaler=target_scaler,
+        target_transform=TARGET_TRANSFORM,
+        shuffle=False,
     )
     
     # Initialize model
@@ -239,7 +301,8 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
                     feature_scaler=feature_scaler,
                     target_scaler=target_scaler,
                     ffnn_batchnorm=config.muscari_batchnorm,
-                    asymptote_transform=ASYMPTOTE_TRANSFORM)
+                    asymptote_transform=ASYMPTOTE_TRANSFORM,
+                    weibull_parameterization=WEIBULL_PARAMETERIZATION)
     
     _, _, eval_device = choose_accelerator()
 
@@ -250,8 +313,14 @@ def train_fold(config: TrainConfig, fold_id, feature_names):
     trainer.fit(lit_model, train_loader, val_loader)
 
     test_loader, _, _ = create_dataloader(
-        test_df, feature_names, config.batch_size, config.num_workers,
-        feature_scaler=feature_scaler, target_scaler=target_scaler, shuffle=False
+        test_df,
+        feature_names,
+        config.batch_size,
+        config.num_workers,
+        feature_scaler=feature_scaler,
+        target_scaler=target_scaler,
+        target_transform=TARGET_TRANSFORM,
+        shuffle=False,
     )
 
     y_true_train, y_pred_train = evaluate_lit_model(lit_model, train_loader, eval_device)
@@ -305,15 +374,27 @@ if __name__ == "__main__":
                          n_epochs=N_EPOCHS,
                          muscari_batchnorm=False,
                          muscari_asymptote_transform=ASYMPTOTE_TRANSFORM,
+                         muscari_weibull_parameterization=WEIBULL_PARAMETERIZATION,
                          effort_transform=EFFORT_TRANSFORM,
-                         layer_sizes=symmetric_arch(6, base=32, factor=4),
+                         layer_sizes=symmetric_arch(6, base=128, factor=4),
                          run_folder=RUN_FOLDER)
     
     sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
     df = gpd.read_parquet(sample_file)
-    
-    feature_names = climate_dem_features(df, BIOCLIMATE_VARS) + ["log_sp_unit_area"]
-    logger.info(f"Training with features: {feature_names}")
+
+    feature_config = resolve_feature_config()
+    feature_names = feature_sets(
+        df,
+        feature_config["bioclimate_vars"],
+        include_elevation=feature_config["include_elevation"],
+        include_landcover=feature_config["include_landcover"],
+    )[FEATURE_GROUP]
+    logger.info(
+        "Training with feature config %s (%d features): %s",
+        SELECTED_FEATURE_CONFIG,
+        len(feature_names),
+        feature_names,
+    )
 
     fold_summaries = []
     write_training_config(config, feature_names, fold_summaries)

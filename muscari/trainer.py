@@ -22,7 +22,7 @@ class TrainConfig:
     run_folder: Path = None
     path_sbcv_data: Path = None
     muscari_batchnorm: bool = False
-    muscari_asymptote_transform: str = "softplus"
+    muscari_asymptote_transform: str = "identity"
     muscari_weibull_parameterization: str = "legacy"
     effort_transform: str = "absolute"
     layer_sizes: list = field(

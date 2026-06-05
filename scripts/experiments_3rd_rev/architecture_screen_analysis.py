@@ -10,16 +10,19 @@ import pandas as pd
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
-RESULTS_DIR = ROOT / "scripts/results/architecture_screen_stable_small" / SBCV_DATASET_ID
+SCREEN_NAME = "architecture_screen_stable_maxabs_large"
+RESULTS_DIR = ROOT / "scripts/results" / SCREEN_NAME / SBCV_DATASET_ID
 RESULTS_PATH = RESULTS_DIR / f"architecture_screen_results_{SBCV_DATASET_ID}.csv"
 
 VARIANT_ORDER = [
+    "legacy_abs",
     "softplus_abs",
     "exp_abs",
     "softplus_rel",
     "exp_rel",
     "stable_abs",
     "stable_coverage",
+    "stable_abs_maxabs",
 ]
 LABEL_MAP = {
     "softplus_abs": "Softplus asymptote + absolute effort",
@@ -28,6 +31,8 @@ LABEL_MAP = {
     "exp_rel": "Exp asymptote + relative effort",
     "stable_abs": "Stable Weibull + absolute effort + log target",
     "stable_coverage": "Stable Weibull + log coverage + log target",
+    "legacy_abs": "Legacy Weibull + absolute effort",
+    "stable_abs_maxabs": "Stable Weibull + absolute effort + maxabs target",
 }
 EFFORT_LABELS = {
     "absolute": "Absolute",
@@ -37,6 +42,7 @@ EFFORT_LABELS = {
 ASYMPTOTE_LABELS = {
     "softplus": "Softplus",
     "exp": "Exponential",
+    "identity": "Identity",
 }
 METRICS = ["rmse", "mape", "median_relative_bias", "r2", "d2", "bias_slope_log_area"]
 PLOT_METRICS = [
@@ -48,10 +54,12 @@ PLOT_METRICS = [
 COLORS = {
     "softplus_abs": "#1f77b4",
     "exp_abs": "#ff7f0e",
+    "legacy_abs": "#2ca02c",
     "softplus_rel": "#2a9d8f",
     "exp_rel": "#e76f51",
     "stable_abs": "#6a4c93",
     "stable_coverage": "#8ac926",
+    "stable_abs_maxabs": "#ffb347",
 }
 
 
