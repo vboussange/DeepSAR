@@ -1,0 +1,17 @@
+\begin{table}
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\textwidth}{l l l c >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+    \toprule
+    Architecture & Effort & Asymptote & Folds & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ & Bias slope \\
+    \midrule
+    Current + absolute effort & Absolute & Identity & 5 & \textbf{45.914 ± 0.901} & \textbf{0.535 ± 0.075} & 0.023 ± 0.029 & \textbf{0.989 ± 0.000} & \textbf{0.857 ± 0.003} & -0.043 ± 0.025 \\
+    Exp asymptote + absolute effort & Absolute & Exponential & 5 & 133.765 ± 175.895 & 0.614 ± 0.195 & -0.187 ± 0.406 & 0.716 ± 0.546 & 0.650 ± 0.421 & -0.043 ± 0.024 \\
+    Current + relative effort & Relative & Identity & 5 & 46.475 ± 1.700 & 0.536 ± 0.032 & \textbf{0.013 ± 0.022} & 0.988 ± 0.001 & 0.856 ± 0.007 & \textbf{-0.034 ± 0.013} \\
+    Exp asymptote + relative effort & Relative & Exponential & 5 & 193.441 ± 185.974 & 1.352 ± 1.432 & -0.052 ± 0.533 & 0.596 ± 0.539 & 0.499 ± 0.451 & 0.085 ± 0.243 \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Architecture screen results on the EVA interpolation folds (mean ± standard deviation across folds). Lower RMSE, MAPE, relative bias, and residual-bias slope magnitudes are better; higher $R^2$ and $D^2$ are better.}
+    \label{tab:architecture_screen_interp}
+\end{table}

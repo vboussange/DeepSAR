@@ -147,6 +147,7 @@ failed_experiments:
     reason: "Cancelled intentionally by user before completion so the full architecture screen can be run on another host."
 
 next_actions:
+  - "Decide whether the final third-revision architecture should prioritize current_abs for interpolation or current_rel for extrapolation and bias behavior, then update benchmark.py/train.py constants if needed."
   - "Run the full architecture screen on ceacce0 from commit ec6cc1a on the target host and summarize GIFT RMSE, interpolation RMSE, and residual-bias slopes."
   - "Generate the 100 km SBCV dataset from existing data-processing scripts or sync d0848f6 if it remains unavailable."
   - "Revise manuscript and reviewer response after experiment outputs are available."
@@ -163,3 +164,4 @@ notes:
   - "2026-06-04: Started full architecture screen architecture_screen_ceacce0 from commit ec6cc1a in screen session muscari_arch_screen."
   - "2026-06-04: Checked local SBCV datasets; d0848f6 is not present, so the 100 km dataset must be synced or generated from scripts/data_processing/compile_sbcv_eva_samples.py."
   - "2026-06-04: Cancelled local architecture_screen_ceacce0 run and terminated screen session muscari_arch_screen so it can be rerun on another host."
+  - "2026-06-05: Added scripts/experiments_3rd_rev/architecture_screen_analysis.py to summarize the successful ceacce0 run with CSV/LaTeX tables and a comparison figure."

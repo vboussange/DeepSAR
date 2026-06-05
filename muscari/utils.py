@@ -58,7 +58,7 @@ def add_effort_columns(df: pd.DataFrame, effort_transform: str) -> pd.DataFrame:
     if effort_transform == "absolute":
         df["log_observed_area"] = log_observed_area
     elif effort_transform == "relative":
-        df["log_observed_area"] = log_observed_area - df["log_sp_unit_area"]
+        df["log_observed_area"] = log_observed_area / df["log_sp_unit_area"]
     else:
         raise ValueError("effort_transform must be 'absolute' or 'relative'")
     return df

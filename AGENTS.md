@@ -6,6 +6,9 @@ style of the project: concise, explicit research code in the style of a Google
 DeepMind research scientist. Prefer readable scripts with visible constants over
 large frameworks, hidden configuration layers, or clever abstractions.
 
+## Execution
+- Always use `uv` environment
+
 ## Project Map
 
 - `muscari/`: core model, dataset, trainer, ensemble, utilities, and
