@@ -15,15 +15,16 @@ from sklearn.preprocessing import StandardScaler
 
 from muscari.utils import (
     add_effort_columns,
-    climate_dem_features,
     compute_metrics,
+    environmental_features,
     finish_wandb,
+    landcover_fraction_features,
     log_wandb_metrics,
     maybe_wandb_logger,
     setup_logger,
     symmetric_arch,
 )
-from muscari.benchmarker import BenchmarkConfig, Benchmarker
+from muscari.trainer import TrainConfig, Trainer
 from muscari.muscari import MuScaRi
 from muscari.ffnn import FFNNExp
 import warnings
@@ -54,6 +55,8 @@ INCLUDE_LANDCOVER_EXPERIMENTS = False
 SELECTED_ARCHITECTURE_NAME = "stable"
 EFFORT_TRANSFORM = "absolute"
 ASYMPTOTE_TRANSFORM = "softplus"
+WEIBULL_PARAMETERIZATION = "stable"
+TARGET_TRANSFORM = "maxabs"
 
 USE_WANDB = False
 WANDB_PROJECT = "muscari-third-revision"
@@ -71,17 +74,19 @@ class MuScaRiInit():
     feature_names: list
     architecture: list = field(default_factory=lambda: symmetric_arch(6, base=32, factor=4))
     asymptote_transform: str = ASYMPTOTE_TRANSFORM
+    weibull_parameterization: str = WEIBULL_PARAMETERIZATION
     def __call__(self, **kwargs):
         return MuScaRi(layer_sizes=self.architecture,
                        feature_names=self.feature_names,
                        ffnn_batchnorm=False,
                        asymptote_transform=self.asymptote_transform,
+                       weibull_parameterization=self.weibull_parameterization,
                        **kwargs)
 
 class WrappedFFNNExp(FFNNExp):
-    def __init__(self, input_dim, layer_sizes, feature_names=[], feature_scaler=None, target_scaler=None, batchnorm=True):
+    def __init__(self, input_dim, layer_sizes, feature_names=None, feature_scaler=None, target_scaler=None, batchnorm=True):
         super().__init__(input_dim, layer_sizes, batchnorm=batchnorm)
-        self.feature_names = feature_names
+        self.feature_names = feature_names or []
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
 
@@ -248,52 +253,79 @@ if __name__ == "__main__":
     root_folder = Path(__file__).parent / Path("results", "benchmark")
     root_folder.mkdir(parents=True, exist_ok=True)
 
-        config = BenchmarkConfig(
-            path_gift_data=GIFT_SAMPLES_PATH,
-            path_sbcv_data=sbcv_samples_path,
-            n_epochs=N_EPOCHS,
-            effort_transform=EFFORT_TRANSFORM,
-            use_wandb=USE_WANDB,
-            wandb_project=WANDB_PROJECT,
-            wandb_group=f"benchmark_{dataset_id}",
-            wandb_tags=WANDB_TAGS + [dataset_id, SELECTED_ARCHITECTURE_NAME],
-            fold_ids=FOLD_IDS,
-        )
+    dataset_id = SBCV_ID
+    config = TrainConfig(
+        path_gift_data=GIFT_SAMPLES_PATH,
+        path_sbcv_data=SBCV_SAMPLES_PATH,
+        n_epochs=N_EPOCHS,
+        effort_transform=EFFORT_TRANSFORM,
+        target_transform=TARGET_TRANSFORM,
+        use_wandb=USE_WANDB,
+        wandb_project=WANDB_PROJECT,
+        wandb_group=f"benchmark_{dataset_id}",
+        wandb_tags=WANDB_TAGS + [dataset_id, SELECTED_ARCHITECTURE_NAME],
+        fold_ids=FOLD_IDS,
+        architecture_variant=SELECTED_ARCHITECTURE_NAME,
+        muscari_asymptote_transform=ASYMPTOTE_TRANSFORM,
+        muscari_weibull_parameterization=WEIBULL_PARAMETERIZATION,
+        save_checkpoints=False,
+        write_summary=False,
+        export_pretrained=False,
+        metadata={
+            "script": str(Path(__file__)),
+            "dataset_id": dataset_id,
+            "gift_dataset_id": GIFT_DATASET_ID,
+        },
+    )
 
-        # Inspect one file to get feature names
-        sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
-        df = gpd.read_parquet(sample_file)
+    sample_file = next(config.path_sbcv_data.glob("*_train.parquet"))
+    df = gpd.read_parquet(sample_file)
+    landcover_feats = landcover_fraction_features(df)
+    climate_dem_feats = environmental_features(
+        df,
+        BIOCLIMATE_VARS,
+        include_elevation=True,
+        include_landcover=False,
+    )
+    all_env_feats = climate_dem_feats + landcover_feats
+    logger.info("Identified %d environmental features.", len(all_env_feats))
 
-        # Identify features
-        lc_feats = [c for c in df.columns if c.startswith("lc_frac_")]
-        climate_dem_feats = climate_dem_features(df, BIOCLIMATE_VARS)
-        landcover_feats = lc_feats
-        all_env_feats = climate_dem_feats + landcover_feats
-        logger.info(f"Identified features: {len(all_env_feats)} environmental features.")
-        experiments = build_experiments(climate_dem_feats, landcover_feats, all_env_feats)
-
-        # Run Benchmark
-        logger.info("Running Benchmark (Interpolation & Extrapolation)...")
-        bench = Benchmarker(config)
-        results = []
-        for exp in experiments:
-            logger.info(f"Running experiment: {exp['name']}")
-            res = bench.run(exp["name"], exp["model_init"], exp["feature_names"], exp["train_frac"])
-            results.append(res)
-
-        logger.info("Running regularized linear baseline.")
+    experiments = build_experiments(climate_dem_feats, landcover_feats, all_env_feats)
+    trainer = Trainer(config)
+    results = []
+    logger.info("Running neural benchmarks (interpolation and extrapolation).")
+    for exp in experiments:
+        logger.info("Running experiment: %s", exp["name"])
+        model_family = "FFNN" if exp["name"].startswith("FFNN") else "MuScaRi"
         results.append(
-            run_linear_baseline(
-                config,
-                dataset_id,
-                climate_dem_feats + ["log_sp_unit_area"],
-                train_frac=TRAIN_FRAC,
+            trainer.run(
+                exp["name"],
+                exp["model_init"],
+                exp["feature_names"],
+                train_frac=exp["train_frac"],
+                model_metadata={
+                    "model_family": model_family,
+                    "architecture_variant": SELECTED_ARCHITECTURE_NAME,
+                    "asymptote_transform": ASYMPTOTE_TRANSFORM,
+                    "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+                    "effort_transform": EFFORT_TRANSFORM,
+                    "target_transform": TARGET_TRANSFORM,
+                },
             )
         )
 
-        df_results = pd.concat(results)
-        suffix = "_smoke" if SMOKE_TEST else ""
-        output_file = root_folder / f"benchmark_results_{dataset_id}{suffix}.csv"
-        df_results.to_csv(output_file, index=False)
+    logger.info("Running regularized linear baseline.")
+    results.append(
+        run_linear_baseline(
+            config,
+            dataset_id,
+            climate_dem_feats + ["log_sp_unit_area"],
+            train_frac=TRAIN_FRAC,
+        )
+    )
 
-        logger.info(f"Benchmark completed, output saved at {output_file}.")
+    df_results = pd.concat(results, ignore_index=True)
+    suffix = "_smoke" if SMOKE_TEST else ""
+    output_file = root_folder / f"benchmark_results_{dataset_id}{suffix}.csv"
+    df_results.to_csv(output_file, index=False)
+    logger.info("Benchmark completed, output saved at %s.", output_file)

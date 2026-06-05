@@ -1,6 +1,47 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "unified_trainer_refactor"
+    important_params:
+      task: "replace split Benchmarker/train.py paths with a unified Trainer, checkpoint metadata, and ensemble pretrained export"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "1d2c40a"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_identity: "canonical config hash"
+      export_owner: "muscari.trainer.Trainer"
+      project_py_behavior: "load existing ensemble_pretrained artifact only"
+      files:
+        - "muscari/trainer.py"
+        - "muscari/benchmarker.py"
+        - "scripts/train.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/benchmark.py"
+        - "scripts/project.py"
+        - "scripts/data_processing/push_to_hub.py"
+        - "README.md"
+        - "scripts/experiments_3rd_rev/bias_investigation/scale_bias_hypotheses.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/experiments_3rd_rev/architecture_screen.py scripts/benchmark.py scripts/project.py scripts/data_processing/push_to_hub.py"
+        - "WANDB_MODE=offline uv run python - <<'PY' ... one-fold Trainer smoke wrote /tmp/muscari_trainer_smoke/fold_0.pth, config.json, ensemble_pretrained/model.safetensors, and metadata.json"
+        - "uv run python - <<'PY' ... MuScaRiEnsemble.from_pretrained round-trip predicted 8 rows from the smoke export"
+        - "MUSCARI_PROJECT_SMOKE=1 MUSCARI_PROJECT_RUN_DIR=/tmp/muscari_trainer_smoke uv run python scripts/project.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "git diff --check"
+      pre_existing_dirty_worktree:
+        - "scripts/results/architecture_screen/ceacce0/architecture_screen_extrap_summary.tex"
+        - "scripts/results/architecture_screen/ceacce0/architecture_screen_interp_summary.tex"
+        - "untracked scripts/results/architecture_screen_* directories"
+    key_finding: "Training and benchmarking had diverged: Benchmarker owned parallel fold execution and GIFT/interpolation evaluation, while scripts/train.py owned final checkpoints and ensemble export. The unified Trainer now owns both behaviors and exposes artifact export through config-hash run metadata."
+    outcome: "Added muscari.trainer.Trainer with parallel/sequential fold scheduling, train/val/test/GIFT metrics, checkpoint summaries, config-hash metadata, and ensemble_pretrained safetensors export. Architecture and benchmark scripts now use Trainer; project.py and push_to_hub.py load existing exported artifacts; scripts/train.py and muscari/benchmarker.py were removed."
+    next_actions:
+      - "Run the full final training with export_pretrained=True for the selected config, then point scripts/project.py at that config-hash run directory."
   - name: "train_script_feature_config_alignment"
     important_params:
       task: "align scripts/train.py with the feature-config abstraction and current MuScaRi training hooks"

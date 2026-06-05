@@ -12,6 +12,7 @@ from muscari import MuScaRiEnsemble
 DATASET_REPO = "vboussange/muscari-data"
 MODEL_REPO   = "vboussange/muscari"
 RUN_DIR      = Path(__file__).parents[1] / "results/train/ceacce0"
+EXPORT_DIR   = RUN_DIR / "ensemble_pretrained"
 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
@@ -30,9 +31,14 @@ if __name__ == "__main__":
     EnvironmentalFeatureDataset().push_to_hub(DATASET_REPO)
 
     print("\n" + "=" * 60)
-    print(f"Building ensemble from {RUN_DIR} …")
+    print(f"Loading exported ensemble from {EXPORT_DIR} …")
     print("=" * 60)
-    ensemble = MuScaRiEnsemble.from_folds(RUN_DIR)
+    if not EXPORT_DIR.exists():
+        raise FileNotFoundError(
+            f"Missing exported model at {EXPORT_DIR}. Run the unified Trainer with "
+            "export_pretrained=True before pushing."
+        )
+    ensemble = MuScaRiEnsemble.from_pretrained(EXPORT_DIR)
     print(f"Pushing ensemble ({ensemble.n_models} models) to {MODEL_REPO} …")
     ensemble.push_to_hub(MODEL_REPO)
 

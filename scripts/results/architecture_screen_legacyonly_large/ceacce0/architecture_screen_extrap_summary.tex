@@ -6,8 +6,8 @@
     \toprule
     Architecture & Effort & Asymptote & Folds & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ & Bias slope \\
     \midrule
-    Exp asymptote + absolute effort & Absolute & Exponential & 5 & \textbf{870.006 ± 464.573} & \textbf{0.545 ± 0.228} & \textbf{-0.477 ± 0.262} & \textbf{-0.251 ± 1.454} & \textbf{-0.060 ± 0.583} & 0.062 ± 0.033 \\
-    Exp asymptote + relative effort & Relative & Exponential & 5 & 1032.154 ± 485.620 & 0.617 ± 0.243 & -0.585 ± 0.283 & -0.673 ± 1.474 & -0.262 ± 0.616 & \textbf{0.051 ± 0.033} \\
+    Legacy Weibull + absolute effort & Absolute & Identity & 5 & \textbf{545.180 ± 26.831} & \textbf{0.336 ± 0.012} & \textbf{-0.219 ± 0.047} & \textbf{0.617 ± 0.037} & \textbf{0.376 ± 0.028} & \textbf{0.010 ± 0.031} \\
+    Stable Weibull + absolute effort + log target & Absolute & Stable span & 5 & 907.108 ± 14.820 & 0.545 ± 0.014 & -0.537 ± 0.019 & -0.058 ± 0.035 & -0.105 ± 0.020 & 0.056 ± 0.005 \\
     \bottomrule
     \end{tabularx}
     \caption{Architecture screen results on the GIFT extrapolation dataset (mean ± standard deviation across folds). Lower RMSE, MAPE, relative bias, and residual-bias slope magnitudes are better; higher $R^2$ and $D^2$ are better.}

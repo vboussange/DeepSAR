@@ -43,7 +43,7 @@ Important implementation points:
 - `observed_area` enters the Weibull branch through `log_observed_area`.
 - `sp_unit_area` enters as a feature through `log_sp_unit_area`.
 - Training uses `MSELoss` on richness scaled by `MaxAbsScaler`.
-- The current benchmarker evaluates GIFT through the ordinary forward pass on a
+- The current training/evaluation path evaluates GIFT through the ordinary forward pass on a
   dataloader, with `observed_area = sp_unit_area`, rather than through
   `predict_sr_tot()`. This is finite full-area prediction, not the asymptotic
   `S_T` evaluation described in the manuscript.
@@ -149,7 +149,7 @@ Separate three quantities explicitly:
 3. True asymptotic richness:
    `predict_sr_tot(df)`.
 
-The current benchmarker reports GIFT as extrapolation but evaluates quantity 2,
+The current training/evaluation path reports GIFT as extrapolation but evaluates quantity 2,
 not quantity 3. The manuscript and maps emphasize quantity 3. Before choosing a
 final architecture, all result tables should report both GIFT finite full-area
 and GIFT asymptote metrics, or clearly justify one of them.
@@ -244,7 +244,7 @@ mismatch.
 
 Start with fixes that preserve the current style and keep changes local:
 
-- Add a corrected GIFT asymptote evaluation path to `Benchmarker`.
+- Add a corrected GIFT asymptote evaluation path to `Trainer`.
 - Report finite full-area and asymptote metrics separately.
 - Add residual diagnostics by area, effort, coverage, and plot density.
 - Try area-effort loss reweighting before changing architecture.

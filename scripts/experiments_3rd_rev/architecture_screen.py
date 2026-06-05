@@ -12,7 +12,7 @@ import geopandas as gpd
 import pandas as pd
 import torch
 
-from muscari.benchmarker import BenchmarkConfig, Benchmarker
+from muscari.trainer import TrainConfig, Trainer
 from muscari.muscari import MuScaRi
 from muscari.utils import (
     feature_sets,
@@ -175,8 +175,9 @@ def torch_threads_per_fold(devices: list[str]) -> int:
     return max(1, min(4, worker_budget // max(1, len(devices))))
 
 
-def build_config(variant: dict, feature_names: list[str], devices: list[str]) -> BenchmarkConfig:
-    return BenchmarkConfig(
+def build_config(variant: dict, feature_names: list[str], devices: list[str]) -> TrainConfig:
+    feature_config = resolve_feature_config()
+    return TrainConfig(
         devices=devices,
         path_gift_data=GIFT_SAMPLES_PATH,
         path_sbcv_data=SBCV_SAMPLES_PATH,
@@ -191,6 +192,13 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         wandb_group=WANDB_GROUP,
         wandb_tags=WANDB_TAGS + [SBCV_DATASET_ID, variant["name"]],
         target_transform=variant["target_transform"],
+        layer_sizes=LAYER_SIZES,
+        muscari_asymptote_transform=variant["asymptote_transform"],
+        muscari_weibull_parameterization=variant["weibull_parameterization"],
+        architecture_variant=variant["name"],
+        model_family="MuScaRi",
+        feature_set=SELECTED_FEATURE_CONFIG,
+        feature_config=feature_config,
         wandb_config={
             "dataset_id": SBCV_DATASET_ID,
             "gift_dataset_id": GIFT_DATASET_ID,
@@ -206,6 +214,9 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
             "epoch_limit": N_EPOCHS,
             "run_folder": str(RUN_FOLDER),
         },
+        save_checkpoints=False,
+        write_summary=False,
+        export_pretrained=False,
         fold_ids=FOLD_IDS,
     )
 
@@ -217,18 +228,27 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
         asymptote_transform=variant["asymptote_transform"],
         weibull_parameterization=variant["weibull_parameterization"],
     )
-    bench = Benchmarker(config)
+    trainer = Trainer(config)
     logger.info(
         "Running %s on %s with %s dataloader workers per fold",
         variant["name"],
         config.devices,
         config.num_workers,
     )
-    results = bench.run(
+    results = trainer.run(
         variant["name"],
         model_init,
         feature_names,
         train_frac=TRAIN_FRAC,
+        model_metadata={
+            "model_family": "MuScaRi",
+            "architecture_variant": variant["name"],
+            "layer_sizes": LAYER_SIZES,
+            "asymptote_transform": variant["asymptote_transform"],
+            "weibull_parameterization": variant["weibull_parameterization"],
+            "effort_transform": variant["effort_transform"],
+            "target_transform": variant["target_transform"],
+        },
     )
     if results.empty:
         logger.warning("No results produced for %s", variant["name"])

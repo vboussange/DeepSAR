@@ -1,19 +1,34 @@
 """
 Projecting spatially the predictions of the ensembled `MuScaRi` model, and saving to geotiff files.
-See `scripts/train.py` for training the ensemble model.
+The ensemble must already be exported by `muscari.trainer.Trainer`.
 """
+import json
+import os
 import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
+from datetime import datetime, timezone
+
 from muscari import MuScaRiEnsemble
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.plotting import CMAP_BR
+from muscari.utils import get_git_hash
 import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
 
 from data_processing.eva_preprocessing import COUNTRY_DATA, COUNTRY_LIST
+
+
+DEFAULT_RUN_DIR = Path(__file__).parent / "results" / "train" / "6dcd90c"
+RUN_DIR = Path(os.environ.get("MUSCARI_PROJECT_RUN_DIR", DEFAULT_RUN_DIR))
+EXPORT_DIR = RUN_DIR / "ensemble_pretrained"
+MODEL_NAME = RUN_DIR.name
+PROJECTION_PATH = Path(__file__).parents[1] / "data/processed/projections" / MODEL_NAME
+RESOLUTIONS_M = [r * 1e3 for r in [2, 2**3, 2**6, 2**7]]
+PLOTTING = True
+SMOKE_TEST = os.environ.get("MUSCARI_PROJECT_SMOKE", "0") == "1"
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -119,37 +134,57 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
     lc_ds = lc_ds.rio.clip(eva_countries_gdf.geometry, drop=True)
     return env_ds, lc_ds
 
+
+def load_exported_model(export_dir: Path, device: str) -> MuScaRiEnsemble:
+    if not export_dir.exists():
+        raise FileNotFoundError(
+            f"Missing exported model at {export_dir}. Run the unified Trainer with "
+            "export_pretrained=True before projecting."
+        )
+    model = MuScaRiEnsemble.from_pretrained(export_dir)
+    return model.to(device).eval()
+
+
+def write_projection_metadata(projection_path: Path, device: str):
+    metadata = {
+        "run_dir": str(RUN_DIR),
+        "export_dir": str(EXPORT_DIR),
+        "model_name": MODEL_NAME,
+        "projection_path": str(projection_path),
+        "resolutions_m": RESOLUTIONS_M,
+        "device": device,
+        "git_hash": get_git_hash(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    with open(projection_path / "projection_metadata.json", "w") as handle:
+        json.dump(metadata, handle, indent=2)
+
 if __name__ == "__main__":
-    seed = 1
-    plotting = True
-    run_dir = Path(__file__).parent / "results" / "train" / "6dcd90c"
-
-    model_name = run_dir.name
-
-    projection_path = Path(__file__).parent / Path(f"../data/processed/projections/{model_name}")
-    projection_path.mkdir(parents=True, exist_ok=True)
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = MuScaRiEnsemble.from_folds(run_dir, device=device)
+    model = load_exported_model(EXPORT_DIR, device)
+    PROJECTION_PATH.mkdir(parents=True, exist_ok=True)
+    write_projection_metadata(PROJECTION_PATH, device)
+    if SMOKE_TEST:
+        print(f"Loaded exported model {EXPORT_DIR} on {device}.")
+        raise SystemExit(0)
+
     env_dataset, lc_dataset = load_environmental_features()
 
-    # for res in range(1000, 100000, 1000):
-    for res in [r * 1e3 for r in [2, 2**3, 2**6, 2**7]]:
+    for res in RESOLUTIONS_M:
         print(f"Calculating SR, and stdSR for resolution: {res}m")
         features, SR, std_SR = batch_predict(model, env_dataset, lc_dataset, res)
 
         SR_rast = create_raster(features, SR)
-        SR_rast.rio.to_raster(projection_path / f"SR_raster_{model_name}_{res:.0f}m.tif")
-        if plotting:
+        SR_rast.rio.to_raster(PROJECTION_PATH / f"SR_raster_{MODEL_NAME}_{res:.0f}m.tif")
+        if PLOTTING:
             import matplotlib.pyplot as plt
-            from matplotlib import cm
 
             fig, ax = plt.subplots(figsize=(8, 6))
             # colors = ["#dad7cd","#a3b18a","#588157","#3a5a40","#344e41"]
             SR_rast = SR_rast.rename("SR")
             SR_rast.plot(ax=ax, cmap=CMAP_BR, vmin=SR_rast.quantile(0.01), vmax=SR_rast.quantile(0.99))
             ax.set_title(f"Res: {res}m")
-            fig.savefig(projection_path / f"SR_raster_{model_name}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
+            fig.savefig(PROJECTION_PATH / f"SR_raster_{MODEL_NAME}_{res:.0f}m.png", dpi=300, bbox_inches='tight')
         
         # std_SR_rast = create_raster(features, std_SR)
         # std_SR_rast.rio.to_raster(projection_path / f"std_SR_raster_{model_name}_{res:.0f}m.tif")
