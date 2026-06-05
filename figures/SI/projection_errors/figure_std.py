@@ -154,9 +154,10 @@ if __name__ == '__main__':
 
         sr_ax.set_aspect('equal')
         dsr_ax.set_aspect('equal')
-        sr_ax.set_title(f'SR | Area = {area_label(res)} km$^2$', y=-0.22)
-        dsr_ax.set_title(f'dSR/dlogA | Area = {area_label(res)} km$^2$', y=-0.22)
 
-    # plt.tight_layout()
+    ax_sr_low.set_title('5 x 5 km$^2$', y=1.02)
+    ax_sr_high.set_title('50 x 50 km$^2$', y=1.02)
+
+    plt.tight_layout()
     fig.subplots_adjust(wspace=0.)
     fig.savefig("figure_rstd.pdf", dpi=300, transparent=True)
