@@ -1,4 +1,30 @@
-active_experiments: []
+active_experiments:
+  - name: "sync_sbcv_100km_d0848f6"
+    important_params:
+      task: "copy the 100 km SBCV dataset d0848f6 from gpunode05 to the current machine"
+      status: "running"
+      started: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "2de8c2c"
+      branch: "dev_3rd_rev"
+      source_host: "gpunode05"
+      source_path: "/home/boussang/deepSAR/data/processed/training_samples/sbcv/d0848f6"
+      destination_path: "data/processed/training_samples/sbcv/d0848f6"
+      dataset_id: "d0848f6"
+      block_size: "100 km"
+  - name: "current_sub_plan_final_revision_work"
+    important_params:
+      task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
+      status: "running"
+      started: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "2de8c2c"
+      branch: "dev_3rd_rev"
+      plan_path: "CURRENT_SUB_PLAN.md"
+      sbcv_1km_dataset_id: "ceacce0"
+      sbcv_100km_dataset_id: "d0848f6"
+      sbcv_100km_local_status: "present with 5 train, 5 validation, and 5 test parquet files"
+      sbcv_100km_block_size_m: 100000
 
 completed_experiments:
   - name: "figure_4_eva_scale_binned_relative_rmse"
