@@ -135,7 +135,7 @@ Commit:
 ## Final Checks
 
 - `uv run python -m py_compile scripts/benchmark.py scripts/data_processing/compile_sbcv_eva_samples.py`
-- `MUSCARI_SMOKE_TEST=1 WANDB_MODE=offline uv run python scripts/benchmark.py`
+- `MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py`
 - Validate final benchmark CSVs for missing primary metrics.
 - Compile the paper if the local TeX environment supports it.
 - `git diff --check`

@@ -15,12 +15,14 @@ from sklearn.preprocessing import StandardScaler
 
 from muscari.utils import (
     add_effort_columns,
+    compute_log1p_metrics,
     compute_metrics,
     environmental_features,
     finish_wandb,
     landcover_fraction_features,
     log_wandb_metrics,
     maybe_wandb_logger,
+    residual_bias_slope,
     setup_logger,
     symmetric_arch,
 )
@@ -33,10 +35,19 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore")
 
 ROOT = Path(__file__).parents[1]
+
+
+def env_flag(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.lower() not in {"0", "false", "no", "off"}
+
+
 GIFT_DATASET_ID = "da569da"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
 
-SBCV_ID = "ceacce0"
+SBCV_ID = os.environ.get("MUSCARI_SBCV_ID", "ceacce0")
 SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_ID
 
 BIOCLIMATE_VARS = [
@@ -59,7 +70,7 @@ LAYER_LABEL = "l32"
 LAYER_SIZE_BASE = 32
 SELECTED_LAYER_SIZES = symmetric_arch(6, base=LAYER_SIZE_BASE, factor=4)
 
-USE_WANDB = True
+USE_WANDB = env_flag("MUSCARI_USE_WANDB", True)
 WANDB_PROJECT = "muscari-third-revision"
 WANDB_TAGS = ["benchmark", "third-revision"]
 
@@ -147,6 +158,31 @@ def log_linear_wandb(metrics, dataset_id, fold_id, feature_names):
     finish_wandb(wandb_logger)
 
 
+def predict_log_linear(model, df, columns):
+    y_log_pred = model.predict(df[columns].to_numpy())
+    return np.clip(np.expm1(y_log_pred), 0, None)
+
+
+def add_log_linear_split_metrics(metrics, prefix, df, y_pred):
+    y_true = df["sr"].to_numpy()
+    split_metrics = {
+        **compute_metrics(y_true, y_pred),
+        **compute_log1p_metrics(y_true, y_pred),
+    }
+    split_metrics["bias_slope_log_area"] = residual_bias_slope(
+        y_true,
+        y_pred,
+        df["log_sp_unit_area"].to_numpy(),
+    )
+    for key, value in split_metrics.items():
+        metrics[f"{prefix}_{key}"] = value
+    metrics[f"{prefix}_prediction_min"] = float(np.nanmin(y_pred))
+    metrics[f"{prefix}_prediction_mean"] = float(np.nanmean(y_pred))
+    metrics[f"{prefix}_prediction_max"] = float(np.nanmax(y_pred))
+    metrics[f"{prefix}_prediction_finite_fraction"] = float(np.isfinite(y_pred).mean())
+    return split_metrics
+
+
 def run_linear_baseline(config, dataset_id, feature_names, train_frac=1.0):
     rows = []
     columns = ["log_observed_area"] + feature_names
@@ -191,18 +227,27 @@ def run_linear_baseline(config, dataset_id, feature_names, train_frac=1.0):
             "fold": fold_id,
             "train_frac": train_frac,
             "n_train_samples": len(train_df),
+            "n_val_samples": len(val_df),
+            "n_test_samples": len(test_df),
+            "n_gift_samples": len(gift_df),
             "ridge_alpha": best_alpha,
             "model_family": "linear",
             **selected_architecture_metadata(),
         }
+        split_metrics = {}
         for prefix, df in [
-            ("interp", test_df),
-            ("extrap", gift_df),
+            ("train", train_df),
+            ("val", val_df),
+            ("test", test_df),
+            ("gift", gift_df),
         ]:
-            y_true = df["sr"].to_numpy()
-            y_pred = np.clip(np.expm1(best_model.predict(df[columns].to_numpy())), 0, None)
-            for key, value in compute_metrics(y_true, y_pred).items():
-                metrics[f"{prefix}_{key}"] = value
+            y_pred = predict_log_linear(best_model, df, columns)
+            split_metrics[prefix] = add_log_linear_split_metrics(metrics, prefix, df, y_pred)
+
+        for key, value in split_metrics["test"].items():
+            metrics[f"interp_{key}"] = value
+        for key, value in split_metrics["gift"].items():
+            metrics[f"extrap_{key}"] = value
 
         log_linear_wandb(metrics, dataset_id, fold_id, feature_names)
         rows.append(metrics)

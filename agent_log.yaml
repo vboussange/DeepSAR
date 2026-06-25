@@ -25,6 +25,25 @@ active_experiments:
       sbcv_100km_dataset_id: "d0848f6"
       sbcv_100km_local_status: "present with 5 train, 5 validation, and 5 test parquet files"
       sbcv_100km_block_size_m: 100000
+      phase_1_log_linear_fix:
+        status: "completed"
+        completed_on: "2026-06-25"
+        files_changed:
+          - "scripts/benchmark.py"
+          - "CURRENT_SUB_PLAN.md"
+        changes:
+          - "Added MUSCARI_USE_WANDB and MUSCARI_SBCV_ID overrides while preserving existing defaults."
+          - "Extended Linear_ClimateDEM_Area rows with train, validation, test, GIFT, interpolation, and extrapolation metrics."
+          - "Added log1p metrics, residual-bias slopes, sample counts, and prediction-range diagnostics for the log-linear baseline."
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile scripts/benchmark.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated non-null linear train/val/test/GIFT/interp/extrap smoke metrics and alias equality"
+          - "git diff --check -- scripts/benchmark.py"
+        audit:
+          subagent: "019eff8c-5415-7380-a42d-1cad69070b71"
+          finding: "No blocking issues; smoke evidence is schema-level only and should not be cited as scientific validation."
+        outcome: "The log-linear benchmark failure was partly a reporting-schema issue. Corrected rows now expose the same primary split metrics as neural benchmark rows, while preserving the Ridge baseline definition."
 
 completed_experiments:
   - name: "figure_4_eva_scale_binned_relative_rmse"
