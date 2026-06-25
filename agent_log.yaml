@@ -1,6 +1,41 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "gift_asymptote_evaluation_ceacce0"
+    important_params:
+      task: "add and run a standalone audit comparing finite full-area GIFT predictions against true asymptotic predict_sr_tot predictions for existing ceacce0 benchmark artifacts"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "59d12fb"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      models:
+        - "MuScaRi_Area/ac733d9bd2f6"
+        - "MuScaRi_ClimateDEM/dae0789a3c87"
+        - "MuScaRi_ClimateDEM_Area/ad74a3020281"
+      output_dir: "scripts/results/gift_asymptote_evaluation/ceacce0"
+      outputs:
+        - "scripts/results/gift_asymptote_evaluation/ceacce0/gift_asymptote_evaluation_results.csv"
+        - "scripts/results/gift_asymptote_evaluation/ceacce0/gift_asymptote_evaluation_summary.md"
+      command: "uv run python scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+      uniform_ensemble_rmse:
+        MuScaRi_Area:
+          finite_full_area: 807.766
+          asymptotic_total: 807.768
+        MuScaRi_ClimateDEM:
+          finite_full_area: 407.409
+          asymptotic_total: 409.584
+        MuScaRi_ClimateDEM_Area:
+          finite_full_area: 511.574
+          asymptotic_total: 511.838
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+        - "uv run python scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+    key_finding: "For the selected ceacce0 MuScaRi benchmark artifacts, true asymptotic predict_sr_tot GIFT predictions are almost identical to finite full-area predictions with observed_area set to sp_unit_area. ClimateDEM remains the best of the audited models under both modes."
+    outcome: "Added a standalone GIFT asymptote audit script and wrote metric and Markdown summary outputs."
   - name: "default_uniform_ensemble_mean"
     important_params:
       task: "make uniform ensemble averaging the repository default after the ensemble weighting analysis"
