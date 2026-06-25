@@ -1,139 +1,215 @@
-"""
-This script generates plots of Shapley values vs area for different habitats.
-"""
-import torch
+"""Plot EVA scale-binned relative RMSE for area-only and ClimateDEM models."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
-import geopandas as gpd
-from captum.attr import ShapleyValueSampling
+import torch
 
-from muscari import MuScaRiEnsemble
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from muscari.muscari import MuScaRi
+from muscari.utils import add_effort_columns
+
 
 ROOT = Path(__file__).parents[2]
-RUN_DIR = ROOT / "scripts" / "results" / "train" / "ceacce0"
+SBCV_DATASET_ID = "ceacce0"
+SBCV_DATA_DIR = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
+ARTIFACT_ROOT = ROOT / "scripts/results/benchmark/artifacts"
+OUTPUT_DIR = Path(__file__).parent
+FIGURE_PATH = OUTPUT_DIR / "figure_4.pdf"
+CSV_PATH = OUTPUT_DIR / "figure_4_relative_rmse_by_area.csv"
 
-# Configuration
-DEVICE = "cuda:3" if torch.cuda.is_available() else "cpu"
-PLOT_CONFIG = [
-    ("Area", r"Spatial unit area, $A$", "#f72585", "o", "-"),
-    ("Environmental heterogeneity", "Environmental heterogeneity", "#4cc9f0", "s", "-"),
-    ("Mean environmental conditions", "Mean environmental conditions", "#3a0ca3", "^", "-"),
+DEVICE = os.environ.get("MUSCARI_FIGURE4_DEVICE", "cpu")
+FOLD_IDS = range(5)
+N_AREA_BINS = 20
+MIN_AREA_KM2 = 4.0
+MAX_AREA_KM2 = 1e6
+LOG_AREA_EDGES = np.linspace(
+    np.log(MIN_AREA_KM2 * 1e6),
+    np.log(MAX_AREA_KM2 * 1e6),
+    N_AREA_BINS + 1,
+)
+
+MODEL_SPECS = [
+    {
+        "name": "MuScaRi_Area",
+        "label": "Area only",
+        "config_hash": "ac733d9bd2f6",
+        "color": "#f72585",
+        "marker": "o",
+    },
+    {
+        "name": "MuScaRi_ClimateDEM",
+        "label": "Climate + DEM",
+        "config_hash": "dae0789a3c87",
+        "color": "#3a0ca3",
+        "marker": "^",
+    },
 ]
 
-class ShapleyAnalyzer:
-    """Handles Shapley value computation and analysis."""
-    
-    def __init__(self, model):
-        model.eval()
-        self.model = model.models[0]  # use the first model of the ensemble
-    
-    def compute_shapley_values(self, gdf):
-        """Compute Shapley values for given dataframe."""        
-        features = torch.tensor(
-            gdf[["log_observed_area"] + self.model.feature_names].values,
-            dtype=torch.float32,
+
+def unique_columns(columns: list[str]) -> list[str]:
+    return list(dict.fromkeys(columns))
+
+
+def load_fold_model(run_dir: Path, fold_id: int) -> tuple[MuScaRi, str]:
+    checkpoint_path = run_dir / f"fold_{fold_id}.pth"
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Missing checkpoint: {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    config = checkpoint["config"]
+    return MuScaRi.initialize(checkpoint, device=DEVICE), config.effort_transform
+
+
+def prepare_fold_data(path: Path, feature_names: list[str], effort_transform: str) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing EVA test fold: {path}")
+    raw_features = [
+        name
+        for name in feature_names
+        if name not in {"log_sp_unit_area", "log_observed_area"}
+    ]
+    columns = unique_columns(["sr", "sp_unit_area", "observed_area"] + raw_features)
+    df = pd.read_parquet(path, columns=columns)
+    df = add_effort_columns(df, effort_transform)
+    df = df.replace([np.inf, -np.inf], np.nan)
+    required = unique_columns(
+        ["sr", "sp_unit_area", "observed_area", "log_sp_unit_area", "log_observed_area"]
+        + feature_names
+    )
+    return df.dropna(subset=required).copy()
+
+
+def relative_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, float]:
+    rmse = float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
+    mean_sr = float(np.mean(y_true))
+    return rmse, mean_sr, 100.0 * rmse / mean_sr
+
+
+def evaluate_model_bins(spec: dict) -> list[dict]:
+    run_dir = ARTIFACT_ROOT / spec["name"] / spec["config_hash"]
+    rows = []
+    for fold_id in FOLD_IDS:
+        model, effort_transform = load_fold_model(run_dir, fold_id)
+        fold_path = SBCV_DATA_DIR / f"fold_{fold_id}_test.parquet"
+        df = prepare_fold_data(
+            fold_path,
+            model.feature_names,
+            effort_transform=effort_transform,
         )
-        feature_scaler = self.model.feature_scaler
-        X = torch.tensor(feature_scaler.transform(features), dtype=torch.float32).to(next(self.model.parameters()).device)
-        X = X[:, 1:]  # Exclude the first column (log_observed_area)
-        
-        def forward_fn(X):
-            with torch.no_grad():
-                return self.model._predict_sr_tot(X).flatten()
+        df["prediction"] = model.predict_sr(df).reshape(-1)
+        df["area_bin"] = pd.cut(
+            df["log_sp_unit_area"],
+            bins=LOG_AREA_EDGES,
+            labels=False,
+            include_lowest=True,
+        )
+        if df["area_bin"].isna().any():
+            missing = int(df["area_bin"].isna().sum())
+            raise ValueError(f"{missing} rows fell outside the configured area bins.")
 
-        explainer = ShapleyValueSampling(forward_fn)
-        shap_values = explainer.attribute(X, n_samples=100).cpu().numpy()
-        
-        df_shap = pd.DataFrame(shap_values, columns=self.model.feature_names)
-        df_shap["log_sp_unit_area_values"] = gdf["log_sp_unit_area"].values
-        
-        return df_shap
+        grouped = df.groupby("area_bin", sort=True, observed=False)
+        for area_bin, group in grouped:
+            y_true = group["sr"].to_numpy(dtype=float)
+            y_pred = group["prediction"].to_numpy(dtype=float)
+            rmse, mean_sr, rel_rmse_pct = relative_rmse(y_true, y_pred)
+            bin_idx = int(area_bin)
+            rows.append(
+                {
+                    "dataset_id": SBCV_DATASET_ID,
+                    "model_name": spec["name"],
+                    "model_label": spec["label"],
+                    "config_hash": spec["config_hash"],
+                    "fold": fold_id,
+                    "area_bin": bin_idx,
+                    "bin_left_km2": float(np.exp(LOG_AREA_EDGES[bin_idx]) / 1e6),
+                    "bin_right_km2": float(np.exp(LOG_AREA_EDGES[bin_idx + 1]) / 1e6),
+                    "area_center_km2": float(np.exp(group["log_sp_unit_area"].mean()) / 1e6),
+                    "n_samples": int(len(group)),
+                    "mean_sr": mean_sr,
+                    "rmse": rmse,
+                    "relative_rmse": rel_rmse_pct / 100.0,
+                    "relative_rmse_percent": rel_rmse_pct,
+                }
+            )
+    return rows
 
-def load_data_and_model():
-    """Load model and data."""
-    model, config = MuScaRiEnsemble.from_folds(RUN_DIR, device=DEVICE, return_config=True)
-    eva_dataset = gpd.read_parquet(config.path_sbcv_data / "fold_0_test.parquet")
-    eva_dataset["log_sp_unit_area"] = np.log(eva_dataset["sp_unit_area"])
-    eva_dataset["log_observed_area"] = np.log(eva_dataset["observed_area"])
-    return model, config, eva_dataset
 
-def aggregate_shapley_features(df_shap):
-    """Aggregate Shapley values by feature groups."""
-    feature_names = df_shap.columns.tolist()
-    std_features = [f for f in feature_names if f.startswith("std_")]
-    mean_features = [
-        f
-        for f in feature_names
-        if f not in std_features
-        and f != "log_sp_unit_area"
-        and f != "log_sp_unit_area_values"
-    ]
-
-    df_shap["Environmental heterogeneity"] = (
-        np.abs(df_shap[std_features]).sum(axis=1) if std_features else 0.0
+def summarize_for_plot(results: pd.DataFrame) -> pd.DataFrame:
+    grouped = results.groupby(["model_name", "model_label", "area_bin"], sort=True)
+    summary = grouped.agg(
+        area_center_km2=("area_center_km2", "mean"),
+        relative_rmse_percent_mean=("relative_rmse_percent", "mean"),
+        relative_rmse_percent_std=("relative_rmse_percent", "std"),
     )
-    df_shap["Mean environmental conditions"] = (
-        np.abs(df_shap[mean_features]).sum(axis=1) if mean_features else 0.0
-    )
-    df_shap["Area"] = (
-        np.abs(df_shap[["log_sp_unit_area"]]).sum(axis=1)
-        if "log_sp_unit_area" in df_shap.columns
-        else 0.0
-    )
+    return summary.reset_index()
 
-    feature_cols = [
-        "Area",
-        "Environmental heterogeneity",
-        "Mean environmental conditions",
-    ]
-    total_importance = df_shap[feature_cols].sum(axis=1)
-    df_shap[feature_cols] = df_shap[feature_cols].div(total_importance, axis=0)
-    
-    return df_shap
 
-def plot_shapley_values(df_shap, ax, config_plot):
-    """Plot Shapley values vs area."""
-    for var_name, label, color, marker, linestyle in config_plot:
-        df_shap['area_bins'] = pd.cut(df_shap['log_sp_unit_area_values'], bins=20, labels=False)
-        grouped = df_shap.groupby('area_bins')
-        mean_vals = grouped[var_name].mean()
-        std_vals = grouped[var_name].std()
-        mean_areas = np.exp(grouped['log_sp_unit_area_values'].mean()) / 1e6 
-        
+def plot_results(results: pd.DataFrame) -> None:
+    summary = summarize_for_plot(results)
+    fig, ax = plt.subplots(figsize=(4, 4))
+
+    for spec in MODEL_SPECS:
+        data = summary[summary["model_name"] == spec["name"]].sort_values("area_bin")
+        y = data["relative_rmse_percent_mean"].to_numpy(dtype=float)
+        y_std = data["relative_rmse_percent_std"].to_numpy(dtype=float)
+        x = data["area_center_km2"].to_numpy(dtype=float)
+
         ax.plot(
-            mean_areas,
-            mean_vals,
-            marker=marker,
+            x,
+            y,
+            marker=spec["marker"],
             markersize=4,
-            linestyle=linestyle,
-            color=color,
-            label=label,
-            alpha=0.8,
+            linestyle="-",
+            color=spec["color"],
+            label=spec["label"],
+            alpha=0.85,
         )
-        ci_lower = mean_vals - std_vals 
-        ci_upper = mean_vals + std_vals 
-        ax.fill_between(mean_areas, ci_lower, ci_upper, alpha=0.2, color=color)    
+        ax.fill_between(
+            x,
+            np.maximum(y - y_std, 1e-9),
+            y + y_std,
+            alpha=0.2,
+            color=spec["color"],
+        )
+
     ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_ylabel("Normalized absolute\nShapley values")
+    ax.set_ylim(bottom=0)
+    ax.set_ylabel("Relative RMSE (%)")
+    ax.set_xlabel(r"Spatial unit area, $A$ (km$^2$)")
+    ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc="center")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(FIGURE_PATH, dpi=300, bbox_inches="tight")
+
+
+def validate_results(results: pd.DataFrame) -> None:
+    expected_rows = len(MODEL_SPECS) * len(list(FOLD_IDS)) * N_AREA_BINS
+    if len(results) != expected_rows:
+        raise ValueError(f"Expected {expected_rows} result rows, found {len(results)}.")
+    if results["relative_rmse_percent"].isna().any():
+        raise ValueError("Relative RMSE contains missing values.")
+    if (results["n_samples"] <= 0).any():
+        raise ValueError("At least one model/fold/area bin has no samples.")
+
+
+def main() -> None:
+    rows = []
+    for spec in MODEL_SPECS:
+        rows.extend(evaluate_model_bins(spec))
+
+    results = pd.DataFrame(rows)
+    validate_results(results)
+    results.to_csv(CSV_PATH, index=False)
+    plot_results(results)
+    print(f"Wrote {CSV_PATH}")
+    print(f"Wrote {FIGURE_PATH}")
+
 
 if __name__ == "__main__":
-    np.random.seed(42)
-
-    model, config, test_data = load_data_and_model()
-    shapley_analyzer = ShapleyAnalyzer(model)
-    df_shap = shapley_analyzer.compute_shapley_values(test_data)
-    df_shap = aggregate_shapley_features(df_shap)
-    
-    fig, ax = plt.subplots(figsize=(4, 4))
-    plot_shapley_values(df_shap, ax, PLOT_CONFIG)
-    
-    ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc='center')
-    # ax.set_ylim(1e-2, 1.5)
-    fig.supxlabel(r"Spatial unit area, $A$ (km²)")
-    fig.tight_layout()
-    ax.grid(True, alpha=0.3)
-    fig.savefig("figure_4.pdf", dpi=300, bbox_inches='tight')
-    plt.show()
+    main()

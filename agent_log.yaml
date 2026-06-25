@@ -1,6 +1,51 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "figure_4_eva_scale_binned_relative_rmse"
+    important_params:
+      task: "replace Shapley-based Figure 4 with an EVA test-set scale-binned relative RMSE comparison of MuScaRi_Area and MuScaRi_ClimateDEM"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "7bd96e2"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      models:
+        - "MuScaRi_Area/ac733d9bd2f6"
+        - "MuScaRi_ClimateDEM/dae0789a3c87"
+        - "MuScaRi_ClimateDEM_Area/ad74a3020281"
+      binning: "20 equal-width bins in log spatial-unit area over 4 to 1e6 km2"
+      gift_variant_binning: "5 quantile bins in log GIFT area, 35 to 36 samples per bin"
+      outputs:
+        - "figures/figure_4/figure_4.pdf"
+        - "figures/figure_4/figure_4_relative_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_variant.pdf"
+        - "figures/figure_4/figure_4_variant_relative_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_GIFT_variant.pdf"
+        - "figures/figure_4/figure_4_GIFT_variant_relative_rmse_by_area.csv"
+      output_rows: 200
+      variant_output_rows: 300
+      gift_variant_output_rows: 75
+      no_missing_relative_rmse: true
+      mean_relative_rmse_percent:
+        MuScaRi_Area: 54.107
+        MuScaRi_ClimateDEM: 33.381
+        MuScaRi_ClimateDEM_Area: 32.365
+      gift_mean_relative_rmse_percent:
+        MuScaRi_Area: 45.753
+        MuScaRi_ClimateDEM: 33.355
+        MuScaRi_ClimateDEM_Area: 34.227
+      checks:
+        - "uv run python -m py_compile figures/figure_4/figure_4.py figures/figure_4/figure_4_variant.py figures/figure_4/figure_4_GIFT_variant.py"
+        - "uv run python figures/figure_4/figure_4.py"
+        - "uv run python figures/figure_4/figure_4_variant.py"
+        - "uv run python figures/figure_4/figure_4_GIFT_variant.py"
+        - "uv run python - <<'PY' ... validated 200 rows, 20 bins per model/fold, no missing relative RMSE values, and non-empty one-page PDF"
+        - "uv run python - <<'PY' ... validated figure_4_variant has 300 rows and GIFT variant has 75 rows with 35 to 36 samples per bin"
+        - "git diff --check"
+    key_finding: "Across EVA test-set area bins, MuScaRi_ClimateDEM has lower mean relative RMSE than MuScaRi_Area, with the gap widening toward larger spatial units."
+    outcome: "Replaced the Figure 4 Shapley script with an EVA scale-binned relative RMSE plotting script and generated main, EVA three-model variant, and GIFT-binned variant PDF/CSV outputs."
   - name: "gift_asymptote_evaluation_ceacce0"
     important_params:
       task: "add and run a standalone audit comparing finite full-area GIFT predictions against true asymptotic predict_sr_tot predictions for existing ceacce0 benchmark artifacts"
