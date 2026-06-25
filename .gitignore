@@ -32,6 +32,7 @@ reports/*
 benchmark_results*.tex
 *.json
 wandb/*
+*.safetensors
 
 
 ## Core latex/pdflatex auxiliary files:

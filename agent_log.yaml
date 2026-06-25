@@ -1,6 +1,46 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "architecture_screen_factorial_ceacce0"
+    important_params:
+      task: "run and summarize the committed 16-variant factorial architecture screen"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "7aa27e4"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      factors:
+        weibull_parameterization: ["legacy", "stable"]
+        target_transform: ["maxabs", "log1p_max"]
+        asymptote_transform: ["absolute", "softplus"]
+        layer_size_base: [32, 128]
+        effort_transform: "absolute"
+      launch_command: "./run_script.sh scripts/experiments_3rd_rev/architecture_screen.py factorial"
+      pid: 357961
+      pgid: 357961
+      sid: 357961
+      wandb_project: "muscari-third-revision"
+      wandb_group: "architecture_screen_factorial_ceacce0"
+      stdout_path: "stdout/factorial_architecture_screen.out"
+      output_path: "scripts/results/architecture_screen_factorial/ceacce0"
+      raw_results: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_results_ceacce0.csv"
+      variant_summary: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_factorial_variant_summary.csv"
+      factor_summary: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_factorial_factor_summary.csv"
+      rows: 80
+      variants: 16
+      folds_per_variant: 5
+      best_gift_rmse_variant: "legacy_maxabs_absolute_l32"
+      best_gift_rmse: 547.914
+      runner_up_gift_rmse_variant: "legacy_maxabs_absolute_l128"
+      runner_up_gift_rmse: 566.617
+      checks:
+        - "uv run python - <<'PY' ... validated 80 rows, 16 variants, 5 folds per variant, and no missing key metrics"
+        - "uv run python - <<'PY' ... wrote variant and factor summaries from raw factorial CSV"
+    key_finding: "Legacy Weibull with maxabs target scaling and absolute asymptote dominates the factorial sweep on GIFT extrapolation. The l32 variant gives the best GIFT RMSE and lowest median relative bias; l128 gives slightly better interpolation RMSE."
+    outcome: "Full factorial sweep completed and summary CSVs were generated for variant-level and factor-level comparisons."
   - name: "proper_architecture_screen_factorial"
     important_params:
       task: "configure architecture_screen.py for a full factorial architecture sweep"

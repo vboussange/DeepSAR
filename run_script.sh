@@ -1,24 +1,34 @@
 #!/bin/bash
-# https://stackoverflow.com/questions/17385794/how-to-get-the-process-id-to-kill-a-nohup-process
 
-file=$1
-prefix=$2  # Optional prefix argument
+file="$1"
+prefix="$2"
 
-namesim_with_ext=$(basename ${file})
+namesim_with_ext=$(basename "$file")
 namesim="${namesim_with_ext%.*}"
 
-# Apply prefix if provided
 if [ -n "$prefix" ]; then
     namesim="${prefix}_${namesim}"
 fi
 
-# Ensure required directories exist
 mkdir -p stdout
 
 echo "Launching script for $namesim"
-chmod +x $file
-# source /home/boussang/miniforge3/bin/activate /home/boussang/SAR_modelling/.env-torch
 
-# Start in a new session/process group
-setsid nohup uv run python $file > "stdout/${namesim}.out" 2>&1 &
-echo $! > "stdout/${namesim}_save_pid.txt"
+setsid nohup uv run python "$file" > "stdout/${namesim}.out" 2>&1 &
+
+pid=$!
+
+# Give the process a moment to appear in ps
+sleep 0.2
+
+pgid=$(ps -o pgid= -p "$pid" | tr -d ' ')
+sid=$(ps -o sid= -p "$pid" | tr -d ' ')
+
+echo "$pid" > "stdout/${namesim}_pid.txt"
+echo "$pgid" > "stdout/${namesim}_pgid.txt"
+echo "$sid" > "stdout/${namesim}_sid.txt"
+
+echo "PID:  $pid"
+echo "PGID: $pgid"
+echo "SID:  $sid"
+echo "Logs: stdout/${namesim}.out"
