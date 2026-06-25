@@ -25,9 +25,9 @@ class MuScaRi(nn.Module):
         weibull_parameterization: str = "legacy",
     ):
         super().__init__()
-        if asymptote_transform not in {"softplus", "exp", "identity"}:
+        if asymptote_transform not in {"absolute", "softplus", "exp", "identity"}:
             raise ValueError(
-                "asymptote_transform must be one of {'softplus', 'exp', 'identity'}"
+                "asymptote_transform must be one of {'absolute', 'softplus', 'exp', 'identity'}"
             )
         if weibull_parameterization not in {"legacy", "stable"}:
             raise ValueError("weibull_parameterization must be one of {'legacy', 'stable'}")
@@ -55,7 +55,7 @@ class MuScaRi(nn.Module):
         with torch.no_grad():
             self.ffnn.last_fully_connected.bias.copy_(
                 torch.tensor(
-                    [0.0, self._softplus_inverse(low), self._softplus_inverse(span), 0.0],
+                    [0.0, self._positive_inverse(low), self._positive_inverse(span), 0.0],
                     dtype=torch.float32,
                 )
             )
@@ -63,6 +63,22 @@ class MuScaRi(nn.Module):
     @staticmethod
     def _softplus_inverse(x):
         return float(np.log(np.expm1(x)))
+
+    def _positive_transform(self, x):
+        if self.asymptote_transform == "absolute":
+            return torch.abs(x) + self._PARAMETER_EPS
+        if self.asymptote_transform == "exp":
+            return torch.exp(torch.clamp(x, min=-20, max=20)) + self._PARAMETER_EPS
+        if self.asymptote_transform == "softplus":
+            return F.softplus(x) + self._PARAMETER_EPS
+        return x
+
+    def _positive_inverse(self, x):
+        if self.asymptote_transform == "exp":
+            return float(np.log(max(x, self._PARAMETER_EPS)))
+        if self.asymptote_transform == "softplus":
+            return self._softplus_inverse(x)
+        return float(x)
 
     def _weibull_4p(self, x, b, c, d, log_e):
         """4-parameter Weibull: f(x) = c + (d - c) * exp(-exp(b * (ln(x) - log_e)))"""
@@ -75,12 +91,7 @@ class MuScaRi(nn.Module):
         x = self.ffnn(x)
         b = F.softplus(x[:, 0:1]) + self._PARAMETER_EPS
         raw_c = x[:, 1:2]
-        if self.asymptote_transform == "exp":
-            c = torch.exp(torch.clamp(raw_c, min=-20, max=20)) + self._PARAMETER_EPS
-        elif self.asymptote_transform == "softplus":
-            c = F.softplus(raw_c) + self._PARAMETER_EPS
-        else:  # identity
-            c = raw_c
+        c = self._positive_transform(raw_c)
         d = c * torch.sigmoid(x[:, 2:3])  # ensure 0 < d < c
         log_e = x[:, 3:4]
         return b, c, d, log_e
@@ -88,8 +99,8 @@ class MuScaRi(nn.Module):
     def _predict_stable_parameters(self, x):
         x = self.ffnn(x)
         beta = F.softplus(x[:, 0:1]) + self._PARAMETER_EPS
-        low = F.softplus(x[:, 1:2]) + self._PARAMETER_EPS
-        span = F.softplus(x[:, 2:3]) + self._PARAMETER_EPS
+        low = self._positive_transform(x[:, 1:2])
+        span = self._positive_transform(x[:, 2:3])
         eta = x[:, 3:4]
         total = low + span
         return beta, low, span, eta, total

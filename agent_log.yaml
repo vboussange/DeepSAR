@@ -1,6 +1,139 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "proper_architecture_screen_factorial"
+    important_params:
+      task: "configure architecture_screen.py for a full factorial architecture sweep"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      factors:
+        weibull_parameterization: ["legacy", "stable"]
+        target_transform: ["maxabs", "log1p_max"]
+        asymptote_transform: ["absolute", "softplus"]
+        layer_size_base: [32, 128]
+        effort_transform: "absolute"
+      variant_count: 16
+      output_path: "scripts/results/architecture_screen_factorial/ceacce0"
+      smoke_output: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated 16 unique factorial variants with absolute effort"
+        - "uv run python - <<'PY' ... validated absolute asymptote transform for legacy and stable MuScaRi forward/total predictions"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV has all 16 factor combinations and required metadata/log metrics"
+        - "git diff --check"
+    key_finding: "The stable parameterization previously ignored asymptote_transform, so an absolute-vs-softplus sweep would have duplicated stable models unless the stable low/span heads used the selected positive transform."
+    outcome: "Configured a 16-variant architecture_screen_factorial sweep and added MuScaRi asymptote_transform='absolute'. Legacy asymptotes and stable low/span heads now use the selected absolute/softplus positive transform."
+  - name: "architecture_screen_variant_layer_sizes"
+    important_params:
+      task: "store architecture_screen.py layer sizes at the variant level and emit them in screen result rows"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      target_script: "scripts/experiments_3rd_rev/architecture_screen.py"
+      layer_sizes: "128;512;2048;2048;512;128"
+      smoke_output: "scripts/results/architecture_screen_legacy_log1p_max/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      aggregate_output: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      files:
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated every active VARIANTS entry has layer_sizes and build_config forwards them"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV contains layer_sizes and log1p metric columns"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated aggregate has layer-size and log1p summary columns with 16 rows"
+        - "git diff --check"
+    key_finding: "The screen was still using the global LAYER_SIZES constant for config/model metadata, so layer size was not part of each variant definition."
+    outcome: "Each active and commented architecture-screen variant now carries layer_sizes, and run_variant/build_config use the variant-owned value for model construction, Trainer config, W&B config, metadata, and CSV rows."
+  - name: "log_sr_architecture_screen_metrics"
+    important_params:
+      task: "track log-transformed species-richness performance in shared Trainer outputs used by architecture_screen.py"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      target_script: "scripts/experiments_3rd_rev/architecture_screen.py"
+      metrics_added:
+        - "log1p_rmse"
+        - "log1p_mae"
+        - "log1p_r2"
+        - "log1p_d2"
+      smoke_output: "scripts/results/architecture_screen_legacy_log1p_max/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      aggregate_output: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      aggregate_rows: 16
+      files:
+        - "muscari/utils.py"
+        - "muscari/trainer.py"
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/utils.py muscari/trainer.py scripts/experiments_3rd_rev/aggregate_screen_results.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... compute_log1p_metrics returned finite log metrics with a negative prediction clipped to zero"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV contains train/val/test/gift/interp/extrap log1p metric columns"
+        - "uv run python - <<'PY' ... validated aggregate has interp/extrap log1p summary columns and 16 rows"
+        - "git diff --check"
+    key_finding: "Architecture-screen metrics are assembled in Trainer._evaluate_splits, so adding log-SR diagnostics there exposes them automatically in fold CSVs and W&B logs."
+    outcome: "Added log1p SR RMSE, MAE, R2, and D2 metrics to shared evaluation output. New architecture-screen runs now write train/val/test/gift/interp/extrap log1p metrics; historical aggregate rows include empty log columns until their source screens are rerun."
+  - name: "aggregate_architecture_screen_results"
+    important_params:
+      task: "aggregate architecture screen fold-level CSVs into one numeric comparison table"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      input_glob: "scripts/results/architecture_*/ceacce0/architecture_screen_results_ceacce0.csv"
+      output_csv: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      source_screens:
+        - "architecture_screen"
+        - "architecture_screen_legacyonly_large"
+        - "architecture_screen_stable"
+        - "architecture_screen_stable_maxabs_large"
+        - "architecture_screen_stable_small"
+        - "architecture_screen_stable_small_full_covariates"
+      covariate_sets:
+        env_area: 11
+        env_area_full_lc: 63
+      layer_size_sets:
+        large: "128;512;2048;2048;512;128"
+        small: "32;128;512;512;128;32"
+      output_rows: 15
+      files:
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated required columns, unique source_screen/model_type/covariates_used/layer_sizes rows, expected layer-size sets, numeric metric columns, and 15 output rows"
+        - "git diff --check"
+    key_finding: "Architecture screens contain 15 source-screen/model/covariate combinations, with repeated stable variants preserved by source_screen provenance."
+    outcome: "Added a reproducible aggregation script and generated a numeric aggregate CSV sorted by covariate set, GIFT RMSE, and interpolation RMSE. The aggregate now tracks small and large model layer sizes."
   - name: "trainer_export_to_project"
     important_params:
       task: "remove Trainer export_pretrained option and move ensemble_pretrained export into project.py"

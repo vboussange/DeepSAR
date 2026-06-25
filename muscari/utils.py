@@ -169,6 +169,26 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     }
 
 
+def compute_log1p_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    from sklearn.metrics import (
+        d2_absolute_error_score,
+        mean_absolute_error,
+        r2_score,
+        root_mean_squared_error,
+    )
+
+    y_true = np.asarray(y_true, dtype=float).ravel()
+    y_pred = np.asarray(y_pred, dtype=float).ravel()
+    log_true = np.log1p(y_true)
+    log_pred = np.log1p(np.clip(y_pred, 0.0, None))
+    return {
+        "log1p_r2": float(r2_score(log_true, log_pred)),
+        "log1p_d2": float(d2_absolute_error_score(log_true, log_pred)),
+        "log1p_rmse": float(root_mean_squared_error(log_true, log_pred)),
+        "log1p_mae": float(mean_absolute_error(log_true, log_pred)),
+    }
+
+
 def residual_bias_slope(
     y_true: np.ndarray,
     y_pred: np.ndarray,

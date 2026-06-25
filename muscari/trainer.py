@@ -23,6 +23,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from muscari.dataset import create_dataloader
 from muscari.utils import (
     add_effort_columns,
+    compute_log1p_metrics,
     compute_metrics,
     evaluate_lit_model,
     finish_wandb,
@@ -568,7 +569,10 @@ class Trainer:
             if loader is None:
                 continue
             y_true, y_pred = evaluate_lit_model(lit_model, loader, device)
-            split_metrics = compute_metrics(y_true, y_pred)
+            split_metrics = {
+                **compute_metrics(y_true, y_pred),
+                **compute_log1p_metrics(y_true, y_pred),
+            }
             metrics_by_split[split] = split_metrics
             bias_slopes[f"{split}_bias_slope_log_area"] = residual_bias_slope(
                 y_true,

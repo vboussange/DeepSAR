@@ -26,7 +26,7 @@ SBCV_DATASET_ID = "ceacce0"
 GIFT_DATASET_ID = "da569da"
 SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
-SCREEN_NAME = "architecture_screen_stable_maxabs_large"
+SCREEN_NAME = "architecture_screen_factorial"
 RUN_FOLDER = ROOT / "scripts/results" / SCREEN_NAME / SBCV_DATASET_ID
 FEATURE_GROUP = "env_area"
 
@@ -80,52 +80,42 @@ N_EPOCHS = 1 if SMOKE_TEST else 500
 TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 BATCH_SIZE = 1024
 LR = 1e-3
-LAYER_SIZES = symmetric_arch(6, base=128, factor=4)
+EFFORT_TRANSFORM = "absolute"
+WEIBULL_PARAMETERIZATIONS = ["legacy", "stable"]
+TARGET_TRANSFORMS = ["maxabs", "log1p_max"]
+ASYMPTOTE_TRANSFORMS = ["absolute", "softplus"]
+LAYER_SIZE_OPTIONS = {
+    "l32": symmetric_arch(6, base=32, factor=4),
+    "l128": symmetric_arch(6, base=128, factor=4),
+}
 
-VARIANTS = [
-    # {
-    #     "name": "legacy_abs",
-    #     "effort_transform": "absolute",
-    #     "asymptote_transform": "identity",
-    #     "weibull_parameterization": "legacy",
-    #     "target_transform": "maxabs",
-    # },
-    # {
-    #     "name": "softplus_abs",
-    #     "effort_transform": "absolute",
-    #     "asymptote_transform": "softplus",
-    #     "weibull_parameterization": "legacy",
-    #     "target_transform": "maxabs",
-    # },
-    # {
-    #     "name": "exp_abs",
-    #     "effort_transform": "absolute",
-    #     "asymptote_transform": "exp",
-    #     "weibull_parameterization": "legacy",
-    #     "target_transform": "maxabs",
-    # },
-    # {
-    #     "name": "stable_abs",
-    #     "effort_transform": "absolute",
-    #     "asymptote_transform": "softplus",
-    #     "weibull_parameterization": "stable",
-    #     "target_transform": "log1p_max",
-    # },
-    {
-        "name": "stable_abs_maxabs",
-        "effort_transform": "absolute",
-        "asymptote_transform": "softplus",
-        "weibull_parameterization": "stable",
-        "target_transform": "maxabs",
-    },
-    # {
-    #     "name": "stable_coverage",
-    #     "effort_transform": "coverage",
-    #     "asymptote_transform": "softplus",
-    #     "weibull_parameterization": "stable",
-    #     "target_transform": "log1p_max",
-    # },
-]
+
+def build_variants() -> list[dict]:
+    variants = []
+    for weibull_parameterization in WEIBULL_PARAMETERIZATIONS:
+        for target_transform in TARGET_TRANSFORMS:
+            for asymptote_transform in ASYMPTOTE_TRANSFORMS:
+                for layer_label, layer_sizes in LAYER_SIZE_OPTIONS.items():
+                    variants.append(
+                        {
+                            "name": (
+                                f"{weibull_parameterization}_"
+                                f"{target_transform}_"
+                                f"{asymptote_transform}_"
+                                f"{layer_label}"
+                            ),
+                            "effort_transform": EFFORT_TRANSFORM,
+                            "asymptote_transform": asymptote_transform,
+                            "weibull_parameterization": weibull_parameterization,
+                            "target_transform": target_transform,
+                            "layer_label": layer_label,
+                            "layer_sizes": layer_sizes.copy(),
+                        }
+                    )
+    return variants
+
+
+VARIANTS = build_variants()
 
 logger = setup_logger("architecture_screen")
 
@@ -145,7 +135,7 @@ class MuScaRiArchitectureInit:
     feature_names: list[str]
     asymptote_transform: str
     weibull_parameterization: str = "legacy"
-    architecture: list[int] = field(default_factory=lambda: LAYER_SIZES.copy())
+    architecture: list[int] = field(default_factory=lambda: LAYER_SIZE_OPTIONS["l128"].copy())
 
     def __call__(self, **kwargs):
         return MuScaRi(
@@ -175,8 +165,17 @@ def torch_threads_per_fold(devices: list[str]) -> int:
     return max(1, min(4, worker_budget // max(1, len(devices))))
 
 
+def variant_layer_sizes(variant: dict) -> list[int]:
+    return list(variant["layer_sizes"])
+
+
+def format_layer_sizes(layer_sizes: list[int]) -> str:
+    return ";".join(str(size) for size in layer_sizes)
+
+
 def build_config(variant: dict, feature_names: list[str], devices: list[str]) -> TrainConfig:
     feature_config = resolve_feature_config()
+    layer_sizes = variant_layer_sizes(variant)
     return TrainConfig(
         devices=devices,
         path_gift_data=GIFT_SAMPLES_PATH,
@@ -192,7 +191,7 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
         wandb_group=WANDB_GROUP,
         wandb_tags=WANDB_TAGS + [SBCV_DATASET_ID, variant["name"]],
         target_transform=variant["target_transform"],
-        layer_sizes=LAYER_SIZES,
+        layer_sizes=layer_sizes,
         muscari_asymptote_transform=variant["asymptote_transform"],
         muscari_weibull_parameterization=variant["weibull_parameterization"],
         architecture_variant=variant["name"],
@@ -205,9 +204,12 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
             "feature_set": SELECTED_FEATURE_CONFIG,
             "feature_names": feature_names,
             "architecture_variant": variant["name"],
+            "effort_transform": variant["effort_transform"],
             "asymptote_transform": variant["asymptote_transform"],
             "weibull_parameterization": variant["weibull_parameterization"],
             "target_transform": variant["target_transform"],
+            "layer_label": variant["layer_label"],
+            "layer_sizes": layer_sizes,
             "model_family": "MuScaRi",
             "batch_size": BATCH_SIZE,
             "learning_rate": LR,
@@ -221,11 +223,13 @@ def build_config(variant: dict, feature_names: list[str], devices: list[str]) ->
 
 
 def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> pd.DataFrame:
+    layer_sizes = variant_layer_sizes(variant)
     config = build_config(variant, feature_names, devices)
     model_init = MuScaRiArchitectureInit(
         feature_names=feature_names,
         asymptote_transform=variant["asymptote_transform"],
         weibull_parameterization=variant["weibull_parameterization"],
+        architecture=layer_sizes,
     )
     trainer = Trainer(config)
     logger.info(
@@ -242,11 +246,12 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
         model_metadata={
             "model_family": "MuScaRi",
             "architecture_variant": variant["name"],
-            "layer_sizes": LAYER_SIZES,
+            "layer_sizes": layer_sizes,
             "asymptote_transform": variant["asymptote_transform"],
             "weibull_parameterization": variant["weibull_parameterization"],
             "effort_transform": variant["effort_transform"],
             "target_transform": variant["target_transform"],
+            "layer_label": variant["layer_label"],
         },
     )
     if results.empty:
@@ -257,6 +262,8 @@ def run_variant(variant: dict, feature_names: list[str], devices: list[str]) -> 
     results["asymptote_transform"] = variant["asymptote_transform"]
     results["weibull_parameterization"] = variant["weibull_parameterization"]
     results["target_transform"] = variant["target_transform"]
+    results["layer_label"] = variant["layer_label"]
+    results["layer_sizes"] = format_layer_sizes(layer_sizes)
     results["feature_set"] = SELECTED_FEATURE_CONFIG
     results["model_family"] = "MuScaRi"
     results["n_epochs"] = N_EPOCHS
