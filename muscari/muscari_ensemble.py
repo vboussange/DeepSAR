@@ -70,10 +70,9 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
             target_scalers=[...],
         )
 
-    By default, predictions are validation-weighted: members with lower
-    validation RMSE receive larger weights, and missing metrics fall back to a
-    uniform ensemble. Pass ``use_validation_weights=False`` to
-    :meth:`from_folds` or :meth:`from_models` to use an unweighted ensemble.
+    By default, predictions use a uniform ensemble mean. Pass
+    ``use_validation_weights=True`` to :meth:`from_folds` or
+    :meth:`from_models` to weight members by inverse validation RMSE squared.
     """
 
     def __init__(
@@ -134,7 +133,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         models: list[MuScaRi],
         member_metrics: Optional[list] = None,
         ensemble_weights: Optional[list] = None,
-        use_validation_weights: bool = True,
+        use_validation_weights: bool = False,
     ) -> "MuScaRiEnsemble":
         """Build an ensemble from a list of already-trained :class:`MuScaRi` models."""
         assert models, "models list must not be empty"
@@ -183,7 +182,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         run_dir: Path,
         device: str = "cpu",
         return_config: bool = False,
-        use_validation_weights: bool = True,
+        use_validation_weights: bool = False,
     ):
         """Build an ensemble from ``fold_*.pth`` checkpoints.
 
@@ -270,7 +269,7 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         return self._weighted_mean(self._as_prediction_matrix(predictions))
 
     def get_member_prediction_dispersion(self, predictions: np.ndarray) -> np.ndarray:
-        """Weighted ensemble dispersion for a ``(n_models, n_samples)`` matrix."""
+        """Configured ensemble dispersion for a ``(n_models, n_samples)`` matrix."""
         return self._weighted_std(self._as_prediction_matrix(predictions))
 
     def predict_members_sr(self, df: pd.DataFrame) -> np.ndarray:
@@ -282,17 +281,17 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         return self._member_predictions(df, "predict_sr_tot")
 
     def predict_mean_sr(self, df: pd.DataFrame) -> np.ndarray:
-        """Validation-weighted species-richness prediction across members."""
+        """Mean finite-effort species-richness prediction across members."""
         return self.aggregate_member_predictions(self.predict_members_sr(df))
 
     def get_std_sr(self, df: pd.DataFrame) -> np.ndarray:
-        """Weighted ensemble dispersion for finite-effort richness."""
+        """Configured ensemble dispersion for finite-effort richness."""
         return self.get_member_prediction_dispersion(self.predict_members_sr(df))
 
     def predict_mean_sr_tot(self, df: pd.DataFrame) -> np.ndarray:
-        """Validation-weighted asymptotic species-richness prediction."""
+        """Mean asymptotic species-richness prediction across members."""
         return self.aggregate_member_predictions(self.predict_members_sr_tot(df))
 
     def get_std_sr_tot(self, df: pd.DataFrame) -> np.ndarray:
-        """Weighted ensemble dispersion for asymptotic richness."""
+        """Configured ensemble dispersion for asymptotic richness."""
         return self.get_member_prediction_dispersion(self.predict_members_sr_tot(df))

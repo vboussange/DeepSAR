@@ -1,6 +1,157 @@
 active_experiments: []
 
 completed_experiments:
+  - name: "default_uniform_ensemble_mean"
+    important_params:
+      task: "make uniform ensemble averaging the repository default after the ensemble weighting analysis"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      affected_defaults:
+        - "MuScaRiEnsemble.from_models"
+        - "MuScaRiEnsemble.from_folds"
+        - "TrainConfig.use_validation_weights"
+        - "scripts/project.py export path"
+        - "widget pretrained model loading"
+      selected_export: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      selected_export_weights: "0.2;0.2;0.2;0.2;0.2"
+      opt_in_validation_weighting:
+        project: "MUSCARI_PROJECT_USE_VALIDATION_WEIGHTS=1"
+        widget: "MUSCARI_ENSEMBLE_WEIGHTING=artifact"
+      checks:
+        - "uv run python -m py_compile muscari/muscari_ensemble.py muscari/trainer.py scripts/project.py scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "cd widget && uv run python -m py_compile muscari_widget/resources.py tests/test_resources.py"
+        - "uv run python - <<'PY' ... validated MuScaRiEnsemble.from_folds defaults to uniform and explicit use_validation_weights=True still uses inverse-val-RMSE-squared weights"
+        - "cd widget && uv run --extra dev pytest tests/test_resources.py -q"
+        - "MUSCARI_PROJECT_RUN_DIR=... MUSCARI_PROJECT_MODEL_NAME=... MUSCARI_PROJECT_EXPORT_OVERWRITE=1 MUSCARI_PROJECT_SMOKE=1 uv run python scripts/project.py"
+        - "uv run python - <<'PY' ... validated selected ensemble_pretrained export loads with uniform weights and metadata use_validation_weights=false"
+        - "cd widget && uv run --extra dev pytest -m 'not slow'"
+        - "git diff --check"
+        - "cd widget && git diff --check"
+    key_finding: "Uniform averaging is now the default ensemble aggregation path in core model loading, training config metadata, projection export, and widget inference."
+    outcome: "Validation-RMSE weighting remains available only by explicit opt-in; the selected local MuScaRi_ClimateDEM ensemble_pretrained export was rewritten to uniform weights."
+  - name: "ensemble_weighting_analysis_ceacce0"
+    important_params:
+      task: "compare uniform, inverse validation RMSE, and inverse validation RMSE squared ensemble aggregation for the selected MuScaRi_ClimateDEM benchmark artifact"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_model: "MuScaRi_ClimateDEM"
+      selected_run_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      output_dir: "scripts/results/ensemble_weighting_analysis/ceacce0"
+      outputs:
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_results.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_weights.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_std_summary.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_summary.md"
+      command: "uv run python scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+      strategies:
+        - "uniform"
+        - "inverse_val_rmse"
+        - "inverse_val_rmse_squared"
+      best_gift_strategy: "uniform"
+      uniform_gift_rmse: 407.409
+      inverse_val_rmse_squared_gift_rmse: 408.928
+      best_interpolation_strategy: "inverse_val_rmse_squared"
+      uniform_interpolation_rmse: 43.460
+      inverse_val_rmse_squared_interpolation_rmse: 43.419
+      inverse_val_rmse_squared_effective_n: 4.982
+      inverse_val_rmse_squared_gift_mean_std_ratio_to_uniform: 1.0048
+      inverse_val_rmse_squared_interpolation_mean_std_ratio_to_uniform: 0.9997
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "uv run python scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "uv run python - <<'PY' ... validated strategies, splits, numeric metric/std columns, weight sums, and inverse_val_rmse_squared weights against MuScaRiEnsemble.from_folds"
+        - "git diff --check"
+    key_finding: "Uniform averaging gives the best GIFT RMSE for the selected artifact. Validation-RMSE-squared weighting slightly improves combined SBCV test RMSE but worsens GIFT RMSE and leaves effective ensemble size nearly unchanged at 4.982."
+    outcome: "Added a standalone ensemble-weighting analysis script and wrote performance, weight, standard-deviation, and Markdown summary artifacts."
+  - name: "project_and_serve_muscari_climatedem"
+    important_params:
+      task: "project the best benchmark model and run the widget locally with local model weights and local environmental features"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_model: "MuScaRi_ClimateDEM"
+      benchmark_run_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      projection_model_name: "benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87"
+      export_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      projection_path: "data/processed/projections/benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87"
+      projection_command: "MUSCARI_PROJECT_RUN_DIR=/home/boussang/DeepSAR/scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87 MUSCARI_PROJECT_MODEL_NAME=benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87 ./run_script.sh scripts/project.py project_muscari_climatedem"
+      projection_pid: 2663312
+      projection_stdout: "stdout/project_muscari_climatedem_project.out"
+      projection_resolutions_m: [2000, 8000, 64000, 128000]
+      country_data: "data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
+      widget_launcher: "scripts/run_widget_local_muscari_climatedem.sh"
+      widget_pid: 2782709
+      widget_stdout: "stdout/widget_local_muscari_climatedem.out"
+      widget_url: "http://127.0.0.1:7860"
+      checks:
+        - "uv run python -m py_compile scripts/project.py"
+        - "MUSCARI_PROJECT_RUN_DIR=... MUSCARI_PROJECT_MODEL_NAME=... MUSCARI_PROJECT_EXPORT_OVERWRITE=1 MUSCARI_PROJECT_SMOKE=1 uv run python scripts/project.py"
+        - "uv run python - <<'PY' ... validated exported ensemble files, metadata, and one positive prediction"
+        - "PYTHONPATH=scripts uv run python - <<'PY' ... validated NaturalEarth file has all 44 EVA country NAME_EN matches"
+        - "MUSCARI_DEVICE=cpu MUSCARI_MODEL_PATH=... MUSCARI_FEATURES_DIR=... uv run python - <<'PY' ... validated widget local resources and predict_geojson"
+        - "cd widget && uv run --extra dev pytest -m 'not slow'"
+        - "uv run python - <<'PY' ... validated four projection GeoTIFFs/PNGs and projection metadata"
+        - "git diff --check"
+        - "cd widget && git diff --check"
+    key_finding: "The best benchmark model exports cleanly as a local five-fold MuScaRiEnsemble and projects successfully when clipped with the newly added NaturalEarth country data."
+    outcome: "Projected SR rasters at 2, 8, 64, and 128 km and launched the widget locally using local model weights and local environmental feature files."
+  - name: "benchmark_legacy_maxabs_absolute_l32"
+    important_params:
+      task: "align benchmark neural architectures with the best factorial-screen variant and launch the full benchmark"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      weibull_parameterization: "legacy"
+      target_transform: "maxabs"
+      asymptote_transform: "absolute"
+      effort_transform: "absolute"
+      layer_label: "l32"
+      layer_size_base: 32
+      layer_sizes: "32;128;512;512;128;32"
+      output_csv: "scripts/results/benchmark/benchmark_results_ceacce0.csv"
+      artifact_root: "scripts/results/benchmark/artifacts"
+      launch_command: "./run_script.sh scripts/benchmark.py benchmark_legacy_maxabs_absolute_l32"
+      pid: 418960
+      pgid: 418960
+      sid: 418960
+      stdout_path: "stdout/benchmark_legacy_maxabs_absolute_l32_benchmark.out"
+      wandb_project: "muscari-third-revision"
+      wandb_group: "benchmark_ceacce0"
+      rows: 25
+      best_extrapolation_model: "MuScaRi_ClimateDEM"
+      best_extrapolation_rmse: 458.834
+      best_model_config_hash: "dae0789a3c87"
+      checks:
+        - "uv run python -m py_compile scripts/benchmark.py"
+        - "uv run python - <<'PY' ... validated all neural benchmark initializers construct SELECTED_LAYER_SIZES"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "uv run python - <<'PY' ... validated smoke CSV columns and neural artifact summaries store legacy_maxabs_absolute_l32 layer metadata"
+        - "git diff --check"
+    key_finding: "MuScaRi_ClimateDEM performed best among benchmark models on GIFT extrapolation RMSE."
+    outcome: "Full benchmark completed and wrote scripts/results/benchmark/benchmark_results_ceacce0.csv. The selected projection/widget artifact is MuScaRi_ClimateDEM/dae0789a3c87."
   - name: "architecture_screen_factorial_ceacce0"
     important_params:
       task: "run and summarize the committed 16-variant factorial architecture screen"

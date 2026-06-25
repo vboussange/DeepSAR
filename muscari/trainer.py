@@ -99,7 +99,7 @@ class TrainConfig:
     wandb_config: dict[str, Any] = field(default_factory=dict)
     save_checkpoints: bool = False
     write_summary: bool = False
-    use_validation_weights: bool = True
+    use_validation_weights: bool = False
     overwrite: bool = False
     model_family: str = "MuScaRi"
     architecture_variant: str = "unspecified"

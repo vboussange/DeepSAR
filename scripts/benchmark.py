@@ -50,13 +50,14 @@ BIOCLIMATE_VARS = [
         ]
 INCLUDE_LANDCOVER_EXPERIMENTS = False
 
-# TODO(agent): update these constants once the full architecture screen selects
-# the final architecture.
-SELECTED_ARCHITECTURE_NAME = "stable_maxabs_softplus"
+SELECTED_ARCHITECTURE_NAME = "legacy_maxabs_absolute_l32"
 EFFORT_TRANSFORM = "absolute"
-ASYMPTOTE_TRANSFORM = "softplus"
-WEIBULL_PARAMETERIZATION = "stable"
+ASYMPTOTE_TRANSFORM = "absolute"
+WEIBULL_PARAMETERIZATION = "legacy"
 TARGET_TRANSFORM = "maxabs"
+LAYER_LABEL = "l32"
+LAYER_SIZE_BASE = 32
+SELECTED_LAYER_SIZES = symmetric_arch(6, base=LAYER_SIZE_BASE, factor=4)
 
 USE_WANDB = True
 WANDB_PROJECT = "muscari-third-revision"
@@ -69,14 +70,32 @@ TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
 RIDGE_ALPHAS = np.logspace(-6, 6, 13)
 logger = setup_logger("benchmark")
 
+
+def format_layer_sizes(layer_sizes):
+    return ";".join(str(size) for size in layer_sizes)
+
+
+def selected_architecture_metadata():
+    return {
+        "architecture_variant": SELECTED_ARCHITECTURE_NAME,
+        "effort_transform": EFFORT_TRANSFORM,
+        "asymptote_transform": ASYMPTOTE_TRANSFORM,
+        "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+        "target_transform": TARGET_TRANSFORM,
+        "layer_label": LAYER_LABEL,
+        "layer_size_base": LAYER_SIZE_BASE,
+        "layer_sizes": format_layer_sizes(SELECTED_LAYER_SIZES),
+    }
+
+
 @dataclass
 class MuScaRiInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=128, factor=4))
+    architecture: list = field(default_factory=lambda: SELECTED_LAYER_SIZES.copy())
     asymptote_transform: str = ASYMPTOTE_TRANSFORM
     weibull_parameterization: str = WEIBULL_PARAMETERIZATION
     def __call__(self, **kwargs):
-        return MuScaRi(layer_sizes=self.architecture,
+        return MuScaRi(layer_sizes=list(self.architecture),
                        feature_names=self.feature_names,
                        ffnn_batchnorm=False,
                        asymptote_transform=self.asymptote_transform,
@@ -85,7 +104,9 @@ class MuScaRiInit():
 
 class WrappedFFNNExp(FFNNExp):
     def __init__(self, input_dim, layer_sizes, feature_names=None, feature_scaler=None, target_scaler=None, batchnorm=True):
+        layer_sizes = list(layer_sizes)
         super().__init__(input_dim, layer_sizes, batchnorm=batchnorm)
+        self.layer_sizes = layer_sizes
         self.feature_names = feature_names or []
         self.feature_scaler = feature_scaler
         self.target_scaler = target_scaler
@@ -93,11 +114,16 @@ class WrappedFFNNExp(FFNNExp):
 @dataclass
 class FFNNExpInit():
     feature_names: list
-    architecture: list = field(default_factory=lambda: symmetric_arch(6, base=128, factor=4))
+    architecture: list = field(default_factory=lambda: SELECTED_LAYER_SIZES.copy())
     batchnorm: bool = True
     def __call__(self, **kwargs):
         # input_dim = len(feature_names) + 1 (for log_observed_area)
-        return WrappedFFNNExp(len(self.feature_names) + 1, self.architecture, batchnorm=self.batchnorm, **kwargs)
+        return WrappedFFNNExp(
+            len(self.feature_names) + 1,
+            list(self.architecture),
+            batchnorm=self.batchnorm,
+            **kwargs,
+        )
 
 
 def log_linear_wandb(metrics, dataset_id, fold_id, feature_names):
@@ -113,8 +139,7 @@ def log_linear_wandb(metrics, dataset_id, fold_id, feature_names):
             "fold": fold_id,
             "feature_names": feature_names,
             "model_family": "linear",
-            "architecture_variant": SELECTED_ARCHITECTURE_NAME,
-            "effort_transform": EFFORT_TRANSFORM,
+            **selected_architecture_metadata(),
             "ridge_alphas": RIDGE_ALPHAS.tolist(),
         },
     )
@@ -167,6 +192,8 @@ def run_linear_baseline(config, dataset_id, feature_names, train_frac=1.0):
             "train_frac": train_frac,
             "n_train_samples": len(train_df),
             "ridge_alpha": best_alpha,
+            "model_family": "linear",
+            **selected_architecture_metadata(),
         }
         for prefix, df in [
             ("interp", test_df),
@@ -262,10 +289,23 @@ if __name__ == "__main__":
         n_epochs=N_EPOCHS,
         effort_transform=EFFORT_TRANSFORM,
         target_transform=TARGET_TRANSFORM,
+        layer_sizes=SELECTED_LAYER_SIZES.copy(),
         use_wandb=USE_WANDB,
         wandb_project=WANDB_PROJECT,
         wandb_group=f"benchmark_{dataset_id}",
         wandb_tags=WANDB_TAGS + [dataset_id, SELECTED_ARCHITECTURE_NAME],
+        wandb_config={
+            "dataset_id": dataset_id,
+            "gift_dataset_id": GIFT_DATASET_ID,
+            "architecture_variant": SELECTED_ARCHITECTURE_NAME,
+            "effort_transform": EFFORT_TRANSFORM,
+            "asymptote_transform": ASYMPTOTE_TRANSFORM,
+            "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+            "target_transform": TARGET_TRANSFORM,
+            "layer_label": LAYER_LABEL,
+            "layer_size_base": LAYER_SIZE_BASE,
+            "layer_sizes": SELECTED_LAYER_SIZES.copy(),
+        },
         fold_ids=FOLD_IDS,
         architecture_variant=SELECTED_ARCHITECTURE_NAME,
         muscari_asymptote_transform=ASYMPTOTE_TRANSFORM,
@@ -277,6 +317,7 @@ if __name__ == "__main__":
             "script": str(Path(__file__)),
             "dataset_id": dataset_id,
             "gift_dataset_id": GIFT_DATASET_ID,
+            **selected_architecture_metadata(),
         },
     )
 
@@ -300,22 +341,28 @@ if __name__ == "__main__":
         logger.info("Running experiment: %s", exp["name"])
         model_family = "FFNN" if exp["name"].startswith("FFNN") else "MuScaRi"
         config.run_root = artifact_root / exp["name"]
-        results.append(
-            trainer.run(
-                exp["name"],
-                exp["model_init"],
-                exp["feature_names"],
-                train_frac=exp["train_frac"],
-                model_metadata={
-                    "model_family": model_family,
-                    "architecture_variant": SELECTED_ARCHITECTURE_NAME,
-                    "asymptote_transform": ASYMPTOTE_TRANSFORM,
-                    "weibull_parameterization": WEIBULL_PARAMETERIZATION,
-                    "effort_transform": EFFORT_TRANSFORM,
-                    "target_transform": TARGET_TRANSFORM,
-                },
-            )
+        exp_results = trainer.run(
+            exp["name"],
+            exp["model_init"],
+            exp["feature_names"],
+            train_frac=exp["train_frac"],
+            model_metadata={
+                "model_family": model_family,
+                "architecture_variant": SELECTED_ARCHITECTURE_NAME,
+                "asymptote_transform": ASYMPTOTE_TRANSFORM,
+                "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+                "effort_transform": EFFORT_TRANSFORM,
+                "target_transform": TARGET_TRANSFORM,
+                "layer_label": LAYER_LABEL,
+                "layer_size_base": LAYER_SIZE_BASE,
+                "layer_sizes": SELECTED_LAYER_SIZES.copy(),
+            },
         )
+        if not exp_results.empty:
+            exp_results["model_family"] = model_family
+            for key, value in selected_architecture_metadata().items():
+                exp_results[key] = value
+        results.append(exp_results)
 
     logger.info("Running regularized linear baseline.")
     results.append(

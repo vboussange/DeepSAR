@@ -25,12 +25,14 @@ from data_processing.eva_preprocessing import COUNTRY_DATA, COUNTRY_LIST
 DEFAULT_RUN_DIR = Path(__file__).parent / "results" / "train" / "6dcd90c"
 RUN_DIR = Path(os.environ.get("MUSCARI_PROJECT_RUN_DIR", DEFAULT_RUN_DIR))
 EXPORT_DIR = RUN_DIR / "ensemble_pretrained"
-MODEL_NAME = RUN_DIR.name
+MODEL_NAME = os.environ.get("MUSCARI_PROJECT_MODEL_NAME", RUN_DIR.name)
 PROJECTION_PATH = Path(__file__).parents[1] / "data/processed/projections" / MODEL_NAME
+ENV_FEATURES_DIR = Path(__file__).parents[1] / "data/processed/environmental_features"
 RESOLUTIONS_M = [r * 1e3 for r in [2, 2**3, 2**6, 2**7]]
 PLOTTING = True
 SMOKE_TEST = os.environ.get("MUSCARI_PROJECT_SMOKE", "0") == "1"
 EXPORT_OVERWRITE = os.environ.get("MUSCARI_PROJECT_EXPORT_OVERWRITE", "0") == "1"
+PROJECT_USE_VALIDATION_WEIGHTS = os.environ.get("MUSCARI_PROJECT_USE_VALIDATION_WEIGHTS", "0") == "1"
 
 
 def load_training_summary(run_dir: Path) -> dict[str, Any]:
@@ -47,6 +49,7 @@ def public_export_metadata(
     ensemble: MuScaRiEnsemble,
     safe_files: list[Path],
     summary: dict[str, Any],
+    use_validation_weights: bool,
 ) -> dict[str, Any]:
     training = summary.get("training", {})
     features = summary.get("features_and_labels", {})
@@ -67,7 +70,7 @@ def public_export_metadata(
         ),
         "n_models": ensemble.n_models,
         "ensemble_weights": ensemble.ensemble_weights,
-        "use_validation_weights": training.get("use_validation_weights", True),
+        "use_validation_weights": use_validation_weights,
     }
     return {
         "export": export_info,
@@ -90,7 +93,7 @@ def public_export_metadata(
             "loss": training.get("loss"),
             "effort_transform": model.get("effort_transform"),
             "target_transform": training.get("target_transform") or model.get("target_transform"),
-            "use_validation_weights": training.get("use_validation_weights", True),
+            "use_validation_weights": use_validation_weights,
         },
         "features_and_labels": {
             "feature_set": features.get("feature_set"),
@@ -115,11 +118,19 @@ def save_public_export_metadata(
     export_dir: Path,
     ensemble: MuScaRiEnsemble,
     safe_files: list[Path],
+    use_validation_weights: bool,
     summary: dict[str, Any] | None = None,
 ):
     summary = summary or load_training_summary(run_dir)
     metadata_path = export_dir / "metadata.json"
-    metadata = public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
+    metadata = public_export_metadata(
+        run_dir,
+        export_dir,
+        ensemble,
+        safe_files,
+        summary,
+        use_validation_weights,
+    )
     with open(metadata_path, "w") as handle:
         json.dump(json_ready(metadata), handle, indent=2)
 
@@ -140,23 +151,24 @@ def ensure_safe_tensors(ensemble: MuScaRiEnsemble, export_dir: Path) -> list[Pat
     return [safe_path]
 
 
-def ensure_model_artifact(
+def has_uniform_weights(ensemble: MuScaRiEnsemble) -> bool:
+    expected = np.full(ensemble.n_models, 1.0 / ensemble.n_models)
+    return np.allclose(np.asarray(ensemble.ensemble_weights, dtype=float), expected)
+
+
+def should_rebuild_export(ensemble: MuScaRiEnsemble, use_validation_weights: bool) -> bool:
+    if use_validation_weights:
+        return has_uniform_weights(ensemble)
+    return not has_uniform_weights(ensemble)
+
+
+def save_ensemble_export(
     run_dir: Path,
     export_dir: Path,
-    overwrite: bool = False,
-) -> Path:
-    summary = load_training_summary(run_dir)
-    if export_dir.exists() and any(export_dir.iterdir()) and not overwrite:
-        readme_path = export_dir / "README.md"
-        if readme_path.exists():
-            readme_path.unlink()
-        ensemble = MuScaRiEnsemble.from_pretrained(export_dir)
-        safe_files = ensure_safe_tensors(ensemble, export_dir)
-        save_public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
-        return export_dir
-
+    summary: dict[str, Any],
+    use_validation_weights: bool,
+) -> MuScaRiEnsemble:
     export_dir.mkdir(parents=True, exist_ok=True)
-    use_validation_weights = summary.get("training", {}).get("use_validation_weights", True)
     ensemble = MuScaRiEnsemble.from_folds(
         run_dir,
         device="cpu",
@@ -172,7 +184,44 @@ def ensure_model_artifact(
         readme_path.unlink()
 
     safe_files = ensure_safe_tensors(ensemble, export_dir)
-    save_public_export_metadata(run_dir, export_dir, ensemble, safe_files, summary)
+    save_public_export_metadata(
+        run_dir,
+        export_dir,
+        ensemble,
+        safe_files,
+        use_validation_weights,
+        summary,
+    )
+    return ensemble
+
+
+def ensure_model_artifact(
+    run_dir: Path,
+    export_dir: Path,
+    overwrite: bool = False,
+) -> Path:
+    summary = load_training_summary(run_dir)
+    use_validation_weights = PROJECT_USE_VALIDATION_WEIGHTS
+    if export_dir.exists() and any(export_dir.iterdir()) and not overwrite:
+        readme_path = export_dir / "README.md"
+        if readme_path.exists():
+            readme_path.unlink()
+        ensemble = MuScaRiEnsemble.from_pretrained(export_dir)
+        if should_rebuild_export(ensemble, use_validation_weights):
+            save_ensemble_export(run_dir, export_dir, summary, use_validation_weights)
+            return export_dir
+        safe_files = ensure_safe_tensors(ensemble, export_dir)
+        save_public_export_metadata(
+            run_dir,
+            export_dir,
+            ensemble,
+            safe_files,
+            use_validation_weights,
+            summary,
+        )
+        return export_dir
+
+    save_ensemble_export(run_dir, export_dir, summary, use_validation_weights)
     return export_dir
 
 
@@ -266,8 +315,16 @@ def batch_predict(model, env_dataset, lc_dataset, res, batch_size=4096):
     return features, mean_SR, std_SR
         
 def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
-    env_features = EnvironmentalFeatureDataset()
-    env_ds, lc_ds = env_features.load(use_cache=True)
+    env_cache = ENV_FEATURES_DIR / "chelsa_dem_cache.nc"
+    lc_cache = ENV_FEATURES_DIR / "landcover_cache.nc"
+    if env_cache.is_file() and lc_cache.is_file():
+        env_ds = xr.open_dataset(env_cache)
+        lc_ds = xr.open_dataset(lc_cache)
+    else:
+        env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub(
+            cache_dir=ENV_FEATURES_DIR,
+            use_cache=True,
+        )
     env_ds = env_ds.rio.write_crs("EPSG:3035")
     lc_ds = lc_ds.rio.write_crs("EPSG:3035")
 
@@ -293,8 +350,11 @@ def write_projection_metadata(projection_path: Path, device: str):
         "export_dir": str(EXPORT_DIR),
         "model_name": MODEL_NAME,
         "projection_path": str(projection_path),
+        "env_features_dir": str(ENV_FEATURES_DIR),
+        "country_data": str(COUNTRY_DATA),
         "resolutions_m": RESOLUTIONS_M,
         "device": device,
+        "use_validation_weights": PROJECT_USE_VALIDATION_WEIGHTS,
         "git_hash": get_git_hash(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
