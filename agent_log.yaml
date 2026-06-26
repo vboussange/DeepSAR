@@ -89,6 +89,17 @@ active_experiments:
           finding: "CSV is complete; commit needed force-added ignored CSV and cautious interpretation because ClimateDEM+Area improves aggregate GIFT performance but not every fold."
         key_finding: "On 100 km SBCV, MuScaRi_ClimateDEM_Area has the best aggregate GIFT RMSE and bias calibration, followed by MuScaRi_ClimateDEM. The improvement is not uniform across folds. The corrected log-linear baseline has reasonable SBCV test RMSE but catastrophic GIFT extrapolation."
         outcome: "Completed the planned 100 km SBCV robustness benchmark for the selected architecture and corrected linear baseline."
+      phase_4_result_synthesis:
+        status: "completed"
+        completed_on: "2026-06-26"
+        outputs:
+          - "scripts/results/final_revision_synthesis.md"
+          - "scripts/results/benchmark/benchmark_results_ceacce0.csv"
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache MUSCARI_USE_WANDB=0 uv run python - <<'PY' ... recomputed only Linear_ClimateDEM_Area rows for ceacce0 and merged them into the existing benchmark CSV"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated ceacce0 and d0848f6 benchmark row counts, folds, primary metrics, and linear aliases"
+        key_finding: "The final synthesis confirms ClimateDEM is best for 1 km GIFT extrapolation, ClimateDEM+Area is best on aggregate for the 100 km robustness benchmark, and the corrected log-linear baseline fails catastrophically on GIFT despite finite predictions."
+        outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
