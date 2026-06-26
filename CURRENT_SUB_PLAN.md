@@ -1,149 +1,170 @@
 # Current Sub Plan
 
-## Summary
+## Status Snapshot
 
-- Use `dev_3rd_rev` for code, data, benchmark, and logging commits.
-- Use a separate writing branch for manuscript and response changes.
-- Use external read-only subagents after major changes, asking them to critique the work as paper reviewers.
-- Never add em dashes in new writing.
+- [x] Code, benchmark, figure, manuscript, and response work for this sub-plan are complete.
+- [x] Work was moved to the separate writing branch `paper_3rd_revision_writing`.
+- [x] Major steps were committed incrementally.
+- [x] External read-only audit subagents reviewed benchmark, results, manuscript, and response changes.
+- [x] Final supported checks passed.
+- [ ] Local TeX compilation remains unchecked because no TeX engine is installed on this machine.
+- [ ] Hand-built figure tasks remain for the user before submission.
 
-## Phase 0: Branch And State Check
+## Completed Work
 
-- Confirm clean worktree on `dev_3rd_rev`.
-- Record task start in `agent_log.yaml`.
-- Confirm whether `d0848f6` exists locally.
-- Confirm `paper/` submodule branch state before writing work.
+### Phase 0: Branch And State Check
 
-Commit:
-- Commit `CURRENT_SUB_PLAN.md` and the start log entry on `dev_3rd_rev`.
+- [x] Confirmed the starting branch and worktree state.
+- [x] Recorded the task in `agent_log.yaml`.
+- [x] Confirmed the local 100 km SBCV dataset `d0848f6` exists and is complete.
+- [x] Confirmed the `paper/` submodule branch state.
+- [x] Committed the sub-plan and initial log entry.
 
-## Phase 1: Fix Log-Linear Benchmark
+Commits:
+- [x] Superproject: `93f1599 Record final revision sub-plan`
 
-- Patch `scripts/benchmark.py` so the Ridge log-linear baseline writes full metric schema:
-  - `train_*`, `val_*`, `test_*`, `gift_*`
-  - `interp_* = test_*`
-  - `extrap_* = gift_*`
-- Keep the model definition unchanged:
-  - Ridge on `log1p(sr)`
-  - `StandardScaler`
-  - validation-selected alpha
-  - `expm1` inverse
-  - non-negative clipping only
-- Add diagnostics for alpha, sample counts, finite predictions, and GIFT prediction range.
-- Run smoke checks with `uv`.
+### Phase 1: Fix Log-Linear Benchmark
 
-Subagent:
-- Spawn a read-only benchmark audit subagent to check leakage risk, metric consistency, and fairness of the linear baseline.
+- [x] Patched `scripts/benchmark.py` so `Linear_ClimateDEM_Area` writes the full benchmark metric schema.
+- [x] Kept the model definition unchanged: Ridge on `log1p(sr)`, `StandardScaler`, validation-selected alpha, `expm1`, and non-negative clipping.
+- [x] Added diagnostics for alpha, split sample counts, finite predictions, GIFT prediction range, and residual-bias slopes.
+- [x] Added `MUSCARI_USE_WANDB` and `MUSCARI_SBCV_ID` overrides while keeping defaults stable.
+- [x] Ran smoke checks with `uv`.
+- [x] Spawned a read-only benchmark audit subagent.
 
-Commit:
-- Commit the log-linear fix after smoke checks and audit response.
+Commits:
+- [x] Superproject: `4abe164 Fix log-linear benchmark metrics`
 
-## Phase 2: Prepare 100 km SBCV Dataset
+### Phase 2: Prepare 100 km SBCV Dataset
 
-- If `d0848f6` exists and is complete, use it.
-- If absent, use the existing SBCV compiler with a minimal explicit block-size override:
-  - `MUSCARI_SBCV_BLOCK_SIZE_M=100000`
-- Do not add a dedicated 100 km compilation script.
-- Verify:
-  - 5 train parquet files
-  - 5 validation parquet files
-  - 5 test parquet files
-  - metadata records `block_size_m = 100000`
-- Record dataset ID and parameters in `agent_log.yaml`.
+- [x] Verified `data/processed/training_samples/sbcv/d0848f6`.
+- [x] Confirmed 5 train, 5 validation, and 5 test parquet files.
+- [x] Confirmed `config_used.json` records `block_size=100000`.
+- [x] Recorded the dataset ID and parameters in `agent_log.yaml`.
+- [x] Did not add a dedicated third-revision compilation script.
 
-Commit:
-- Commit the dataset-generation interface and logging updates before launching long work.
-- Commit completed dataset metadata and final log update after generation.
+Commits:
+- [x] Superproject: `23b90ee Record 100km SBCV dataset availability`
 
-## Phase 3: Run 100 km Benchmark
+### Phase 3: Run 100 km Benchmark
 
-- Make `scripts/benchmark.py` accept `MUSCARI_SBCV_ID=<dataset_id>` while keeping `ceacce0` as default.
-- Run selected architecture on the 100 km SBCV dataset:
-  - `MuScaRi_Area`
-  - `MuScaRi_ClimateDEM`
-  - `MuScaRi_ClimateDEM_Area`
-  - `FFNN_ClimateDEM_Area`
-  - corrected `Linear_ClimateDEM_Area`
-- Use `run_script.sh` for long benchmark runs.
-- Write results to `scripts/results/benchmark/benchmark_results_<100km_id>.csv`.
-- Validate row count and missing metric columns.
+- [x] Ran the selected architecture benchmark on `d0848f6`.
+- [x] Included `MuScaRi_Area`.
+- [x] Included `MuScaRi_ClimateDEM`.
+- [x] Included `MuScaRi_ClimateDEM_Area`.
+- [x] Included `FFNN_ClimateDEM_Area`.
+- [x] Included corrected `Linear_ClimateDEM_Area`.
+- [x] Wrote `scripts/results/benchmark/benchmark_results_d0848f6.csv`.
+- [x] Validated 25 rows, 5 folds per model, and no missing primary metrics.
+- [x] Spawned a read-only results audit subagent.
 
-Subagent:
-- Spawn a read-only results audit subagent to assess robustness interpretation and benchmark completeness.
+Commits:
+- [x] Superproject: `458cb57 Record 100km benchmark launch`
+- [x] Superproject: `478b000 Add 100km SBCV benchmark results`
 
-Commit:
-- Commit completed 100 km benchmark results and `agent_log.yaml` outcome.
+### Phase 4: Results Synthesis
 
-## Phase 4: Results Synthesis
+- [x] Corrected the 1 km benchmark linear rows in `benchmark_results_ceacce0.csv`.
+- [x] Summarized 1 km SBCV benchmark results.
+- [x] Summarized 100 km SBCV robustness results.
+- [x] Summarized the corrected log-linear baseline.
+- [x] Summarized Figure 4 scale-binned EVA results.
+- [x] Summarized the GIFT asymptotic audit.
+- [x] Wrote `scripts/results/final_revision_synthesis.md`.
+- [x] Kept interpretation predictive and diagnostic, not mechanistic.
 
-- Summarize final numbers for:
-  - 1 km SBCV benchmark
-  - 100 km SBCV robustness benchmark
-  - corrected linear baseline
-  - Figure 4 scale-binned EVA result
-  - GIFT asymptotic audit
-- Decide which values enter main text versus SI.
-- Keep interpretation predictive and diagnostic, not mechanistic.
+Commits:
+- [x] Superproject: `2a2f02a Synthesize final revision benchmark results`
 
-Commit:
-- Commit synthesis tables or summaries if new tracked artifacts are created.
+### Phase 5: Writing Branch Setup
 
-## Phase 5: Writing Branch Setup
+- [x] Created the superproject writing branch `paper_3rd_revision_writing`.
+- [x] Created the matching `paper/` submodule branch `paper_3rd_revision_writing`.
+- [x] Kept manuscript and response edits on the writing branch.
 
-- Create a separate superproject branch from updated `dev_3rd_rev`, for example `paper_3rd_revision_writing`.
-- Inside `paper/`, create a matching branch from `3rd_revision`.
-- Make all manuscript and reviewer-response edits on this writing branch.
+Commits:
+- [x] Superproject: `0ccf982 Record writing branch setup`
 
-Commit:
-- Commit only writing-related changes on the writing branch.
+### Phase 6: Manuscript And Figure Updates
 
-## Phase 6: Manuscript Updates
+- [x] Updated `paper/main.tex` with the final benchmark narrative.
+- [x] Replaced Shapley-based Figure 4 interpretation with scale-binned relative RMSE.
+- [x] Added the corrected log-linear baseline to the manuscript and SI performance tables.
+- [x] Added the 100 km SBCV robustness result.
+- [x] Recomputed Chao2 outputs and included Chao2 in Figure 3.
+- [x] Regenerated Figure 3 with corrected benchmark rows, the log-linear baseline, Chao2, and ClimateDEM prediction panels.
+- [x] Fixed the Figure 3 panel c checkpoint-loading bug by using `MuScaRi.initialize(...)`.
+- [x] Copied regenerated Figure 3 and Figure 4 assets into `paper/figures/`.
+- [x] Updated Figure 5 manuscript text to state that maps use the ClimateDEM-only ensemble.
+- [x] Checked new writing for em dashes.
+- [x] Spawned a read-only manuscript audit subagent and addressed blocking findings.
 
-- Update `paper/main.tex` to:
-  - Replace Shapley-based Figure 4 interpretation with scale-binned relative RMSE.
-  - Add corrected log-linear baseline.
-  - Add 100 km SBCV robustness result.
-  - Update SI performance discussion and tables where needed.
-- Match the existing manuscript style: compact, technical, cautious.
-- Check that new text contains no em dashes.
+Commits:
+- [x] Paper submodule: `c73fd07 Update manuscript benchmark narrative`
+- [x] Paper submodule: `045d9e8 Fix Figure 3 benchmark panel`
+- [x] Superproject: `1d7de8b Update manuscript figures and Chao2 baseline`
+- [x] Superproject: `3c2314c Fix Figure 3 checkpoint loading`
 
-Subagent:
-- Spawn a read-only manuscript audit subagent as a skeptical reviewer.
+Key check:
+- [x] Figure 3 panel c audited after the fix: RMSE `45.95`, R2 `0.988`, median relative bias `0.021`.
 
-Commit:
-- Commit manuscript updates inside `paper/`.
-- Commit the `paper` submodule pointer in the superproject branch.
+### Phase 7: Reviewer Response Updates
 
-## Phase 7: Reviewer Response Updates
+- [x] Updated `paper/response_to_reviewers_3rd_rev.md`.
+- [x] Addressed the 100 km spatial-block robustness point.
+- [x] Addressed the corrected log-linear baseline.
+- [x] Addressed the Shapley replacement and Figure 4 predictive framing.
+- [x] Addressed the RMSE scale context.
+- [x] Addressed ClimateDEM-only mapping text for Figure 5.
+- [x] Added main-text discussion of direct macroecological models.
+- [x] Added a limitation on absolute versus relative sampling effort.
+- [x] Clarified nested spatial units in the Figure 1 caption.
+- [x] Clarified grey grouping blocks in the Figure 5 caption.
+- [x] Removed hidden HTML comments from the response draft.
+- [x] Spawned a read-only response audit subagent and addressed blocking findings.
 
-- Update `paper/response_to_reviewers_3rd_rev.md`.
-- For each relevant reviewer point:
-  - quote the concern
-  - acknowledge it
-  - state the change
-  - cite placeholder manuscript locations
-- Emphasize minimal, reviewer-driven revisions.
-- Keep unresolved human decisions marked as `TODO(agent): ...`.
+Commits:
+- [x] Paper submodule: `e5b1d54 Update third revision reviewer responses`
+- [x] Superproject: `c155895 Record reviewer response updates`
 
-Subagent:
-- Spawn a read-only response audit subagent as Reviewers 1 and 3.
+### Phase 8: Final Checks
 
-Commit:
-- Commit reviewer-response updates inside `paper/`.
-- Commit the final `paper` submodule pointer and `agent_log.yaml` update in the superproject branch.
+- [x] Ran `uv run python -m py_compile scripts/benchmark.py scripts/data_processing/compile_sbcv_eva_samples.py scripts/chao2_estimator.py figures/figure_3/figure_3.py muscari/cld.py`.
+- [x] Ran `MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py`.
+- [x] Validated `benchmark_results_ceacce0.csv`.
+- [x] Validated `benchmark_results_d0848f6.csv`.
+- [x] Validated `benchmark_chao2_results_ceacce0.csv`.
+- [x] Validated the smoke benchmark CSV.
+- [x] Ran `git diff --check`.
+- [x] Ran `git -C paper diff --check`.
+- [x] Checked current diffs for em dashes.
+- [x] Checked that stale Shapley references and old percentages were removed from `paper/main.tex`.
+- [x] Confirmed the superproject worktree was clean after final commits.
+- [x] Confirmed the `paper/` submodule worktree was clean after final commits.
+- [x] Recorded final checks in `agent_log.yaml`.
 
-## Final Checks
+Commits:
+- [x] Superproject: `59662fd Record final revision checks`
 
-- `uv run python -m py_compile scripts/benchmark.py scripts/data_processing/compile_sbcv_eva_samples.py`
-- `MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py`
-- Validate final benchmark CSVs for missing primary metrics.
-- Compile the paper if the local TeX environment supports it.
-- `git diff --check`
-- `git diff | python -c 'import sys; s=sys.stdin.read(); raise SystemExit(1 if chr(0x2014) in s else 0)'` must pass.
+## Remaining Before Submission
+
+- [ ] Reorder the top-panel illustrations in the hand-assembled Figure 1 source, then remove the visible `TODO(agent)` marker in `paper/response_to_reviewers_3rd_rev.md`.
+- [ ] Hand-build the final Figure 5 image using the ClimateDEM-only ensemble, as planned by the user.
+- [ ] Refresh any Figure 5 focal-location numeric summaries if the hand-built image changes values shown in the text or caption.
+- [ ] Compile the paper on a machine with a TeX engine and inspect warnings, floats, references, and bibliography.
+- [ ] Do one final human read-through of `paper/main.tex` and `paper/response_to_reviewers_3rd_rev.md`.
+- [ ] Decide whether to merge or cherry-pick the writing branch back into the submission branch.
+
+## Current Branch And Cleanliness
+
+- [x] Superproject branch: `paper_3rd_revision_writing`.
+- [x] Paper submodule branch: `paper_3rd_revision_writing`.
+- [x] Superproject clean after final log commit.
+- [x] Paper submodule clean after final response commit.
 
 ## Assumptions
 
-- `dev_2rd_rev` meant `dev_3rd_rev`.
-- The log-linear model remains a faithful baseline even if GIFT extrapolation remains poor.
-- If `d0848f6` is unavailable, the regenerated 100 km dataset ID will be recorded and used consistently.
-- Writing changes belong on a separate branch, including commits inside the `paper` submodule.
+- [x] `dev_2rd_rev` meant `dev_3rd_rev`.
+- [x] The log-linear model remains a faithful baseline even though GIFT extrapolation remains poor.
+- [x] `d0848f6` is the 100 km SBCV dataset used for robustness checks.
+- [x] Writing changes belong on the separate writing branch, including commits inside the `paper/` submodule.
