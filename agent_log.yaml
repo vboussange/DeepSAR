@@ -48,17 +48,47 @@ active_experiments:
           - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... verified d0848f6 fold parquet counts and config_used.json block_size=100000"
         outcome: "The planned 100 km SBCV dataset is present locally, so no regeneration from compile_sbcv_eva_samples.py is needed."
       phase_3_sbcv_100km_benchmark:
-        status: "running"
+        status: "completed"
         started: "2026-06-26"
+        completed_on: "2026-06-26"
         dataset_id: "d0848f6"
         command: "MUSCARI_SBCV_ID=d0848f6 ./run_script.sh scripts/benchmark.py benchmark_d0848f6"
-        expected_output: "scripts/results/benchmark/benchmark_results_d0848f6.csv"
-        expected_models:
+        output: "scripts/results/benchmark/benchmark_results_d0848f6.csv"
+        stdout_log: "stdout/benchmark_d0848f6_benchmark.out"
+        models:
           - "MuScaRi_Area"
           - "MuScaRi_ClimateDEM"
           - "MuScaRi_ClimateDEM_Area"
           - "FFNN_ClimateDEM_Area"
           - "Linear_ClimateDEM_Area"
+        output_rows: 25
+        folds_per_model: 5
+        gift_dataset_id_used: "da569da"
+        gift_dataset_equivalence_note: "da569da and canonical 418c563 compiled GIFT parquet files have identical shape, columns, non-geometry values, CRS, and geometries locally; byte sizes differ."
+        mean_rmse:
+          MuScaRi_ClimateDEM_Area:
+            test: 92.916
+            gift: 513.718
+          MuScaRi_ClimateDEM:
+            test: 97.929
+            gift: 578.796
+          MuScaRi_Area:
+            test: 156.781
+            gift: 782.893
+          FFNN_ClimateDEM_Area:
+            test: 97.465
+            gift: 2129.284
+          Linear_ClimateDEM_Area:
+            test: 146.103
+            gift: 92918.445
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated 25 rows, 5 folds per planned model, no missing primary RMSE metrics, and corrected linear alias metrics"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed local da569da and 418c563 compiled GIFT datasets are equivalent in data content and geometry"
+        audit:
+          subagent: "019f020c-f0ad-7310-a1d0-fe829538b14b"
+          finding: "CSV is complete; commit needed force-added ignored CSV and cautious interpretation because ClimateDEM+Area improves aggregate GIFT performance but not every fold."
+        key_finding: "On 100 km SBCV, MuScaRi_ClimateDEM_Area has the best aggregate GIFT RMSE and bias calibration, followed by MuScaRi_ClimateDEM. The improvement is not uniform across folds. The corrected log-linear baseline has reasonable SBCV test RMSE but catastrophic GIFT extrapolation."
+        outcome: "Completed the planned 100 km SBCV robustness benchmark for the selected architecture and corrected linear baseline."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
