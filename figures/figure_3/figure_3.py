@@ -284,15 +284,7 @@ def add_performance_panels(
 def load_fold_model(ckpt_path: Path, device: str) -> tuple[MuScaRi, object, dict]:
     checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
     config = checkpoint["config"]
-    model = MuScaRi(
-        config.layer_sizes,
-        feature_names=checkpoint["feature_names"],
-        feature_scaler=checkpoint["feature_scaler"],
-        target_scaler=checkpoint["target_scaler"],
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(device)
-    model.eval()
+    model = MuScaRi.initialize(checkpoint, device=device)
     metrics = checkpoint.get("metrics", {})
     return model, config, metrics
 

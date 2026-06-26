@@ -145,6 +145,16 @@ active_experiments:
           finding: "Initial manuscript audit found the prose cautious but flagged stale paper Figure 3 and Figure 4 PDFs, overbroad baseline wording, and an ambiguous bias claim. The current edits address those findings."
         key_finding: "The final manuscript narrative now treats ClimateDEM as the best 1 km extrapolation model, reports the corrected log-linear failure, and uses Figure 4 as predictive rather than causal evidence."
         outcome: "Manuscript and figure assets are ready for response-writing work, except for the user-owned hand-built ClimateDEM-only Figure 5 refresh and associated focal-location numeric summaries."
+      phase_6_figure_3_fix:
+        status: "completed"
+        completed_on: "2026-06-26"
+        issue: "Regenerated Figure 3 panel c initially showed negative R2 and inflated bias."
+        cause: "The Figure 3 script manually reconstructed the single-fold MuScaRi model and lost checkpoint-specific configuration fields; the ensemble loader used for panel d was unaffected."
+        fix: "Switched the Figure 3 single-fold loader to MuScaRi.initialize, regenerated Figure 3, copied the PDF into the paper submodule, and corrected the Figure 3 caption panel order."
+        validation:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MPLBACKEND=Agg uv run python figures/figure_3/figure_3.py"
+          - "Panel c source fold 0 audited at RMSE 45.95, R2 0.988, median relative bias 0.021."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
