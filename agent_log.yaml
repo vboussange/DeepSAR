@@ -47,6 +47,18 @@ active_experiments:
         checks:
           - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... verified d0848f6 fold parquet counts and config_used.json block_size=100000"
         outcome: "The planned 100 km SBCV dataset is present locally, so no regeneration from compile_sbcv_eva_samples.py is needed."
+      phase_3_sbcv_100km_benchmark:
+        status: "running"
+        started: "2026-06-26"
+        dataset_id: "d0848f6"
+        command: "MUSCARI_SBCV_ID=d0848f6 ./run_script.sh scripts/benchmark.py benchmark_d0848f6"
+        expected_output: "scripts/results/benchmark/benchmark_results_d0848f6.csv"
+        expected_models:
+          - "MuScaRi_Area"
+          - "MuScaRi_ClimateDEM"
+          - "MuScaRi_ClimateDEM_Area"
+          - "FFNN_ClimateDEM_Area"
+          - "Linear_ClimateDEM_Area"
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
