@@ -100,6 +100,14 @@ active_experiments:
           - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated ceacce0 and d0848f6 benchmark row counts, folds, primary metrics, and linear aliases"
         key_finding: "The final synthesis confirms ClimateDEM is best for 1 km GIFT extrapolation, ClimateDEM+Area is best on aggregate for the 100 km robustness benchmark, and the corrected log-linear baseline fails catastrophically on GIFT despite finite predictions."
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
+      phase_5_writing_branch_setup:
+        status: "completed"
+        completed_on: "2026-06-26"
+        superproject_branch: "paper_3rd_revision_writing"
+        paper_submodule_branch: "paper_3rd_revision_writing"
+        base_superproject_branch: "dev_3rd_rev"
+        base_paper_branch: "3rd_revision"
+        outcome: "Created separate writing branches before manuscript and response edits."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
