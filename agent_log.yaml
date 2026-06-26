@@ -155,6 +155,30 @@ active_experiments:
           - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
           - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MPLBACKEND=Agg uv run python figures/figure_3/figure_3.py"
           - "Panel c source fold 0 audited at RMSE 45.95, R2 0.988, median relative bias 0.021."
+      phase_7_reviewer_response_updates:
+        status: "completed"
+        started: "2026-06-26"
+        completed_on: "2026-06-26"
+        hostname: "gpunode04"
+        superproject_branch: "paper_3rd_revision_writing"
+        paper_submodule_branch: "paper_3rd_revision_writing"
+        files_changed:
+          - "paper/response_to_reviewers_3rd_rev.md"
+          - "paper/main.tex"
+        changes:
+          - "Updated reviewer responses for 100 km spatial-block robustness, corrected log-linear baseline, Shapley replacement, Figure 4 predictive framing, RMSE scale context, and ClimateDEM-only mapping text."
+          - "Added main-text discussion of direct macroecological models and an absolute-versus-relative sampling effort limitation."
+          - "Clarified Figure 1 nested spatial units in the caption and Figure 5 grey grouping blocks in the caption."
+        unresolved:
+          - "Figure 1 top-panel ordering remains marked TODO(agent) because the final paper figure appears hand-assembled and needs a figure-source edit before final submission."
+        checks:
+          - "rg -n '<!--|-->' paper/response_to_reviewers_3rd_rev.md returned no matches"
+          - "git -C paper diff --check"
+          - "git -C paper diff | UV_CACHE_DIR=/tmp/uv-cache uv run python -c '... no em dash in paper diff'"
+        audit:
+          subagent: "019f0230-563c-7893-bb1d-ee380a4fc536"
+          finding: "Audit found the main experiment responses matched the manuscript, and flagged remaining figure TODOs, table-number wording, and overstatement of 100 km spatial separation. The table wording, 100 km phrasing, and Figure 5 caption were fixed; Figure 1 ordering remains explicitly marked."
+        outcome: "Reviewer response draft is updated for completed experiment and writing changes, with one visible hand-assembly TODO for Figure 1."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
