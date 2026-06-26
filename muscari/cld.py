@@ -12,7 +12,7 @@ def multcomp_letters(pd_comp_matrix, letters=None, reversed=False):
     
     n = pd_comp_matrix.shape[0]
     lvls = pd_comp_matrix.index
-    comp_matrix = pd_comp_matrix.to_numpy()
+    comp_matrix = pd_comp_matrix.to_numpy(copy=True)
 
     np.fill_diagonal(comp_matrix, False)
 
@@ -102,7 +102,6 @@ def create_comp_matrix_allpair_t_test(mc_results):
     level_indices = {level: idx for idx, level in enumerate(levels)}
 
     for row in comparisons:
-        print(row)
         group1, group2, reject = row[0], row[1], row[3]
         i, j = level_indices[group1], level_indices[group2]
         comp_matrix[i, j] = reject
@@ -176,4 +175,3 @@ if __name__ == "__main__":
 
         result = multcomp_letters(comp_matrix)
         print("Letters:", result)
-

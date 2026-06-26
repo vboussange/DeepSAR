@@ -108,6 +108,43 @@ active_experiments:
         base_superproject_branch: "dev_3rd_rev"
         base_paper_branch: "3rd_revision"
         outcome: "Created separate writing branches before manuscript and response edits."
+      phase_6_manuscript_updates:
+        status: "completed"
+        started: "2026-06-26"
+        completed_on: "2026-06-26"
+        hostname: "gpunode04"
+        git_hash: "0ccf982"
+        superproject_branch: "paper_3rd_revision_writing"
+        paper_submodule_branch: "paper_3rd_revision_writing"
+        files_changed:
+          - "paper/main.tex"
+          - "paper/figures/figure_3.pdf"
+          - "paper/figures/figure_4.pdf"
+          - "figures/figure_3/figure_3.py"
+          - "figures/figure_3/figure_3.pdf"
+          - "figures/figure_3/model_performance_and_bias_report.txt"
+          - "scripts/chao2_estimator.py"
+          - "scripts/results/benchmark/benchmark_chao2_results_ceacce0.csv"
+          - "muscari/cld.py"
+        changes:
+          - "Updated manuscript performance narrative, SI benchmark tables, and Figure 4 text to use the final ceacce0 and d0848f6 benchmark results."
+          - "Replaced the Shapley interpretation with EVA scale-binned relative RMSE, and copied the regenerated Figure 4 PDF into the paper submodule."
+          - "Recomputed Chao2 fold outputs from local EVA preprocessing files and canonical GIFT 418c563."
+          - "Regenerated Figure 3 with corrected benchmark rows, the log-linear baseline, Chao2, and environment-only MuScaRi prediction panels."
+          - "Changed Figure 5 wording to state that the maps use the environment-only MuScaRi ensemble; the hand-built Figure 5 image and focal-location numeric summaries still need a human refresh."
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile muscari/cld.py figures/figure_3/figure_3.py scripts/chao2_estimator.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python scripts/chao2_estimator.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MPLBACKEND=Agg uv run python figures/figure_3/figure_3.py"
+          - "git diff --check && git -C paper diff --check"
+          - "git diff | UV_CACHE_DIR=/tmp/uv-cache uv run python -c '... no em dash in superproject diff'"
+          - "git -C paper diff | UV_CACHE_DIR=/tmp/uv-cache uv run python -c '... no em dash in paper diff'"
+          - "rg -n 'fig:shapley|sec:shapley|Shap|disentangle|61\\\\%|68\\\\%' paper/main.tex returned no matches"
+        audit:
+          subagent: "019f021d-924b-7a91-b033-2578d285a732"
+          finding: "Initial manuscript audit found the prose cautious but flagged stale paper Figure 3 and Figure 4 PDFs, overbroad baseline wording, and an ambiguous bias claim. The current edits address those findings."
+        key_finding: "The final manuscript narrative now treats ClimateDEM as the best 1 km extrapolation model, reports the corrected log-linear failure, and uses Figure 4 as predictive rather than causal evidence."
+        outcome: "Manuscript and figure assets are ready for response-writing work, except for the user-owned hand-built ClimateDEM-only Figure 5 refresh and associated focal-location numeric summaries."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"

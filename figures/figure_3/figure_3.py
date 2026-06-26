@@ -23,8 +23,9 @@ ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
-GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
+RUN_DIR = ROOT / "scripts" / "results" / "benchmark" / "artifacts" / "MuScaRi_ClimateDEM" / "dae0789a3c87"
+GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/418c563/compiled_data.parquet"
+OUTPUT_PATH = Path(__file__).with_suffix(".pdf")
 PLOT_STYLE = {
     "axis_label": 12,
     "tick_label": 12,
@@ -155,6 +156,7 @@ def add_performance_panels(
     ]
     colors = ["#f72585", "#4cc9f0"]
     axes = [ax1, ax2]
+    rng = np.random.default_rng(42)
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
 
@@ -190,7 +192,7 @@ def add_performance_panels(
         for i, data in enumerate(box_data):
             if missing_rows[i]:
                 continue
-            y = np.random.normal(i + 1, 0.06, size=len(data))
+            y = rng.normal(i + 1, 0.06, size=len(data))
             ax.scatter(data, y, alpha=0.6, s=10, color=color, zorder=3)
 
         for patch in bplot["boxes"]:
@@ -202,10 +204,12 @@ def add_performance_panels(
 
         ax.set_yticks(range(1, len(experiments) + 1))
         ax.set_xlabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"])
-        # ax.set_xscale("log")
-        # ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
-        # # ax.xaxis.get_major_formatter().set_scientific(False)
-        # ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.0f}'))
+        finite_positive = np.concatenate([
+            data[np.isfinite(data) & (data > 0)] for data in box_data
+        ])
+        if len(finite_positive):
+            ax.set_xscale("log")
+            ax.xaxis.set_minor_formatter(mticker.NullFormatter())
 
         if j == 0:
             display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
@@ -242,7 +246,12 @@ def add_performance_panels(
             test_results = mc.allpairtest(stats.ttest_ind, alpha=alpha)
 
             comp_matrix = create_comp_matrix_allpair_t_test(test_results)
-            letters = multcomp_letters(comp_matrix < alpha)
+            significant = pd.DataFrame(
+                np.array(comp_matrix < alpha, dtype=bool, copy=True),
+                index=comp_matrix.index,
+                columns=comp_matrix.columns,
+            )
+            letters = multcomp_letters(significant)
 
             for i, experiment in enumerate(experiments):
                 if experiment in letters:
@@ -250,11 +259,14 @@ def add_performance_panels(
                     q75 = np.percentile(data_vals, 75)
                     iqr = np.percentile(data_vals, 75) - np.percentile(data_vals, 25)
                     whisker_top = q75 + 1.5 * iqr
-                    xpos = min(whisker_top, max(data_vals)) + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.02
 
                     mean_val = np.mean(data_vals)
+                    if ax.get_xscale() == "log":
+                        xpos = mean_val * 1.08
+                    else:
+                        xpos = mean_val + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.01
                     ax.text(
-                        mean_val + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.01,
+                        xpos,
                         i + 0.7,
                         letters[experiment],
                         ha="left",
@@ -348,14 +360,19 @@ if __name__ == "__main__":
     eva_test_data = prepare_eva_test_data(best_test_df, best_model)
     gift_dataset = prepare_gift_data(ensemble_model)
 
-    report_model_performance(df_perf, metric)
+    report_model_performance(
+        df_perf,
+        metric,
+        output_file=Path(__file__).with_name("model_performance_and_bias_report.txt"),
+    )
     
     label_map = {
-        "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
-        "MuScaRi_Area": "MuScaRi\n(area only)",
-        "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
-        "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
+        "MuScaRi_Area": "MuScaRi\n(area only)",
+        "MuScaRi_ClimateDEM": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. only)}$",
+        "MuScaRi_ClimateDEM_Area": "MuScaRi\n(env. + area)",
+        "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
+        "Linear_ClimateDEM_Area": "Linear\n(env. + area)",
     }
 
     df_perf = df_perf[df_perf["experiment"].isin(label_map)].copy()
@@ -439,4 +456,4 @@ if __name__ == "__main__":
     
     plt.tight_layout()
     plt.show()
-    fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
+    fig.savefig(OUTPUT_PATH, dpi=300, bbox_inches='tight')

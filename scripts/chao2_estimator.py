@@ -23,7 +23,7 @@ numba_logger.setLevel(
     logging.WARNING
 )  # see https://stackoverflow.com/questions/65398774/numba-printing-information-regarding-nvidia-driver-to-python-console-when-using
 
-GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/6dcd90c/compiled_data.parquet"
+GIFT_SAMPLES_PATH = Path(__file__).parent / "../data/processed/test_samples_GIFT/418c563/compiled_data.parquet"
 SBCV_SAMPLES_PATH = Path(__file__).parent / "../data/processed/training_samples/sbcv/ceacce0"
 
 CONFIG = {
@@ -41,8 +41,15 @@ CONFIG["run_folder"].mkdir(parents=True, exist_ok=True)
 def load_and_preprocess_data():
     logging.info("Loading EVA plot data and species...")
     eva = EVADataset()
-    eva_plots = eva.read_plot_data()
-    eva_species = eva.read_species_data()
+    try:
+        eva_plots = eva.read_plot_data()
+        eva_species = eva.read_species_data()
+    except FileNotFoundError:
+        logging.info("Anonymised EVA files not found; falling back to preprocessing files.")
+        eva_plots = gpd.read_parquet(eva.data_dir / "preprocessing/plot_data.parquet")
+        eva_species = pd.read_parquet(eva.data_dir / "preprocessing/species_data.parquet")
+        if "anonymised_species_name" not in eva_species.columns:
+            eva_species = eva_species.rename(columns={"species_name": "anonymised_species_name"})
 
     eva_plots = eva_plots.to_crs(CONFIG["crs"])
     eva_plots = eva_plots.set_index("record_id")
