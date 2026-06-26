@@ -2,8 +2,9 @@ active_experiments:
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
-      status: "running"
+      status: "completed"
       started: "2026-06-25"
+      completed_on: "2026-06-26"
       hostname: "gpunode04"
       git_hash: "2de8c2c"
       branch: "dev_3rd_rev"
@@ -179,6 +180,25 @@ active_experiments:
           subagent: "019f0230-563c-7893-bb1d-ee380a4fc536"
           finding: "Audit found the main experiment responses matched the manuscript, and flagged remaining figure TODOs, table-number wording, and overstatement of 100 km spatial separation. The table wording, 100 km phrasing, and Figure 5 caption were fixed; Figure 1 ordering remains explicitly marked."
         outcome: "Reviewer response draft is updated for completed experiment and writing changes, with one visible hand-assembly TODO for Figure 1."
+      phase_8_final_checks:
+        status: "completed"
+        completed_on: "2026-06-26"
+        superproject_commit_before_log_update: "c155895"
+        paper_submodule_commit: "e5b1d54"
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile scripts/benchmark.py scripts/data_processing/compile_sbcv_eva_samples.py scripts/chao2_estimator.py figures/figure_3/figure_3.py muscari/cld.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated ceacce0, d0848f6, Chao2, and smoke benchmark row counts, folds, and required metrics"
+          - "git diff --check && git -C paper diff --check"
+          - "git diff | UV_CACHE_DIR=/tmp/uv-cache uv run python -c '... no em dash in superproject diff'"
+          - "git -C paper diff | UV_CACHE_DIR=/tmp/uv-cache uv run python -c '... no em dash in paper diff'"
+          - "rg -n 'fig:shapley|sec:shapley|Shap|disentangle|61\\\\%|68\\\\%' paper/main.tex returned no matches"
+          - "git status --short --branch and git -C paper status --short --branch were clean before final log update"
+        tex_compile: "not_run_no_latexmk_pdflatex_tectonic_or_xelatex_binary_available_locally"
+        remaining_human_actions:
+          - "Hand-assembled Figure 1 top-panel ordering remains marked TODO(agent) in the response draft."
+          - "Hand-built Figure 5 image remains user-owned; manuscript text now states that Figure 5 should use the ClimateDEM-only ensemble."
+        outcome: "Final supported checks passed. The remaining items are explicitly human-owned figure assembly tasks rather than code or manuscript consistency failures."
 
 completed_experiments:
   - name: "sync_sbcv_100km_d0848f6"
