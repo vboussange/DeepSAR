@@ -1,7 +1,8 @@
 """
 Projecting spatially the predictions of an ensembled `MuScaRi` model,
-and saving SR, std_SR, dSR/dlogA and std_dSR/dlogA to geotiffs.
+and saving SR, std_SR, dS/dA and std_dS/dA to geotiffs.
 """
+import os
 import torch
 import numpy as np
 import xarray as xr
@@ -16,8 +17,12 @@ from muscari.data_processing.utils_eva import COUNTRY_DATA, COUNTRY_LIST
 from muscari.plotting import CMAP_BR
 
 ROOT = Path(__file__).parents[2]
-TRAINING_DATASET_SEED = "ceacce0"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
+MODEL_NAME = os.environ.get("FIGURE5_MODEL_NAME", "dae0789a3c87")
+RUN_DIR = (
+    Path(os.environ["FIGURE5_RUN_DIR"]).expanduser()
+    if "FIGURE5_RUN_DIR" in os.environ
+    else ROOT / "scripts" / "results" / "benchmark" / "artifacts" / "MuScaRi_ClimateDEM" / MODEL_NAME
+)
 
 def create_raster(X_map, ypred):
     Xy_map = X_map.copy()
@@ -88,12 +93,11 @@ def align_features_to_reference(features_ref: xr.Dataset, features_other: xr.Dat
     return features_other.rio.reproject_match(features_ref).assign_coords(x=features_ref.x, y=features_ref.y)
         
 # we use batches, otherwise model and data may not fit in memory
-def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
+def get_sr_ds_da_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     """
-    Calculate SR, std_SR and dlogSR_dlogA for the given model and climate
-    dataset at a specified resolution. dSR is obtained as a gradient of SR with
-    respect to log_sp_unit_area. Does not account for changes in climate
-    features with area.
+    Calculate SR, std_SR and dS/dA for the given model and climate dataset at a
+    specified resolution. The accumulation rate is expressed in species/km2 and
+    estimated between square windows of side length res0 and 2 * res0.
     """
     
     resolution = abs(env_dataset.rio.resolution()[0])
@@ -106,7 +110,7 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     print(f"Creating features for res1: {res1}m")
     features1 = create_features(model, env_dataset, lc_dataset, res1)
 
-    # Align features to a common grid for dSR/dlogA computation
+    # Align features to a common grid for paired dS/dA computation.
     features1 = align_features_to_reference(features0, features1)
 
     features0_df = features0.to_dataframe()
@@ -135,10 +139,11 @@ def get_SR_dSR_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     mean_SR = model.aggregate_member_predictions(SR01_list[0].T)
     std_SR = model.get_member_prediction_dispersion(SR01_list[0].T)
         
-    dSR_dlogA = (SR01_list[1] - SR01_list[0]) / (res1 - res0)
-    mean_dSR_dlogA = model.aggregate_member_predictions(dSR_dlogA.T)
-    std_dSR_dlogA = model.get_member_prediction_dispersion(dSR_dlogA.T)
-    return features0_df, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA
+    delta_area_km2 = (res1**2 - res0**2) / 1e6
+    dS_dA = np.maximum(SR01_list[1] - SR01_list[0], 0.0) / delta_area_km2
+    mean_dS_dA = model.aggregate_member_predictions(dS_dA.T)
+    std_dS_dA = model.get_member_prediction_dispersion(dS_dA.T)
+    return features0_df, mean_SR, std_SR, mean_dS_dA, std_dS_dA
 
 
 def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
@@ -159,7 +164,7 @@ def load_environmental_features() -> tuple[xr.Dataset, xr.Dataset]:
 if __name__ == "__main__":
     plotting = True
 
-    model_name = RUN_DIR.name
+    model_name = MODEL_NAME
 
     projection_path = Path(__file__).parents[2] / Path(f"data/processed/projections/{model_name}")
     projection_path.mkdir(parents=True, exist_ok=True)
@@ -171,9 +176,9 @@ if __name__ == "__main__":
     
 
     for res in [5e3, 5e4]:
-        print(f"Calculating SR, and stdSR for resolution: {res}m")
+        print(f"Calculating SR, stdSR, and dS/dA for resolution: {res}m")
 
-        features0, mean_SR, std_SR, mean_dSR_dlogA, std_dSR_dlogA = get_SR_dSR_stats(
+        features0, mean_SR, std_SR, mean_dS_dA, std_dS_dA = get_sr_ds_da_stats(
             model, env_dataset, lc_dataset, res
         )
         if len(features0) == 0:
@@ -183,8 +188,8 @@ if __name__ == "__main__":
         raster_configs = [
             ("SR", mean_SR, "SR"),
             ("std_SR", std_SR, "Standard Deviation of SR"),
-            ("dSR_dlogA", mean_dSR_dlogA, "dSR/dlogA"),
-            ("std_dSR_dlogA", std_dSR_dlogA, "Standard Deviation of dSR/dlogA"),
+            ("dS_dA", mean_dS_dA, "dS/dA (species/km2)"),
+            ("std_dS_dA", std_dS_dA, "Standard Deviation of dS/dA"),
         ]
 
         for raster_name, data, plot_title in raster_configs:
