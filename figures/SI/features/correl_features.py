@@ -10,7 +10,7 @@ import numpy as np
 from muscari.plotting import CMAP_BR
 
 
-SBCV_SAMPLES_PATH = Path(__file__).parent / "../../../data/processed/training_samples/sbcv/a9a058d"
+SBCV_SAMPLES_PATH = Path(__file__).parent / "../../../data/processed/training_samples/sbcv/ceacce0"
 BIOCLIMATE_VARS = [
             "bio1",
             "pet_penman_mean",
