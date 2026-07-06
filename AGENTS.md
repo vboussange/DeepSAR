@@ -26,12 +26,18 @@ git --git-dir=.git/modules/paper \
   > /tmp/muscari_previous_main_d4b8ad5.tex
 
 cd paper
-latexdiff --type=CFONT --disable-citation-markup \
+latexdiff --type=UNDERLINE \
   /tmp/muscari_previous_main_d4b8ad5.tex main.tex \
   > revision_diff_d4b8ad5.tex
 ```
 
-Known `latexdiff` cleanup for this manuscript: if the generated diff introduces `\DIF...` markup inside the corresponding-author `\href` before the diff macros are defined, replace that author-email line in `revision_diff_d4b8ad5.tex` with the plain current line. If a deleted reference to the old Shapley figure leaves `fig:shapley` undefined, add a compatibility label next to the current scale-binned figure label in the diff source only, e.g. `\label{fig:shapley}\label{fig:scale_binned_rmse}`. Then compile from `paper/` with `latexmk -pdf -interaction=nonstopmode -halt-on-error revision_diff_d4b8ad5.tex`. Do not commit the generated diff source or PDF to the Overleaf `paper/` repo unless explicitly requested.
+Use `--type=UNDERLINE` so deleted text is rendered with a red strikeout and added text with blue wavy underlining. Do not add `--disable-citation-markup` for this strikeout diff: with `ulem`-based styles it also disables protective boxing around fragile commands such as `\cref`, which can make the generated file fail to compile. Known `latexdiff` cleanup for this manuscript: if the generated diff introduces `\DIF...` markup inside the corresponding-author `\href` before the diff macros are defined, replace the entire generated author-email block with the plain current line:
+
+```tex
+$^\star$ Corresponding author, email: \href{mailto:vic.boussange@gmail.com}{\texttt{vic.boussange@gmail.com}}
+```
+
+In practice this may mean replacing a multi-line block beginning with `$^\star$ Corresponding author, email: \DIFdelbegin` and ending before `\end{flushleft}`. If a deleted reference to the old Shapley figure leaves `fig:shapley` undefined, add a compatibility label next to the current scale-binned figure label in the diff source only, e.g. `\label{fig:shapley}\label{fig:scale_binned_rmse}`. Then compile from `paper/` with `latexmk -pdf -interaction=nonstopmode -halt-on-error revision_diff_d4b8ad5.tex`. If `latexmk` reports that all targets are up to date while also showing `pdflatex: gave an error in previous invocation`, rerun after touching the fixed `revision_diff_d4b8ad5.tex` or force a rebuild with `latexmk -g -pdf -interaction=nonstopmode -halt-on-error revision_diff_d4b8ad5.tex`. Do not commit the generated diff source or PDF to the Overleaf `paper/` repo unless explicitly requested.
 
 ## Build, Test, and Development Commands
 
