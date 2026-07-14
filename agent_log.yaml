@@ -1,47 +1,4 @@
 active_experiments:
-  - name: "branch_cleanup_phase_3_master_reconciliation"
-    important_params:
-      task: "selectively port misplaced master changes to dev_3rd_rev, archive master, and restore the intended branch topology"
-      status: "running"
-      started: "2026-07-14"
-      hostname: "gpunode04"
-      git_hash: "e0642d88aca2364fcfdfadf39f1eea71b1d7036e"
-      branch: "dev_3rd_rev"
-      misplaced_master_tip: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
-      intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
-      archive_tag: "archive/misplaced-master-2026-07-14"
-      remote_url: "git@github.com:vboussange/MuScaRi.git"
-      current_step: "stage the statistical-tightening plan"
-      port_group_1:
-        source_commits:
-          - "113e10f"
-          - "selected hunks from 0d384db"
-        changes:
-          - "Updated the paper submodule URL to SSH."
-          - "Moved projection-error resolution labels to the column headers."
-          - "Pointed the feature-correlation script to ceacce0."
-          - "Removed an unused Torch import and corrected the scaling-axis label typo."
-          - "Applied 25 km2 and 2,500 km2 typography to the current dS/dA Figure 5 source and table."
-        omitted_as_superseded:
-          - "The alternate AGENTS.md from 0d384db and 124a06f."
-          - "The three-model Figure 4 rewrite, which conflicts with the verified two-model manuscript analysis."
-          - "Legacy Figure 5 computation logic superseded by the centered-window uniform-ensemble implementation."
-        checks:
-          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile ... for all touched SI and Figure 5 scripts plus unchanged Figure 4."
-          - "Ran the ceacce0 feature-correlation script and generated a non-empty verification PDF in /tmp."
-          - "Ran Figure 4 end to end; its 200-row CSV was byte-identical and verification-only PDF byte churn was discarded."
-          - "Generated a synthetic Figure 5 SAR table and validated the updated units and dS/dA notation."
-          - "Synchronized the paper submodule URL and confirmed the submodule is clean."
-          - "git diff --check"
-        unavailable_checks:
-          - "Projection-error rendering: data/processed/projections/ceacce0 is absent."
-          - "Scaling experiment runtime: the legacy benchmark CSV is absent."
-        commit: "e965d80 Reconcile misplaced figure script fixes"
-      port_group_2:
-        source_commit: "6e3bdff"
-        file: "TIGHTENING_STATS_PLAN.md"
-        policy: "preserve the plan verbatim without implementing its statistical changes in this branch-cleanup phase"
-      next_action: "validate and obtain user approval for the staged statistical-tightening plan commit"
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
@@ -146,6 +103,63 @@ active_experiments:
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
+  - name: "branch_cleanup_phase_3_master_reconciliation"
+    important_params:
+      task: "selectively port misplaced master changes to dev_3rd_rev, archive master, and restore the intended branch topology"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      git_hash: "e0642d88aca2364fcfdfadf39f1eea71b1d7036e"
+      branch: "dev_3rd_rev"
+      misplaced_master_tip: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+      intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+      archive_tag: "archive/misplaced-master-2026-07-14"
+      remote_url: "git@github.com:vboussange/MuScaRi.git"
+      current_step: "completed"
+      port_group_1:
+        source_commits:
+          - "113e10f"
+          - "selected hunks from 0d384db"
+        changes:
+          - "Updated the paper submodule URL to SSH."
+          - "Moved projection-error resolution labels to the column headers."
+          - "Pointed the feature-correlation script to ceacce0."
+          - "Removed an unused Torch import and corrected the scaling-axis label typo."
+          - "Applied 25 km2 and 2,500 km2 typography to the current dS/dA Figure 5 source and table."
+        omitted_as_superseded:
+          - "The alternate AGENTS.md from 0d384db and 124a06f."
+          - "The three-model Figure 4 rewrite, which conflicts with the verified two-model manuscript analysis."
+          - "Legacy Figure 5 computation logic superseded by the centered-window uniform-ensemble implementation."
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile ... for all touched SI and Figure 5 scripts plus unchanged Figure 4."
+          - "Ran the ceacce0 feature-correlation script and generated a non-empty verification PDF in /tmp."
+          - "Ran Figure 4 end to end; its 200-row CSV was byte-identical and verification-only PDF byte churn was discarded."
+          - "Generated a synthetic Figure 5 SAR table and validated the updated units and dS/dA notation."
+          - "Synchronized the paper submodule URL and confirmed the submodule is clean."
+          - "git diff --check"
+        unavailable_checks:
+          - "Projection-error rendering: data/processed/projections/ceacce0 is absent."
+          - "Scaling experiment runtime: the legacy benchmark CSV is absent."
+        commit: "e965d80 Reconcile misplaced figure script fixes"
+      port_group_2:
+        source_commit: "6e3bdff"
+        file: "TIGHTENING_STATS_PLAN.md"
+        policy: "preserve the plan verbatim without implementing its statistical changes in this branch-cleanup phase"
+        commit: "f1e6a64 Add statistical tightening plan"
+      master_archive:
+        tag: "archive/misplaced-master-2026-07-14"
+        target: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+        status: "pushed and verified before rewriting master"
+      master_repair:
+        expected_lease: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+        restored_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+        method: "exact force-with-lease"
+        verification: "local master, origin/master, origin/HEAD, and remote master all resolved to 0842ba0"
+      deleted_branches:
+        - "local dev_3rd_rev_reparametrization at 74e2b84; it was 22 commits behind dev_3rd_rev with no unique commits"
+      outcome: "Useful master changes were selectively ported to dev_3rd_rev, superseded changes remain recoverable through the archive tag, remote master was safely restored to its intended stable tip, and the merged local reparameterization branch was removed."
+      next_action: "commit this reconciliation log after user approval, then implement TIGHTENING_STATS_PLAN.md as a separate scientific task"
   - name: "branch_cleanup_phase_2_writing_branch_reconciliation"
     important_params:
       task: "selectively preserve useful writing-branch content and retire the outer paper_3rd_revision_writing branch"
