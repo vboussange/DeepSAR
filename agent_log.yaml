@@ -1,20 +1,4 @@
 active_experiments:
-  - name: "branch_cleanup_phase_2_writing_branch_reconciliation"
-    important_params:
-      task: "selectively preserve useful writing-branch content and retire the outer paper_3rd_revision_writing branch"
-      status: "running"
-      started: "2026-07-14"
-      hostname: "gpunode04"
-      git_hash: "2d3042251d39028422d84d86532f22899730edeb"
-      branch: "dev_3rd_rev"
-      writing_branch_tip: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
-      archive_tag: "archive/paper_3rd_revision_writing-2026-06-26"
-      current_step: "stage verified 100 km GIFT audit, synthesis, and logging group"
-      implementation_note: "Real Chao2 folds change the rendered Figure 3, so preserving synchronized root/manuscript PDFs requires one new commit on the existing paper submodule branch instead of retaining pointer d42b958."
-      paper_git_hash: "9e10881afc073c5ec054684a05c9aa4fce8346c2"
-      paper_push_status: "pushed to codex/paper_3rd_revision_writing and verified with ls-remote"
-      outer_figure_commit: "34f7a83"
-      next_action: "validate and obtain user approval for the staged 100 km GIFT audit, synthesis, and logging commit"
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
@@ -119,6 +103,39 @@ active_experiments:
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
+  - name: "branch_cleanup_phase_2_writing_branch_reconciliation"
+    important_params:
+      task: "selectively preserve useful writing-branch content and retire the outer paper_3rd_revision_writing branch"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      starting_git_hash: "2d3042251d39028422d84d86532f22899730edeb"
+      branch: "dev_3rd_rev"
+      writing_branch_tip: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
+      archive_tag: "archive/paper_3rd_revision_writing-2026-06-26"
+      archive_tag_target: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
+      archive_status: "annotated tag pushed and peeled target verified before branch deletion"
+      branch_retirement:
+        local: "deleted"
+        remote: "deleted"
+        nested_manuscript_branches: "retained"
+      commits:
+        paper: "9e10881 Update Figure 3 Chao2 baseline"
+        figure_and_chao2: "34f7a83 Update Figure 3 benchmark panels and Chao2 baseline"
+        gift_audit_and_synthesis: "5787e69 Record final GIFT audit and manuscript updates"
+      checks:
+        - "Full Chao2 regeneration produced five canonical folds with RMSE 1258.533 +/- 13.102."
+        - "Full Figure 3 regeneration loaded real Chao2 fold rows and synchronized root/manuscript PDFs."
+        - "d0848f6 GIFT audit validated 36 rows, unique model/mode/aggregation/fold keys, and complete RMSE values."
+        - "ceacce0 and d0848f6 synthesis values matched benchmark and GIFT audit sources."
+        - "Root and paper diff checks passed; the paper submodule was clean and pushed."
+        - "dev_3rd_rev was pushed through 5787e69 before the writing branch was deleted."
+        - "The remote archive tag resolved to 24a6658 after deletion; local and remote outer writing branch refs were absent."
+      warnings:
+        - "The root origin reports that the repository moved from vboussange/DeepSAR to vboussange/MuScaRi; pushes still succeeded through the existing URL."
+      outcome: "Canonical Chao2 and GIFT result artifacts were preserved on dev_3rd_rev, the manuscript pointer was updated to the pushed Figure 3 commit, and the confusing outer writing branch was archived as a tag and removed locally and remotely."
+      next_action: "Commit this branch-retirement log after user approval, then reconcile the misplaced origin/master commits in a separate phase."
   - name: "branch_cleanup_phase_1_dirty_worktree"
     important_params:
       task: "classify and verify the dirty dev_3rd_rev worktree before branch reconciliation"
