@@ -11,7 +11,7 @@ active_experiments:
       intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
       archive_tag: "archive/misplaced-master-2026-07-14"
       remote_url: "git@github.com:vboussange/MuScaRi.git"
-      current_step: "stage approved supplementary and Figure 5 fixes"
+      current_step: "stage the statistical-tightening plan"
       port_group_1:
         source_commits:
           - "113e10f"
@@ -36,7 +36,12 @@ active_experiments:
         unavailable_checks:
           - "Projection-error rendering: data/processed/projections/ceacce0 is absent."
           - "Scaling experiment runtime: the legacy benchmark CSV is absent."
-      next_action: "obtain user approval for the staged first reconciliation commit"
+        commit: "e965d80 Reconcile misplaced figure script fixes"
+      port_group_2:
+        source_commit: "6e3bdff"
+        file: "TIGHTENING_STATS_PLAN.md"
+        policy: "preserve the plan verbatim without implementing its statistical changes in this branch-cleanup phase"
+      next_action: "validate and obtain user approval for the staged statistical-tightening plan commit"
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
