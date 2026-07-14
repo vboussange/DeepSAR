@@ -1,9 +1,26 @@
 active_experiments:
+  - name: "branch_cleanup_phase_2_writing_branch_reconciliation"
+    important_params:
+      task: "selectively preserve useful writing-branch content and retire the outer paper_3rd_revision_writing branch"
+      status: "running"
+      started: "2026-07-14"
+      hostname: "gpunode04"
+      git_hash: "2d3042251d39028422d84d86532f22899730edeb"
+      branch: "dev_3rd_rev"
+      writing_branch_tip: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
+      archive_tag: "archive/paper_3rd_revision_writing-2026-06-26"
+      current_step: "stage verified 100 km GIFT audit, synthesis, and logging group"
+      implementation_note: "Real Chao2 folds change the rendered Figure 3, so preserving synchronized root/manuscript PDFs requires one new commit on the existing paper submodule branch instead of retaining pointer d42b958."
+      paper_git_hash: "9e10881afc073c5ec054684a05c9aa4fce8346c2"
+      paper_push_status: "pushed to codex/paper_3rd_revision_writing and verified with ls-remote"
+      outer_figure_commit: "34f7a83"
+      next_action: "validate and obtain user approval for the staged 100 km GIFT audit, synthesis, and logging commit"
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
-      status: "running"
+      status: "completed"
       started: "2026-06-25"
+      completed_on: "2026-06-26"
       hostname: "gpunode04"
       git_hash: "2de8c2c"
       branch: "dev_3rd_rev"
@@ -102,6 +119,199 @@ active_experiments:
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
+  - name: "branch_cleanup_phase_1_dirty_worktree"
+    important_params:
+      task: "classify and verify the dirty dev_3rd_rev worktree before branch reconciliation"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      git_hash: "2d3042251d39028422d84d86532f22899730edeb"
+      branch: "dev_3rd_rev"
+      classified_groups:
+        figure_3_and_cld:
+          files:
+            - "figures/figure_3/figure_3.py"
+            - "figures/figure_3/figure_3.pdf"
+            - "figures/figure_3/model_performance_and_bias_report.txt"
+            - "muscari/cld.py"
+          staging_status: "committed as 34f7a83 after replacing the synthetic Chao2 fallback with canonical fold results"
+        gift_100km_and_manuscript:
+          files:
+            - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+            - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_summary.md"
+            - "scripts/results/final_revision_synthesis.md"
+            - "paper"
+            - "agent_log.yaml"
+          staging_status: "paper pointer committed with 34f7a83; remaining 100 km GIFT artifacts, synthesis, and log prepared as a second commit"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py muscari/cld.py scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated all ceacce0/d0848f6 synthesis values against benchmark and GIFT asymptote CSVs"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated the d0848f6 CSV schema, expected 36 rows, unique keys, and complete RMSE values"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated Figure 3 model membership and asymptotic metric loading"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated compact-letter generation without mutating the input matrix"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... parsed agent_log.yaml"
+        - "git diff --check"
+        - "git -C paper diff --check"
+      warnings:
+        - "The ignored d0848f6 results CSV is a required scientific result artifact and should be force-added with the second group rather than left unversioned."
+        - "PDF rendering utilities were unavailable; Figure 3 regenerated successfully, its numeric report was byte-identical, and the pre-existing synchronized root/manuscript PDF was retained to avoid verification-only PDF byte churn."
+        - "The existing Figure 3 code still uses independent-samples pairwise tests; the statistical-tightening plan on origin/master proposes a later paired-fold Holm analysis."
+      outcome: "The dirty worktree was reproduced and divided into two reviewable groups; phase 2 reconciled the first group with canonical Chao2 folds before committing it."
+      next_action: "Commit the verified 100 km GIFT audit, synthesis, and logging group after user approval."
+  - name: "manuscript_replace_fused_gift_table_with_100km"
+    important_params:
+      task: "replace the fused EVA+GIFT 100 km performance table/reference with 100 km spatial-block tables matching the earlier performance-table style"
+      status: "completed"
+      started: "2026-07-01"
+      completed_on: "2026-07-01"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "c146e09"
+      dataset_ids:
+        sbcv_1km: "ceacce0"
+        sbcv_100km: "d0848f6"
+        gift: "da569da/418c563 equivalent local compiled data"
+      important_parameters:
+        block_size_m: 100000
+        table_value_sources:
+          - "scripts/results/benchmark/benchmark_results_d0848f6.csv"
+          - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+      files_changed:
+        - "paper/main.tex"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "agent_log.yaml"
+      changes:
+        - "Replaced the fused 100 km EVA+GIFT table with separate 100 km EVA interpolation and GIFT extrapolation tables using the same metric columns as the preceding performance tables."
+        - "Updated the Results references from tab:robust_100km to tab:interp_performance_100km and tab:extrap_performance_100km."
+        - "Updated the reviewer-response placeholder from a singular supplementary table to plural supplementary tables."
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated updated 100 km labels, references, and table values against d0848f6 benchmark/asymptote-audit CSVs"
+        - "git diff --check -- agent_log.yaml && git -C paper diff --check"
+      warnings:
+        - "A full LaTeX build was not run because latexmk, tectonic, and pdflatex are unavailable in this environment."
+      outcome: "The manuscript now reports the 100 km robustness results as separate EVA interpolation and GIFT extrapolation tables, matching the style of the preceding performance tables."
+  - name: "figure_3_typography_unbold_models_titles"
+    important_params:
+      task: "remove bold styling from Figure 3 model labels and performance-panel titles"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Removed math-bold styling from the MuScaRi env.+area y-axis label."
+        - "Set Interpolation/Extrapolation performance titles to normal font weight."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 now leaves model labels and performance-panel titles unbolded; only panel letters retain bold styling."
+  - name: "figure_3_cld_position_refinement"
+    important_params:
+      task: "move Figure 3 compact-letter-display labels below-right of each central summary bar"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Changed Figure 3 CLD placement from a fixed right-axis lane to row-local positions just below and to the right of each central summary bar."
+        - "Used an additive offset on the interpolation panel and a multiplicative log-aware offset on the GIFT extrapolation panel."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed panel c/d relative-bias diagnostics remained sane"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 CLD labels now live below-right of the central summary bars, matching the placement style requested for previous figures."
+  - name: "figure_3_panel_bias_and_letters_fix"
+    important_params:
+      task: "diagnose and fix Figure 3 panel c/d bias annotations and panel b statistical-letter placement"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Pointed Figure 3 panel c/d generation to the benchmark artifact MuScaRi_ClimateDEM/dae0789a3c87 instead of the stale train/ceacce0 checkpoint directory."
+        - "Loaded fold checkpoints with the saved MuScaRi batchnorm, asymptote-transform, and Weibull-parameterization settings."
+        - "Dropped GIFT rows only against the ensemble feature columns and target, rather than using a broad all-column dropna."
+        - "Anchored statistical letters at row centers using blended axes/data coordinates and added right-side x-axis padding, stabilizing panel b on a log RMSE axis."
+      diagnostics:
+        panel_c:
+          fold: 0
+          median_relative_bias: 0.021
+          r2: 0.988
+        panel_d:
+          median_relative_bias: 0.066
+          r2: 0.784
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py muscari/cld.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed panel c/d median relative bias and R2 are sane and Figure 3 loader uses asymptotic MuScaRi GIFT metrics"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 no longer shows near-minus-one relative-bias artifacts in panels c/d, and panel b statistical letters are placed in a stable right-side lane."
+  - name: "manuscript_revision_plan_completion"
+    important_params:
+      task: "address every actionable checkbox in paper/REVISION_PLAN.md, verify manuscript/response consistency, and run external subagent audit"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      dataset_ids:
+        sbcv_1km: "ceacce0"
+        sbcv_100km: "d0848f6"
+      files_changed:
+        - "paper/main.tex"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "paper/REVISION_PLAN.md"
+        - "figures/figure_3/figure_3.py"
+        - "figures/figure_3/figure_3.pdf"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+        - "paper/figures/figure_3.pdf"
+        - "muscari/cld.py"
+        - "scripts/results/final_revision_synthesis.md"
+        - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+        - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_summary.md"
+        - "agent_log.yaml"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py scripts/experiments_3rd_rev/gift_asymptote_evaluation.py muscari/cld.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uvx codespell -L MAPE paper/main.tex paper/response_to_reviewers_3rd_rev.md"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... static label/reference/citation/graphic audit"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed Figure 3 loader includes Linear_ClimateDEM_Area, Chao2 fallback, and asymptotic MuScaRi GIFT RMSE values"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed EVA/GIFT richness context, Figure 4 relative RMSE, and ceacce0/d0848f6 asymptotic benchmark values"
+        - "git diff --check"
+        - "git -C paper diff --check"
+      audit:
+        first_subagent: "019f18a5-f09f-7661-b4da-83163d676d51"
+        first_findings_resolved:
+          - "Updated Figure 3 source to use asymptotic MuScaRi GIFT metrics, include the log-linear baseline, use a log-scaled GIFT RMSE axis, and tolerate the absent archived Chao2 CSV with an explicit manuscript-summary fallback."
+          - "Removed stale Introduction wording that claimed ablation studies disentangle causal contributions."
+          - "Clarified the response to the Figure 3 R2 concern by separating high EVA interpolation R2 from lower GIFT extrapolation R2."
+          - "Updated scripts/results/final_revision_synthesis.md date to 2026-06-30."
+        final_subagent: "019f18a5-f09f-7661-b4da-83163d676d51"
+        final_finding: "No remaining findings in the requested audit scope."
+      warnings:
+        - "A full LaTeX build was not run because latexmk, pdflatex, tectonic, biber, and chktex are unavailable in this environment."
+        - "The archived fold-level Chao2 CSV is absent locally; Figure 3 uses an explicit fallback preserving the manuscript's Chao2 RMSE mean and sample standard deviation."
+      outcome: "All REVISION_PLAN.md checkboxes are completed with manuscript, response, Figure 3, Figure 5, and result-synthesis consistency checks. The first external audit findings were addressed before the final audit loop."
   - name: "figure_5_layout_refinement_callouts_sar_typography"
     important_params:
       task: "refine Figure 5 layout so callout labels avoid maps, SAR panels are shorter/wider, and typography matches template weight hierarchy"
