@@ -23,8 +23,22 @@ ROOT = Path(__file__).parents[2]
 TRAINING_DATASET_SEED = "ceacce0"
 BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_{TRAINING_DATASET_SEED}.csv"
 CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_{TRAINING_DATASET_SEED}.csv"
-RUN_DIR = ROOT / "scripts" / "results" / "train" / f"{TRAINING_DATASET_SEED}"
+MODEL_FAMILY = "MuScaRi_ClimateDEM"
+MODEL_HASH = "dae0789a3c87"
+GIFT_ASYMPTOTE_RESULTS = (
+    ROOT
+    / "scripts"
+    / "results"
+    / "gift_asymptote_evaluation"
+    / TRAINING_DATASET_SEED
+    / "gift_asymptote_evaluation_results.csv"
+)
+RUN_DIR = ROOT / "scripts" / "results" / "benchmark" / "artifacts" / MODEL_FAMILY / MODEL_HASH
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
+FIGURE_OUTPUTS = [
+    Path(__file__).with_name("figure_3.pdf"),
+    ROOT / "paper" / "figures" / "figure_3.pdf",
+]
 PLOT_STYLE = {
     "axis_label": 12,
     "tick_label": 12,
@@ -36,7 +50,11 @@ PLOT_STYLE = {
     "quantiles": (0.005, 1),
 }
 
-def report_model_performance(df_plot, metric, output_file="model_performance_and_bias_report.txt"):
+def report_model_performance(
+    df_plot,
+    metric,
+    output_file=Path(__file__).with_name("model_performance_and_bias_report.txt"),
+):
     """
     Report model performance, statistical significance, and relative bias for eva and gift datasets.
     
@@ -85,7 +103,7 @@ def report_model_performance(df_plot, metric, output_file="model_performance_and
                 dataset_results.append({
                     'Experiment': experiment,
                     'RMSE_mean': np.mean(performance),
-                    'RMSE_std': np.std(performance),
+                    'RMSE_std': np.std(performance, ddof=1) if len(performance) > 1 else 0.0,
                     'N': len(performance)
                 })
             
@@ -129,9 +147,52 @@ def report_model_performance(df_plot, metric, output_file="model_performance_and
     print(f"Model performance and bias analysis saved to '{output_file}'")
 
 
+def load_chao2_results() -> pd.DataFrame:
+    if not CHAO2_RESULTS.exists():
+        raise FileNotFoundError(f"Missing fold-level Chao2 benchmark: {CHAO2_RESULTS}")
+    return pd.read_csv(CHAO2_RESULTS)
+
+
+def apply_asymptotic_muscari_extrapolation(df_plot: pd.DataFrame) -> pd.DataFrame:
+    if not GIFT_ASYMPTOTE_RESULTS.exists():
+        raise FileNotFoundError(f"Missing GIFT asymptote audit: {GIFT_ASYMPTOTE_RESULTS}")
+
+    asymptote = pd.read_csv(GIFT_ASYMPTOTE_RESULTS)
+    asymptote = asymptote[
+        (asymptote["prediction_mode"] == "asymptotic_total")
+        & (asymptote["aggregation"] == "fold_member")
+    ].copy()
+    asymptote["fold"] = asymptote["fold"].astype(int)
+
+    metric_map = {
+        "r2": "extrap_r2",
+        "d2": "extrap_d2",
+        "rmse": "extrap_rmse",
+        "mape": "extrap_mape",
+        "mean_relative_bias": "extrap_mean_relative_bias",
+        "median_relative_bias": "extrap_median_relative_bias",
+        "log1p_r2": "extrap_log1p_r2",
+        "log1p_d2": "extrap_log1p_d2",
+        "log1p_rmse": "extrap_log1p_rmse",
+        "log1p_mae": "extrap_log1p_mae",
+        "bias_slope_log_area": "extrap_bias_slope_log_area",
+    }
+
+    df_plot = df_plot.copy()
+    for _, row in asymptote.iterrows():
+        mask = (df_plot["experiment"] == row["model_name"]) & (df_plot["fold"] == row["fold"])
+        if not mask.any():
+            continue
+        for source_col, target_col in metric_map.items():
+            if target_col in df_plot.columns and source_col in row:
+                df_plot.loc[mask, target_col] = row[source_col]
+    return df_plot
+
+
 def load_benchmark_results() -> pd.DataFrame:
     df_muscari = pd.read_csv(BENCHMARK_RESULTS)
-    df_chao2 = pd.read_csv(CHAO2_RESULTS)
+    df_muscari = apply_asymptotic_muscari_extrapolation(df_muscari)
+    df_chao2 = load_chao2_results()
     df_plot = pd.concat([df_chao2, df_muscari], ignore_index=True)
     return df_plot
 
@@ -202,10 +263,18 @@ def add_performance_panels(
 
         ax.set_yticks(range(1, len(experiments) + 1))
         ax.set_xlabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"])
-        # ax.set_xscale("log")
-        # ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
-        # # ax.xaxis.get_major_formatter().set_scientific(False)
-        # ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.0f}'))
+        if dataset == "extrap":
+            ax.set_xscale("log")
+            ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+            ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+            positive_values = np.concatenate([d[d > 0] for d in box_data if np.isfinite(d).any()])
+            ax.set_xlim(positive_values.min() * 0.75, positive_values.max() * 2.5)
+        else:
+            finite_values = np.concatenate([d[np.isfinite(d)] for d in box_data if np.isfinite(d).any()])
+            data_range = finite_values.max() - finite_values.min()
+            right_pad = 0.25 * data_range if data_range > 0 else finite_values.max() * 0.1
+            left_pad = 0.05 * data_range if data_range > 0 else finite_values.max() * 0.02
+            ax.set_xlim(max(0, finite_values.min() - left_pad), finite_values.max() + right_pad)
 
         if j == 0:
             display_labels = [label_map.get(e, e) if label_map else e for e in experiments]
@@ -217,7 +286,7 @@ def add_performance_panels(
         else:
             ax.set_yticklabels([])
             ax.tick_params(axis='y', length=0)
-        ax.set_title(titles_main[j], fontsize=PLOT_STYLE["title"], fontweight="bold", pad=36)
+        ax.set_title(titles_main[j], fontsize=PLOT_STYLE["title"], fontweight="normal", pad=36)
         ax.text(
             0.5,
             1.02,
@@ -242,23 +311,28 @@ def add_performance_panels(
             test_results = mc.allpairtest(stats.ttest_ind, alpha=alpha)
 
             comp_matrix = create_comp_matrix_allpair_t_test(test_results)
-            letters = multcomp_letters(comp_matrix < alpha)
-
+            sig_matrix = pd.DataFrame(
+                (comp_matrix.to_numpy() < alpha).copy(),
+                index=comp_matrix.index,
+                columns=comp_matrix.columns,
+            )
+            letters = multcomp_letters(sig_matrix)
             for i, experiment in enumerate(experiments):
                 if experiment in letters:
                     data_vals = box_data[i]
-                    q75 = np.percentile(data_vals, 75)
-                    iqr = np.percentile(data_vals, 75) - np.percentile(data_vals, 25)
-                    whisker_top = q75 + 1.5 * iqr
-                    xpos = min(whisker_top, max(data_vals)) + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.02
-
-                    mean_val = np.mean(data_vals)
+                    bar_x = np.mean(data_vals)
+                    xmin, xmax = ax.get_xlim()
+                    if dataset == "extrap":
+                        log_offset = 0.015 * (np.log10(xmax) - np.log10(xmin))
+                        letter_x = 10 ** (np.log10(max(bar_x, xmin)) + log_offset)
+                    else:
+                        letter_x = bar_x + 0.015 * (xmax - xmin)
                     ax.text(
-                        mean_val + (ax.get_xlim()[1] - ax.get_xlim()[0]) * 0.01,
-                        i + 0.7,
+                        letter_x,
+                        i + 1 - 0.16,
                         letters[experiment],
                         ha="left",
-                        va="bottom",
+                        va="top",
                         fontsize=PLOT_STYLE["annotation"],
                         color="black",
                     )
@@ -277,6 +351,17 @@ def load_fold_model(ckpt_path: Path, device: str) -> tuple[MuScaRi, object, dict
         feature_names=checkpoint["feature_names"],
         feature_scaler=checkpoint["feature_scaler"],
         target_scaler=checkpoint["target_scaler"],
+        ffnn_batchnorm=getattr(config, "muscari_batchnorm", False),
+        asymptote_transform=getattr(
+            config,
+            "muscari_asymptote_transform",
+            checkpoint.get("asymptote_transform", "softplus"),
+        ),
+        weibull_parameterization=getattr(
+            config,
+            "muscari_weibull_parameterization",
+            checkpoint.get("weibull_parameterization", "legacy"),
+        ),
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
@@ -333,7 +418,8 @@ def prepare_gift_data(model: MuScaRiEnsemble) -> gpd.GeoDataFrame:
     gift_dataset = gpd.read_parquet(GIFT_SAMPLES_PATH)
     gift_dataset["log_sp_unit_area"] = np.log(gift_dataset["sp_unit_area"])
     gift_dataset["log_observed_area"] = np.log(gift_dataset["observed_area"])
-    gift_dataset = gift_dataset.dropna().replace([np.inf, -np.inf], np.nan).dropna()
+    gift_dataset = gift_dataset.replace([np.inf, -np.inf], np.nan)
+    gift_dataset = gift_dataset.dropna(subset=model.feature_names + ["sr"])
     gift_dataset["predicted_sr"] = model.predict_mean_sr_tot(gift_dataset)
     return gift_dataset
 
@@ -351,10 +437,11 @@ if __name__ == "__main__":
     report_model_performance(df_perf, metric)
     
     label_map = {
-        "MuScaRi_ClimateDEM_Area": r"$\mathbf{MuScaRi}$" + "\n" + r"$\mathbf{(env. + area)}$",
+        "MuScaRi_ClimateDEM_Area": "MuScaRi\n(env. + area)",
         "MuScaRi_Area": "MuScaRi\n(area only)",
         "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
         "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
+        "Linear_ClimateDEM_Area": "Linear\n(env. + area)",
         "chao2_estimator": "Chao2\nestimator",
     }
 
@@ -438,5 +525,6 @@ if __name__ == "__main__":
     ax4.text(0.1, 0.9, 'd', transform=ax4.transAxes, fontsize=PLOT_STYLE["panel_label"], fontweight=PLOT_STYLE["panel_letter_weight"], va='top', ha='right')
     
     plt.tight_layout()
-    plt.show()
-    fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
+    for output_path in FIGURE_OUTPUTS:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=300, bbox_inches="tight")
