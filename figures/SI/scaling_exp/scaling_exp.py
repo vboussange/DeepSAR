@@ -1,7 +1,6 @@
 """
 Plotting training sample size vs model performance
 """
-import torch
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -57,7 +56,7 @@ if __name__ == "__main__":
     # Set labels and formatting
     ax.set_xticks(x_pos)
     ax.set_xticklabels([f'$10^{{{int(np.log10(frac))}}}$' if i % 2 == 0 else '' for i, frac in enumerate(train_fracs)])
-    ax.set_xlabel('Proporition of training samples')
+    ax.set_xlabel('Proportion of training samples')
     ax.set_ylabel('RMSE')
     
     plt.tight_layout()
