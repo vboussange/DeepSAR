@@ -161,6 +161,27 @@ active_experiments:
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
+  - name: "branch_cleanup_master_topology_follow_up"
+    important_params:
+      task: "restore remote master after it was advanced back to the archived misplaced-master tip"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "734c56b7ef63e7b59ceddaf5a0f0e523fce1463f"
+      branch: "dev_3rd_rev"
+      observed_remote_master: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+      intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+      archive_tag: "archive/misplaced-master-2026-07-14"
+      method: "exact force-with-lease"
+      scope: "leave dev_3rd_rev and the manuscript submodule untouched"
+      verification:
+        - "The exact force-with-lease accepted only the observed 6e3bdff remote tip and restored master to 0842ba0."
+        - "Live GitHub HEAD and refs/heads/master both resolved to 0842ba0 after the repair."
+        - "The pushed archive tag still peeled to 6e3bdff."
+        - "Local and remote dev_3rd_rev refs were not changed by the repair."
+      outcome: "The intended stable master topology was restored on GitHub without altering development or manuscript branch content."
+      next_action: "commit this follow-up log after user approval"
   - name: "tighten_figure_3_benchmark_statistics"
     important_params:
       task: "implement TIGHTENING_STATS_PLAN.md"
