@@ -29,13 +29,14 @@ Species names are fully anonymized; it is not possible to reconstruct the origin
 
 ## Dataset Structure
 
-The dataset bundles three interoperable components:
+The dataset bundles four interoperable components:
 
 | Component | Description | Format |
 |-----------|-------------|--------|
 | **EVA** | Anonymized presence-absence matrix derived from the European Vegetation Archive (EVA). Each row is a vegetation plot; each column is an anonymized plant species. | Parquet |
 | **GIFT** | Anonymized presence-absence matrix derived from the Global Inventory of Floras and Traits (GIFT). Each row is a regional flora (polygon); each column is an anonymized plant species. Used as an independent out-of-distribution evaluation set. | Parquet |
 | **Environmental Features** | Gridded environmental predictors over Europe: 19 CHELSA v2 bioclimatic variables (1981–2010), EEA Digital Elevation Model (1 km), and Corine Land Cover 2018. | NetCDF |
+| **Generated Samples** | Model-ready spatial cross-validation partitions and the compiled GIFT evaluation table used for the published pretrained ensemble. | GeoParquet / JSON |
 
 Together these components provide the inputs and ground-truth supervision to train and evaluate MuScaRi, and to generate continent-scale species-richness projections.
 
@@ -101,11 +102,19 @@ Species column names are anonymized tokens (e.g. `sp_00042`) that are consistent
 |----------|------|-------------|
 | `landcover` | categorical (int16) | Corine Land Cover 2018 class code |
 
+#### Generated samples
+
+| Path | Description |
+|------|-------------|
+| `generated_samples/sbcv/ceacce0/` | Five spatial cross-validation folds, each containing training, validation, and test GeoParquet partitions plus summary metadata. Spatial block groups use a 1 km block size. |
+| `generated_samples/GIFT/418c563/compiled_data.parquet` | GIFT total-species-richness extrapolation samples with richness targets, geometry, and environmental features. |
+| `generated_samples/GIFT/418c563/dataset_summary.json` | Schema, sample count, environmental variables, and value ranges for the compiled GIFT table. |
+
 ### Data Splits
 
-The EVA dataset cannot be used directly as training samples for species richness estimation. A sample-generation procedure is described in detail in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) (`scripts/data_processing/compile_sbcv_eva_samples.py` and `scripts/data_processing/compile_gift_samples.py`).
+The EVA species matrix is converted into model-ready richness samples by the procedure described in the [paper](https://arxiv.org/abs/2507.06358) (Methods, Section "Sample generation and spatial block cross-evaluation procedure") and implemented in the [MuScaRi GitHub repository](https://github.com/vboussange/MuScaRi) (`scripts/data_processing/compile_sbcv_eva_samples.py`). Dataset [`ceacce0`](https://huggingface.co/datasets/vboussange/muscari-data/tree/main/generated_samples/sbcv/ceacce0) provides the resulting five-fold spatial cross-validation partitions used to train and evaluate the pretrained ensemble.
 
-The GIFT dataset, consisting of exhaustive regional plant inventories, may serve as an independent out-of-distribution benchmark: the total species richness recorded for each entry — corresponding to a country or administrative region — can be treated as a ground-truth estimate of total species richness under asymptotic sampling effort.
+The GIFT dataset, consisting of exhaustive regional plant inventories, serves as an independent out-of-distribution benchmark: the total species richness recorded for each entry — corresponding to a country or administrative region — is treated as a ground-truth estimate of total species richness under asymptotic sampling effort. Dataset [`418c563`](https://huggingface.co/datasets/vboussange/muscari-data/tree/main/generated_samples/GIFT/418c563) provides the total-species-richness extrapolation samples.
 
 
 ## Quick Start
@@ -114,6 +123,7 @@ The GIFT dataset, consisting of exhaustive regional plant inventories, may serve
 from muscari.data_processing.utils_eva import EVADataset
 from muscari.data_processing.utils_gift import GIFTDataset
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
+from huggingface_hub import hf_hub_download
 
 # Load vegetation-plot data (downloads automatically on first call)
 eva_df  = EVADataset.from_hub()        # GeoDataFrame, EPSG:3035 point geometries
@@ -126,6 +136,13 @@ print(list(env_ds.data_vars))          # ['bio01', ..., 'bio19', 'elevation']
 # Inspect the species matrix
 species_list = eva_df.attrs['species_list']
 print(f"{len(eva_df)} plots × {len(species_list)} species")
+
+# Download one model-ready spatial cross-validation partition
+test_partition = hf_hub_download(
+    repo_id="vboussange/muscari-data",
+    repo_type="dataset",
+    filename="generated_samples/sbcv/ceacce0/fold_0_test.parquet",
+)
 ```
 
 

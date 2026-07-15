@@ -1,4 +1,64 @@
 active_experiments:
+  - name: "huggingface_best_model_publication"
+    important_params:
+      task: "publish the selected third-revision MuScaRi_ClimateDEM ensemble and version-comparison scores to vboussange/muscari"
+      status: "running"
+      started: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "e01f859febfd4315390f17d8757ec1a4dec14e09"
+      branch: "dev_3rd_rev"
+      model_repository: "vboussange/muscari"
+      observed_remote_tip: "f3d680efab77fff6fa3a99ece3460147f744c0fe"
+      dataset_repository: "vboussange/muscari-data"
+      observed_dataset_remote_tip: "5ee72e34e36baee9c3f3ce8d0db89591027ce504"
+      publication_policy: "replace main directly in one leased commit; do not create an archive tag"
+      model_family: "MuScaRi_ClimateDEM"
+      config_hash: "dae0789a3c87"
+      architecture_variant: "legacy_maxabs_absolute_l32"
+      artifact_path: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      sbcv_dataset_id: "ceacce0"
+      artifact_gift_dataset_id: "da569da"
+      canonical_gift_dataset_id: "418c563"
+      ensemble_members: 5
+      ensemble_weights: [0.2, 0.2, 0.2, 0.2, 0.2]
+      artifact_sha256:
+        config.json: "f1ed7267098205d72631ef264bf05e560e75ab1ca9cb18d2a294ed9620ccbddf"
+        metadata.json: "552ad3a746a69b7c76a8dd1336c98a7f31f628c9f0c707b935066e1dc3e4dfe6"
+        model.safetensors: "a990f4099bd89d1bdbc85817b1ec33347ca02153cd873142b518e630947a24b5"
+      model_card_scores:
+        sbcv_test_fold_mean_nrmse_percent: "18.166 +/- 1.028"
+        gift_asymptotic_fold_mean_nrmse_percent: "29.473 +/- 4.448"
+        gift_asymptotic_uniform_ensemble_nrmse_percent: 26.136
+      authentication: "not configured at task start; require a write-capable cached token or HF_TOKEN before upload"
+      release_files:
+        - "README.md"
+        - "config.json"
+        - "metadata.json"
+        - "model.safetensors"
+      dataset_release:
+        sbcv_path: "generated_samples/sbcv/ceacce0"
+        sbcv_files: "five train, validation, and test Parquet partitions plus one summary per partition"
+        gift_path: "generated_samples/GIFT/418c563"
+        gift_files: ["compiled_data.parquet", "dataset_summary.json"]
+        total_files: 33
+        total_size_mib: 384.1
+        existing_source_data: "EVA and GIFT species matrices and environmental rasters already present on the Hub and left unchanged"
+      uploader_maintenance: "Kept scripts/data_processing/push_to_hub.py as the single orchestrator, reused one HfApi upload-folder helper for generated samples/cards/model, and retained existing dataset-class push_to_hub methods only for explicit source refreshes"
+      refresh_source_data: false
+      checks:
+        - "uv run python -m py_compile scripts/data_processing/push_to_hub.py"
+        - "uv run python scripts/data_processing/push_to_hub.py: dry run validated the selected model and release copy, reproduced two finite positive predictions, and confirmed leased model and dataset uploads with no deletions"
+        - "uv run python score audit: model-card SBCV and GIFT scores reproduce exactly from the authoritative benchmark and asymptote-evaluation CSVs"
+        - "Validated that the model card contains only public Hugging Face dataset links and no artifact, local-path, or peer-review-process language"
+        - "Dynamically discovered ceacce0 partitions, required a matching summary for every partition, and selected the available 418c563 Parquet/summary files"
+        - "Confirmed the live dataset repository already contains the EVA and GIFT species matrices and both environmental feature caches"
+        - "uv run --directory widget --extra dev pytest tests/test_resources.py tests/test_features.py tests/test_inference.py -q: 8 passed, 1 slow test skipped"
+        - "Parsed agent_log.yaml and ran git diff --check on the release files"
+      unavailable_checks:
+        - "Hugging Face write authentication is not configured on this machine; no external write was attempted"
+        - "Remote dataset hash checks, remote model download, and hosted-model prediction verification require the publication commits and will run immediately after upload"
+      outcome: "The model and generated-dataset releases are locally validated and pinned to model main f3d680e and dataset main 5ee72e3; no Hub state has changed."
+      next_action: "stage the isolated release changes and pause before committing or changing the Hub"
   - name: "normalized_rmse_reporting_revision"
     important_params:
       task: "replace revision-facing raw RMSE with mean-normalized RMSE and regenerate affected outputs"
