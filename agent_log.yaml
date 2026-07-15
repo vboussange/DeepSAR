@@ -90,6 +90,7 @@ active_experiments:
       integration_commit: "38ee56e3fd7cfa7f00e37a4680714369b16bae7f"
       figure_5_follow_up_commit: "610199fd103b7968d738115228156c48d418e0b1"
       reviewer_response_follow_up_commit: "032d0746e08e9114031a34eab5fcf1a6b6b6f71d"
+      reviewer_reference_follow_up_commit: "158dd13f43d342d4261dc1058abcb70411eee570"
       source_commits:
         - "9e10881 Update Figure 3 Chao2 baseline"
         - "00d3634 strenghtened analysis"
@@ -172,7 +173,7 @@ active_experiments:
         - "git diff --cached --check in the Overleaf submodule"
       unavailable_checks:
         - "A local TeX build is unavailable because latexmk, pdflatex, and bibtex are not installed; require successful compilation in Overleaf after push."
-      current_step: "Overleaf integration, Figure 5, and sampling-effort response commits created locally; not yet pushed"
+      current_step: "Overleaf integration, Figure 5, sampling-effort response, and line-reference commits created locally; not yet pushed"
       next_action: "push the local manuscript commits to Overleaf main as a fast-forward after explicit publication approval, then verify Overleaf compilation before publishing the root branch"
   - name: "normalized_rmse_reporting_revision"
     important_params:
