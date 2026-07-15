@@ -2,10 +2,20 @@ import unittest
 
 import numpy as np
 
-from figures.figure_4.figure_4 import normalized_rmse
+from figures.figure_4.figure_4 import MODEL_SPECS, normalized_rmse
 
 
 class Figure4NormalizedRmseTest(unittest.TestCase):
+    def test_canonical_figure_uses_all_muscari_feature_variants(self):
+        self.assertEqual(
+            [(spec["name"], spec["label"]) for spec in MODEL_SPECS],
+            [
+                ("MuScaRi_Area", "Area only"),
+                ("MuScaRi_ClimateDEM", "Environment only"),
+                ("MuScaRi_ClimateDEM_Area", "Environment + area"),
+            ],
+        )
+
     def test_matches_previous_mean_normalized_definition_within_bin(self):
         y_true = np.array([10.0, 20.0, 30.0])
         y_pred = np.array([13.0, 18.0, 35.0])

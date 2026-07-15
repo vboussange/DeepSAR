@@ -1,4 +1,4 @@
-"""Plot EVA scale-binned normalized RMSE for area-only and ClimateDEM models."""
+"""Plot EVA scale-binned NRMSE for the three MuScaRi feature variants."""
 from __future__ import annotations
 
 import os
@@ -46,10 +46,17 @@ MODEL_SPECS = [
     },
     {
         "name": "MuScaRi_ClimateDEM",
-        "label": "Climate + DEM",
+        "label": "Environment only",
         "config_hash": "dae0789a3c87",
         "color": "#3a0ca3",
         "marker": "^",
+    },
+    {
+        "name": "MuScaRi_ClimateDEM_Area",
+        "label": "Environment + area",
+        "config_hash": "ad74a3020281",
+        "color": "#4cc9f0",
+        "marker": "s",
     },
 ]
 

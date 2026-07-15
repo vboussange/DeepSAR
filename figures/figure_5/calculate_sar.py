@@ -147,7 +147,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{Pointwise estimate of species richness and rate of species accumulation obtained for nested spatial units at sampling areas of 25\\,km$^2$ and 2,500\\,km$^2$. Species accumulation rates are finite differences in species/km$^2$. Values are uniform ensemble estimates ± ensemble dispersion.}\n"
+        "    \\caption{Pointwise estimates of total species richness and species accumulation rates for nested spatial units near sampling areas of 25\\,km$^2$ and 2,500\\,km$^2$. Species accumulation rates are finite-difference estimates of $dS_T/dA$ in species km$^{-2}$, calculated after applying a cumulative maximum to each ensemble member. Values are mean ± standard deviation across ensemble members.}\n"
         "    \\label{tab:sar_summary}\n"
         "\\end{table}\n"
     )

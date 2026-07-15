@@ -18,7 +18,7 @@ rcparams = {
 plt.rcParams.update(rcparams)
 
 
-MODEL_NAME = "ceacce0"
+MODEL_NAME = "dae0789a3c87"
 RESOLUTIONS_M = (5_000, 50_000)
 
 # Constants for file paths
@@ -109,8 +109,7 @@ if __name__ == '__main__':
 
         sr_mean = preprocess_raster(get_raster(rast_dict, "SR", res), europe_geom, rolling_kwargs, coarsen_factor)
         sr_std = preprocess_raster(get_raster(rast_dict, "std_SR", res), europe_geom, rolling_kwargs, coarsen_factor)
-        dsr_mean = preprocess_raster(get_raster(rast_dict, "dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
-        dsr_std = preprocess_raster(get_raster(rast_dict, "std_dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
+        dsr_std = preprocess_raster(get_raster(rast_dict, "std_dS_dA", res), europe_geom, rolling_kwargs, coarsen_factor)
 
         std_sr = sr_std
         std_dsr = dsr_std
@@ -130,7 +129,7 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{d\\log A}$',
+            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{dA}$\n(species km$^{-2}$)',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }

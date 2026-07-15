@@ -42,7 +42,7 @@ def render_latex_table(df: pd.DataFrame) -> str:
         "    \\setlength{\\tabcolsep}{6pt}\n"
         "    \\begin{tabularx}{\\textwidth}{l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Split & Train & Validation & Test \\\\\n"
+        "    Fold & Train & Validation & Test \\\\\n"
         "    \\midrule\n"
     )
     rows = []
@@ -53,7 +53,7 @@ def render_latex_table(df: pd.DataFrame) -> str:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{Sample counts per training, validation, and test datasets for each training/validation/test split.}\n"
+        "    \\caption{Sample counts in the training, validation, and test partitions of each cross-validation fold.}\n"
         "    \\label{tab:fold_sample_counts}\n"
         "\\end{table}\n"
     )

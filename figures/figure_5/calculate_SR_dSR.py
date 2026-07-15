@@ -1,6 +1,6 @@
 """
 Projecting spatially the predictions of an ensembled `MuScaRi` model,
-and saving SR, std_SR, dS/dA and std_dS/dA to geotiffs.
+and saving SR, std_SR, dS_T/dA and std_dS_T/dA to geotiffs.
 """
 import os
 import torch
@@ -95,7 +95,7 @@ def align_features_to_reference(features_ref: xr.Dataset, features_other: xr.Dat
 # we use batches, otherwise model and data may not fit in memory
 def get_sr_ds_da_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     """
-    Calculate SR, std_SR and dS/dA for the given model and climate dataset at a
+    Calculate SR, std_SR and dS_T/dA for the given model and climate dataset at a
     specified resolution. The accumulation rate is expressed in species/km2 and
     estimated between square windows of side length res0 and 2 * res0.
     """
@@ -110,7 +110,7 @@ def get_sr_ds_da_stats(model, env_dataset, lc_dataset, res0, batch_size=2**15):
     print(f"Creating features for res1: {res1}m")
     features1 = create_features(model, env_dataset, lc_dataset, res1)
 
-    # Align features to a common grid for paired dS/dA computation.
+    # Align features to a common grid for paired dS_T/dA computation.
     features1 = align_features_to_reference(features0, features1)
 
     features0_df = features0.to_dataframe()
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     
 
     for res in [5e3, 5e4]:
-        print(f"Calculating SR, stdSR, and dS/dA for resolution: {res}m")
+        print(f"Calculating SR, stdSR, and dS_T/dA for resolution: {res}m")
 
         features0, mean_SR, std_SR, mean_dS_dA, std_dS_dA = get_sr_ds_da_stats(
             model, env_dataset, lc_dataset, res
@@ -188,8 +188,8 @@ if __name__ == "__main__":
         raster_configs = [
             ("SR", mean_SR, "SR"),
             ("std_SR", std_SR, "Standard Deviation of SR"),
-            ("dS_dA", mean_dS_dA, "dS/dA (species/km2)"),
-            ("std_dS_dA", std_dS_dA, "Standard Deviation of dS/dA"),
+            ("dS_dA", mean_dS_dA, "dS_T/dA (species/km2)"),
+            ("std_dS_dA", std_dS_dA, "Standard Deviation of dS_T/dA"),
         ]
 
         for raster_name, data, plot_title in raster_configs:

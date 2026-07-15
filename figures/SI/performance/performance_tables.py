@@ -133,7 +133,7 @@ def render_latex_table(table: pd.DataFrame, caption: str, label: str) -> str:
 
 def main() -> None:
     description = (
-        "NRMSE: root mean squared error divided by mean observed richness for each model and split, "
+        "NRMSE: root mean squared error divided by mean observed richness for each model and fold, "
         "reported as a percentage; "
         "MAPE: mean absolute percentage error; Rel.\\ Bias: median relative bias, defined as "
         "$\\mathrm{median}[(\\hat{S}-S)/S]$; $R^2$: coefficient of determination; $D^2$: fraction "
@@ -149,7 +149,7 @@ def main() -> None:
             endpoint_label = "Interpolation" if endpoint == "interp" else "Extrapolation"
             caption = (
                 f"{endpoint_label} performance on the {dataset_name} dataset{block_text} "
-                "(mean ± standard deviation across splits). " + description
+                "(mean ± standard deviation across folds). " + description
             )
             label = f"tab:{endpoint}_performance{suffix}"
             latex = render_latex_table(table, caption, label)

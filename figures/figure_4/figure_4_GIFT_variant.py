@@ -23,15 +23,7 @@ base.PAPER_FIGURE_PATH = None
 N_GIFT_BINS = 5
 MIN_BIN_SAMPLES = 30
 
-MODEL_SPECS = base.MODEL_SPECS + [
-    {
-        "name": "MuScaRi_ClimateDEM_Area",
-        "label": "Climate + DEM + area",
-        "config_hash": "ad74a3020281",
-        "color": "#4cc9f0",
-        "marker": "s",
-    },
-]
+MODEL_SPECS = list(base.MODEL_SPECS)
 
 
 def run_dir_for(spec: dict) -> base.Path:

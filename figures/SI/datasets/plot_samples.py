@@ -40,7 +40,17 @@ if __name__ == "__main__":
     test_samples = gpd.read_parquet(TEST_SAMPLE_FILE)
     test_samples = test_samples.set_crs(samples.crs, allow_override=True)
 
-    eva_plots = EVADataset().read_plot_data()
+    try:
+        eva_plots = EVADataset().read_plot_data()
+    except FileNotFoundError:
+        eva_plots = gpd.read_parquet(
+            Path(__file__).parents[3]
+            / "data"
+            / "processed"
+            / "EVA"
+            / "preprocessing"
+            / "plot_data.parquet"
+        )
     eva_plots = eva_plots.to_crs(samples.crs)
     eva_plots = assign_checkerboard_folds(eva_plots, n_splits=5, block_size=BLOCK_SIZE_M) # "spatial_split" == 0 is the test set, the rest is val/train
 
@@ -103,9 +113,9 @@ if __name__ == "__main__":
         Patch(facecolor="#4361ee", edgecolor="none", alpha=0.6, label="Training/validation spatial units"),
         Patch(facecolor="#ff7a00", edgecolor="none", alpha=0.7, label="Test spatial units"),
         Line2D([0], [0], marker="x", color="none", markerfacecolor="none",
-               markeredgecolor="#4361ee", markersize=6, markeredgewidth=1.5, label="Vegetation plots, training/validation split"),
+               markeredgecolor="#4361ee", markersize=6, markeredgewidth=1.5, label="Vegetation plots, training/validation partitions"),
         Line2D([0], [0], marker="x", color="none", markerfacecolor="none",
-               markeredgecolor="#ff7a00", markersize=6, markeredgewidth=1.5, label="Vegetation plots, test split"),
+               markeredgecolor="#ff7a00", markersize=6, markeredgewidth=1.5, label="Vegetation plots, test partition"),
         # Patch(facecolor="none", edgecolor="#9aa0a6", linewidth=1.2, label="Spatial blocks"),
     ]
     ax.legend(
