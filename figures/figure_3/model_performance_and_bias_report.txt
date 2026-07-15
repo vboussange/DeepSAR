@@ -1,58 +1,59 @@
-
-
-MODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE
+MODEL PERFORMANCE AND PAIRED STATISTICAL ANALYSIS
 ============================================================
+Two-sided paired t-tests use matched fold-level RMSE values. Differences are model - reference_model; Holm adjustment is applied separately within each panel.
 
 Interpolation Dataset
 ==================================================
              Experiment              RMSE  N
+MuScaRi_ClimateDEM_Area  46.9823 ± 1.3931  5
            MuScaRi_Area 157.8266 ± 4.9809  5
      MuScaRi_ClimateDEM  48.2438 ± 1.9165  5
-MuScaRi_ClimateDEM_Area  46.9823 ± 1.3931  5
    FFNN_ClimateDEM_Area  46.7257 ± 2.6732  5
  Linear_ClimateDEM_Area 152.8139 ± 4.6512  5
 
-Pairwise Statistical Significance Tests (Interpolation)
+Pairwise paired t-tests (10-comparison Holm family)
 --------------------------------------------------
-MuScaRi_Area vs MuScaRi_ClimateDEM: t=45.913, p=0.0000 ***, rel_diff=-69.9%
-MuScaRi_Area vs MuScaRi_ClimateDEM_Area: t=47.922, p=0.0000 ***, rel_diff=-70.5%
-MuScaRi_Area vs FFNN_ClimateDEM_Area: t=43.947, p=0.0000 ***, rel_diff=-70.5%
-MuScaRi_Area vs Linear_ClimateDEM_Area: t=1.645, p=0.1386 ns, rel_diff=-2.5%
-MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Area: t=1.191, p=0.2679 ns, rel_diff=-2.2%
-MuScaRi_ClimateDEM vs FFNN_ClimateDEM_Area: t=1.032, p=0.3323 ns, rel_diff=-2.1%
-MuScaRi_ClimateDEM vs Linear_ClimateDEM_Area: t=-46.481, p=0.0000 ***, rel_diff=+223.9%
-MuScaRi_ClimateDEM_Area vs FFNN_ClimateDEM_Area: t=0.190, p=0.8538 ns, rel_diff=+0.1%
-MuScaRi_ClimateDEM_Area vs Linear_ClimateDEM_Area: t=-48.740, p=0.0000 ***, rel_diff=+231.1%
-FFNN_ClimateDEM_Area vs Linear_ClimateDEM_Area: t=-44.219, p=0.0000 ***, rel_diff=+230.8%
+                  model        reference_model  fold_ids  n  df  mean_paired_rmse_difference  percentage_difference_vs_reference  ci95_lower  ci95_upper  t_statistic  p_value_raw  p_value_holm  reject_holm
+MuScaRi_ClimateDEM_Area           MuScaRi_Area 0;1;2;3;4  5   4                     -110.844                            -70.2317    -116.659     -105.03     -52.9292  7.62673e-07   6.86405e-06         True
+MuScaRi_ClimateDEM_Area     MuScaRi_ClimateDEM 0;1;2;3;4  5   4                     -1.26151                            -2.61487    -2.67757    0.154546     -2.47343    0.0686934      0.137387        False
+MuScaRi_ClimateDEM_Area   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                     0.256561                            0.549079    -2.06315     2.57627     0.307076     0.774108      0.774108        False
+MuScaRi_ClimateDEM_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                     -105.832                            -69.2553    -111.143     -100.52     -55.3209  6.39216e-07   6.39216e-06         True
+           MuScaRi_Area     MuScaRi_ClimateDEM 0;1;2;3;4  5   4                      109.583                             227.144     102.827     116.339      45.0335  1.45406e-06   1.16325e-05         True
+           MuScaRi_Area   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                      111.101                             237.773     104.193     118.008       44.656  1.50377e-06   1.16325e-05         True
+           MuScaRi_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      5.01267                             3.28024     3.23998     6.78536      7.85102   0.00142193     0.0056877         True
+     MuScaRi_ClimateDEM   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                      1.51807                             3.24891    0.280176     2.75597      3.40484    0.0271559     0.0814678        False
+     MuScaRi_ClimateDEM Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      -104.57                            -68.4297    -111.062    -98.0781     -44.7211  1.49505e-06   1.16325e-05         True
+   FFNN_ClimateDEM_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                     -106.088                            -69.4231      -112.9    -99.2762     -43.2394  1.71036e-06   1.16325e-05         True
 
-Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
+Compact-letter display: {'MuScaRi_ClimateDEM_Area': 'a', 'MuScaRi_Area': 'b', 'MuScaRi_ClimateDEM': 'a', 'FFNN_ClimateDEM_Area': 'a', 'Linear_ClimateDEM_Area': 'c'}
 
 Extrapolation Dataset
 ==================================================
              Experiment                     RMSE  N
-        chao2_estimator      1258.5335 ± 13.1019  5
+MuScaRi_ClimateDEM_Area       542.0241 ± 34.4564  5
            MuScaRi_Area       810.6542 ± 24.8451  5
      MuScaRi_ClimateDEM       461.8798 ± 69.7036  5
-MuScaRi_ClimateDEM_Area       542.0241 ± 34.4564  5
    FFNN_ClimateDEM_Area     2565.6902 ± 493.9669  5
  Linear_ClimateDEM_Area 128918.7222 ± 11450.2019  5
+        chao2_estimator      1258.5335 ± 13.1019  5
 
-Pairwise Statistical Significance Tests (Extrapolation)
+Pairwise paired t-tests (15-comparison Holm family)
 --------------------------------------------------
-chao2_estimator vs MuScaRi_Area: t=35.655, p=0.0000 ***, rel_diff=-34.9%
-chao2_estimator vs MuScaRi_ClimateDEM: t=25.117, p=0.0000 ***, rel_diff=-66.0%
-chao2_estimator vs MuScaRi_ClimateDEM_Area: t=43.462, p=0.0000 ***, rel_diff=-57.9%
-chao2_estimator vs FFNN_ClimateDEM_Area: t=-5.915, p=0.0004 ***, rel_diff=+116.0%
-chao2_estimator vs Linear_ClimateDEM_Area: t=-24.930, p=0.0000 ***, rel_diff=+10319.6%
-MuScaRi_Area vs MuScaRi_ClimateDEM: t=10.539, p=0.0000 ***, rel_diff=-47.7%
-MuScaRi_Area vs MuScaRi_ClimateDEM_Area: t=14.140, p=0.0000 ***, rel_diff=-35.4%
-MuScaRi_Area vs FFNN_ClimateDEM_Area: t=-7.935, p=0.0000 ***, rel_diff=+232.0%
-MuScaRi_Area vs Linear_ClimateDEM_Area: t=-25.018, p=0.0000 ***, rel_diff=+15915.1%
-MuScaRi_ClimateDEM vs MuScaRi_ClimateDEM_Area: t=-2.305, p=0.0501 ns, rel_diff=+23.6%
-MuScaRi_ClimateDEM vs FFNN_ClimateDEM_Area: t=-9.430, p=0.0000 ***, rel_diff=+534.6%
-MuScaRi_ClimateDEM vs Linear_ClimateDEM_Area: t=-25.085, p=0.0000 ***, rel_diff=+30512.0%
-MuScaRi_ClimateDEM_Area vs FFNN_ClimateDEM_Area: t=-9.138, p=0.0000 ***, rel_diff=+413.6%
-MuScaRi_ClimateDEM_Area vs Linear_ClimateDEM_Area: t=-25.070, p=0.0000 ***, rel_diff=+24675.9%
-FFNN_ClimateDEM_Area vs Linear_ClimateDEM_Area: t=-24.652, p=0.0000 ***, rel_diff=+4723.9%
+                  model        reference_model  fold_ids  n  df  mean_paired_rmse_difference  percentage_difference_vs_reference  ci95_lower  ci95_upper  t_statistic  p_value_raw  p_value_holm  reject_holm
+MuScaRi_ClimateDEM_Area           MuScaRi_Area 0;1;2;3;4  5   4                      -268.63                            -33.1374    -333.633    -203.627     -11.4739  0.000329324    0.00197594         True
+MuScaRi_ClimateDEM_Area     MuScaRi_ClimateDEM 0;1;2;3;4  5   4                      80.1443                             17.3518    -41.1397     201.428      1.83467     0.140464      0.140464        False
+MuScaRi_ClimateDEM_Area   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                     -2023.67                            -78.8741    -2622.68    -1424.65     -9.37968  0.000719758    0.00310736         True
+MuScaRi_ClimateDEM_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      -128377                            -99.5796     -142626     -114128     -25.0145  1.51625e-05   0.000192451         True
+MuScaRi_ClimateDEM_Area        chao2_estimator 0;1;2;3;4  5   4                     -716.509                            -56.9321    -757.376    -675.643     -48.6796  1.06548e-06   1.59822e-05         True
+           MuScaRi_Area     MuScaRi_ClimateDEM 0;1;2;3;4  5   4                      348.774                             75.5119     275.581     421.967      13.2301  0.000188597    0.00132018         True
+           MuScaRi_Area   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                     -1755.04                            -68.4041    -2355.73    -1154.34     -8.11191   0.00125572    0.00376716         True
+           MuScaRi_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      -128108                            -99.3712     -142323     -113893     -25.0214  1.51458e-05   0.000192451         True
+           MuScaRi_Area        chao2_estimator 0;1;2;3;4  5   4                     -447.879                            -35.5874    -484.952    -410.807     -33.5428  4.71177e-06   6.59648e-05         True
+     MuScaRi_ClimateDEM   FFNN_ClimateDEM_Area 0;1;2;3;4  5   4                     -2103.81                            -81.9978    -2703.31    -1504.31     -9.74333  0.000621472    0.00310736         True
+     MuScaRi_ClimateDEM Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      -128457                            -99.6417     -142629     -114284     -25.1654  1.48039e-05   0.000192451         True
+     MuScaRi_ClimateDEM        chao2_estimator 0;1;2;3;4  5   4                     -796.654                            -63.3002    -896.599    -696.708     -22.1307  2.46765e-05   0.000197412         True
+   FFNN_ClimateDEM_Area Linear_ClimateDEM_Area 0;1;2;3;4  5   4                      -126353                            -98.0098     -140836     -111870     -24.2225  1.72328e-05   0.000192451         True
+   FFNN_ClimateDEM_Area        chao2_estimator 0;1;2;3;4  5   4                      1307.16                             103.863     687.133     1927.18      5.85341   0.00425019    0.00850037         True
+ Linear_ClimateDEM_Area        chao2_estimator 0;1;2;3;4  5   4                       127660                             10143.6      113434      141886      24.9156  1.54035e-05   0.000192451         True
 
-Significance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant
+Compact-letter display: {'MuScaRi_ClimateDEM_Area': 'a', 'MuScaRi_Area': 'b', 'MuScaRi_ClimateDEM': 'a', 'FFNN_ClimateDEM_Area': 'c', 'Linear_ClimateDEM_Area': 'd', 'chao2_estimator': 'e'}

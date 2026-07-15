@@ -103,6 +103,57 @@ active_experiments:
         outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
 
 completed_experiments:
+  - name: "tighten_figure_3_benchmark_statistics"
+    important_params:
+      task: "implement TIGHTENING_STATS_PLAN.md"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "242d2a6559816e7181efeb4c27982abe54162bcc"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      sensitivity_dataset_id: "d0848f6"
+      inference_unit: "five predefined spatial cross-validation splits"
+      endpoints:
+        - "interp_rmse"
+        - "extrap_rmse"
+      adjustment: "Holm within each Figure 3 performance panel"
+      alpha: 0.05
+      family_sizes:
+        interpolation: 10
+        extrapolation: 15
+      outputs:
+        - "figures/figure_3/model_performance_pairwise_results.csv"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      focal_contrasts:
+        interpolation_combined_minus_environment_only:
+          mean_paired_rmse_difference: -1.261513
+          ci95: [-2.677571, 0.154546]
+          holm_adjusted_p: 0.137387
+          reject: false
+        extrapolation_combined_minus_environment_only:
+          mean_paired_rmse_difference: 80.144279
+          ci95: [-41.139739, 201.428297]
+          holm_adjusted_p: 0.140464
+          reject: false
+      compact_letters:
+        interpolation: "combined=a, area-only=b, environment-only=a, FFNN=a, linear=c"
+        extrapolation: "combined=a, area-only=b, environment-only=a, FFNN=c, linear=d, Chao2=e"
+      sensitivity_finding: "The d0848f6 asymptotic GIFT aggregate ordering reverses the 1 km direction: environment plus area improves mean fold RMSE by 80.17 species relative to environment only, with improvement in three of five folds. The manuscript now describes sensitivity to spatial blocking rather than robustness of the ordering."
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py tests/test_figure_3_statistics.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m unittest discover -s tests -p 'test_figure_3_statistics.py' -v: 5 tests passed"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py: regenerated from full ceacce0 benchmark and Chao2 inputs"
+        - "Executable assertions matched the saved 25-row pairwise CSV to recomputed results, verified n=5 and df=4, focal manuscript values, letter decisions, and byte-identical root/manuscript PDFs."
+        - "Rendered and visually inspected Figure 3 with pypdfium2; model membership, missing Chao2 interpolation row, fold points, and letters agree with the statistical table."
+        - "git diff --check and git -C paper diff --check"
+      unavailable_checks:
+        - "The required latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex check could not run because latexmk and all alternative TeX engines are unavailable on gpunode04."
+      outcome: "Figure 3 reporting and compact letters now share one validated matched-fold paired t-test implementation with panel-wise Holm adjustment. The manuscript and rebuttal state the working independence approximation and avoid treating non-significance as equivalence."
+      next_action: "obtain user verification of the staged root and nested-paper changes before committing"
   - name: "branch_cleanup_phase_3_master_reconciliation"
     important_params:
       task: "selectively port misplaced master changes to dev_3rd_rev, archive master, and restore the intended branch topology"

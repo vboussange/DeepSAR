@@ -2,21 +2,23 @@
 Plotting figure 2 'prediction power of climate, area, and both on SR'.
 Keeps the original experiments and correlation plots.
 """
-import numpy as np
-import pandas as pd
-import geopandas as gpd
-import torch
+from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
+import shutil
+
+import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-
+import numpy as np
+import pandas as pd
+import torch
 import scipy.stats as stats
-from scipy.stats import ttest_ind
 from sklearn.metrics import r2_score
-from statsmodels.stats.multicomp import MultiComparison
+from statsmodels.stats.multitest import multipletests
 
 from muscari.muscari import MuScaRi
-from muscari.cld import create_comp_matrix_allpair_t_test, multcomp_letters
+from muscari.cld import multcomp_letters
 from muscari import MuScaRiEnsemble
 
 ROOT = Path(__file__).parents[2]
@@ -35,6 +37,7 @@ GIFT_ASYMPTOTE_RESULTS = (
 )
 RUN_DIR = ROOT / "scripts" / "results" / "benchmark" / "artifacts" / MODEL_FAMILY / MODEL_HASH
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
+PAIRWISE_RESULTS_OUTPUT = Path(__file__).with_name("model_performance_pairwise_results.csv")
 FIGURE_OUTPUTS = [
     Path(__file__).with_name("figure_3.pdf"),
     ROOT / "paper" / "figures" / "figure_3.pdf",
@@ -49,102 +52,253 @@ PLOT_STYLE = {
     "panel_letter_weight": "bold",
     "quantiles": (0.005, 1),
 }
+ALPHA = 0.05
+EXPECTED_FOLDS = tuple(range(5))
+LABEL_MAP = {
+    "MuScaRi_ClimateDEM_Area": "MuScaRi\n(env. + area)",
+    "MuScaRi_Area": "MuScaRi\n(area only)",
+    "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
+    "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
+    "Linear_ClimateDEM_Area": "Linear\n(env. + area)",
+    "chao2_estimator": "Chao2\nestimator",
+}
+
+
+@dataclass(frozen=True)
+class PairedComparisonAnalysis:
+    endpoint: str
+    metric_column: str
+    fold_values: pd.DataFrame
+    pairwise_results: pd.DataFrame
+    adjusted_p_matrix: pd.DataFrame
+    rejection_matrix: pd.DataFrame
+    letters: dict[str, str]
+
+
+def _validated_fold_table(
+    df: pd.DataFrame,
+    metric_column: str,
+    models: list[str],
+    expected_folds: tuple[int, ...] = EXPECTED_FOLDS,
+) -> pd.DataFrame:
+    required_columns = {"experiment", "fold", metric_column}
+    missing_columns = required_columns.difference(df.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {sorted(missing_columns)}")
+
+    selected = df[df["experiment"].isin(models)].copy()
+    absent_models = [model for model in models if model not in set(selected["experiment"])]
+    if absent_models:
+        raise ValueError(f"Requested models are absent: {absent_models}")
+
+    duplicated = selected.duplicated(["experiment", "fold"], keep=False)
+    if duplicated.any():
+        duplicate_keys = (
+            selected.loc[duplicated, ["experiment", "fold"]]
+            .drop_duplicates()
+            .to_dict("records")
+        )
+        raise ValueError(f"Duplicate model-fold rows: {duplicate_keys}")
+
+    expected_fold_set = set(expected_folds)
+    participating_models = []
+    for model in models:
+        model_rows = selected[selected["experiment"] == model]
+        values = pd.to_numeric(model_rows[metric_column], errors="coerce")
+        finite = np.isfinite(values.to_numpy(dtype=float))
+        if not finite.any():
+            continue
+        if not finite.all():
+            raise ValueError(f"{model} has missing or non-finite {metric_column} values")
+
+        model_folds = set(model_rows["fold"])
+        if model_folds != expected_fold_set:
+            raise ValueError(
+                f"{model} has folds {sorted(model_folds)}, expected {sorted(expected_fold_set)}"
+            )
+        participating_models.append(model)
+
+    if len(participating_models) < 2:
+        raise ValueError(f"Fewer than two models have finite {metric_column} values")
+
+    fold_table = selected[selected["experiment"].isin(participating_models)].pivot(
+        index="fold", columns="experiment", values=metric_column
+    )
+    fold_table = fold_table.reindex(index=expected_folds, columns=participating_models)
+    if not np.isfinite(fold_table.to_numpy(dtype=float)).all():
+        raise ValueError(f"Could not construct a complete matched-fold table for {metric_column}")
+    fold_table.index.name = "fold"
+    return fold_table
+
+
+def _adjusted_p_matrix(
+    pairwise_results: pd.DataFrame,
+    models: list[str],
+) -> pd.DataFrame:
+    matrix = pd.DataFrame(1.0, index=models, columns=models, dtype=float)
+    for row in pairwise_results.itertuples(index=False):
+        matrix.loc[row.model, row.reference_model] = row.p_value_holm
+        matrix.loc[row.reference_model, row.model] = row.p_value_holm
+    return matrix
+
+
+def paired_model_comparisons(
+    df: pd.DataFrame,
+    endpoint: str,
+    models: list[str],
+    metric: str = "rmse",
+    expected_folds: tuple[int, ...] = EXPECTED_FOLDS,
+    alpha: float = ALPHA,
+) -> PairedComparisonAnalysis:
+    """Compare models by matched cross-validation fold with panel-wise Holm correction.
+
+    Differences use the sign convention ``model - reference_model``. Percentage
+    differences use the reference model's mean RMSE as the denominator.
+    """
+    metric_column = f"{endpoint}_{metric}"
+    fold_values = _validated_fold_table(df, metric_column, models, expected_folds)
+    participating_models = list(fold_values.columns)
+    fold_ids = ";".join(str(fold) for fold in fold_values.index)
+
+    records = []
+    for model, reference_model in combinations(participating_models, 2):
+        model_values = fold_values[model].to_numpy(dtype=float)
+        reference_values = fold_values[reference_model].to_numpy(dtype=float)
+        differences = model_values - reference_values
+        n = len(differences)
+        df_t = n - 1
+        statistic, p_value = stats.ttest_rel(model_values, reference_values)
+        if not np.isfinite([statistic, p_value]).all():
+            raise ValueError(
+                f"Non-finite paired t-test for {model} and {reference_model} on {metric_column}"
+            )
+
+        mean_difference = differences.mean()
+        standard_error = stats.sem(differences)
+        ci_half_width = stats.t.ppf(0.975, df_t) * standard_error
+        reference_mean = reference_values.mean()
+        records.append(
+            {
+                "endpoint": endpoint,
+                "metric_column": metric_column,
+                "model": model,
+                "reference_model": reference_model,
+                "fold_ids": fold_ids,
+                "n": n,
+                "df": df_t,
+                "model_mean_rmse": model_values.mean(),
+                "reference_mean_rmse": reference_mean,
+                "mean_paired_rmse_difference": mean_difference,
+                "percentage_difference_vs_reference": 100 * mean_difference / reference_mean,
+                "ci95_lower": mean_difference - ci_half_width,
+                "ci95_upper": mean_difference + ci_half_width,
+                "t_statistic": statistic,
+                "p_value_raw": p_value,
+            }
+        )
+
+    pairwise_results = pd.DataFrame.from_records(records)
+    reject, p_values_holm, _, _ = multipletests(
+        pairwise_results["p_value_raw"].to_numpy(), alpha=alpha, method="holm"
+    )
+    pairwise_results["p_value_holm"] = p_values_holm
+    pairwise_results["reject_holm"] = reject
+    pairwise_results["alpha"] = alpha
+
+    adjusted_p_matrix = _adjusted_p_matrix(pairwise_results, participating_models)
+    rejection_matrix = (adjusted_p_matrix < alpha).copy()
+    for model in rejection_matrix.index:
+        rejection_matrix.loc[model, model] = False
+    if not np.array_equal(
+        pairwise_results["reject_holm"].to_numpy(),
+        pairwise_results["p_value_holm"].to_numpy() < alpha,
+    ):
+        raise AssertionError("Holm rejection decisions disagree with adjusted P values")
+    letters = multcomp_letters(rejection_matrix)
+
+    return PairedComparisonAnalysis(
+        endpoint=endpoint,
+        metric_column=metric_column,
+        fold_values=fold_values,
+        pairwise_results=pairwise_results,
+        adjusted_p_matrix=adjusted_p_matrix,
+        rejection_matrix=rejection_matrix,
+        letters=letters,
+    )
+
+
+def analyze_performance_panels(
+    df: pd.DataFrame,
+    models: list[str],
+    metric: str = "rmse",
+) -> dict[str, PairedComparisonAnalysis]:
+    return {
+        endpoint: paired_model_comparisons(df, endpoint, models, metric=metric)
+        for endpoint in ("interp", "extrap")
+    }
+
 
 def report_model_performance(
-    df_plot,
-    metric,
+    analyses: dict[str, PairedComparisonAnalysis],
     output_file=Path(__file__).with_name("model_performance_and_bias_report.txt"),
 ):
-    """
-    Report model performance, statistical significance, and relative bias for eva and gift datasets.
-    
-    Parameters:
-    -----------
-    df_plot : pd.DataFrame
-        Combined dataframe with model results
-    metric : str
-        Performance metric to analyze
-    output_file : str
-        Path to output text file for results
-    """
-    datasets = ["interp", "extrap"]
-    
-    with open(output_file, "w") as file:
-        # Model Performance and Statistical Significance Analysis
-        print("\n\nMODEL PERFORMANCE AND STATISTICAL SIGNIFICANCE", file=file)
+    """Write the same paired results used to construct the figure letters."""
+    output_file = Path(output_file)
+    with output_file.open("w") as file:
+        print("MODEL PERFORMANCE AND PAIRED STATISTICAL ANALYSIS", file=file)
         print("=" * 60, file=file)
-        
-        for dataset in datasets:
-            metric_col = f"{dataset}_{metric}"
-            
-            # Get available models for this dataset
-            available_models = []
-            model_data_dict = {}
-            
-            for experiment in df_plot['experiment'].unique():
-                model_data = df_plot[df_plot['experiment'] == experiment]
-                if not model_data.empty and metric_col in model_data.columns:
-                    performance = model_data[metric_col].dropna().values
-                    if len(performance) > 0:
-                        available_models.append(experiment)
-                        model_data_dict[experiment] = performance
-            
-            if not available_models:
-                continue
-                
-            label = "Interpolation" if dataset == "interp" else "Extrapolation"
+        print(
+            "Two-sided paired t-tests use matched fold-level RMSE values. "
+            "Differences are model - reference_model; Holm adjustment is applied "
+            "separately within each panel.",
+            file=file,
+        )
+
+        for endpoint, analysis in analyses.items():
+            label = "Interpolation" if endpoint == "interp" else "Extrapolation"
             print(f"\n{label} Dataset", file=file)
             print("=" * 50, file=file)
-            
-            # Performance summary table
-            dataset_results = []
-            for experiment in available_models:
-                performance = model_data_dict[experiment]
-                dataset_results.append({
-                    'Experiment': experiment,
-                    'RMSE_mean': np.mean(performance),
-                    'RMSE_std': np.std(performance, ddof=1) if len(performance) > 1 else 0.0,
-                    'N': len(performance)
-                })
-            
-            results_df = pd.DataFrame(dataset_results)
-            results_df['RMSE'] = results_df.apply(lambda x: f"{x['RMSE_mean']:.4f} ± {x['RMSE_std']:.4f}", axis=1)
-            summary_table = results_df[['Experiment', 'RMSE', 'N']]
-            print(summary_table.to_string(index=False), file=file)
-            
-            # Statistical significance tests (pairwise comparisons)
-            print(f"\nPairwise Statistical Significance Tests ({label})", file=file)
-            print("-" * 50, file=file)
-            
-            # Create significance matrix
-            n_experiments = len(available_models)
-            for i in range(n_experiments):
-                for j in range(i+1, n_experiments):
-                    experiment1, experiment2 = available_models[i], available_models[j]
-                    data1, data2 = model_data_dict[experiment1], model_data_dict[experiment2]
-                    
-                    # Calculate means for relative difference
-                    median1, median2 = np.median(data1), np.median(data2)
-                    rel_diff = ((median2 - median1) / median1) * 100
-                    
-                    # Perform t-test
-                    statistic, p_value = ttest_ind(data1, data2)
-                    
-                    # Determine significance level
-                    if p_value < 0.001:
-                        sig_level = "***"
-                    elif p_value < 0.01:
-                        sig_level = "**"
-                    elif p_value < 0.05:
-                        sig_level = "*"
-                    else:
-                        sig_level = "ns"
-                    
-                    print(f"{experiment1} vs {experiment2}: t={statistic:.3f}, p={p_value:.4f} {sig_level}, rel_diff={rel_diff:+.1f}%", file=file)
-            
-            print(f"\nSignificance levels: *** p<0.001, ** p<0.01, * p<0.05, ns not significant", file=file)
 
-    print(f"Model performance and bias analysis saved to '{output_file}'")
+            summary = pd.DataFrame(
+                {
+                    "Experiment": analysis.fold_values.columns,
+                    "RMSE_mean": analysis.fold_values.mean(axis=0).to_numpy(),
+                    "RMSE_std": analysis.fold_values.std(axis=0, ddof=1).to_numpy(),
+                    "N": analysis.fold_values.count(axis=0).to_numpy(),
+                }
+            )
+            summary["RMSE"] = summary.apply(
+                lambda row: f"{row['RMSE_mean']:.4f} ± {row['RMSE_std']:.4f}", axis=1
+            )
+            print(summary[["Experiment", "RMSE", "N"]].to_string(index=False), file=file)
+            print(
+                f"\nPairwise paired t-tests "
+                f"({len(analysis.pairwise_results)}-comparison Holm family)",
+                file=file,
+            )
+            print("-" * 50, file=file)
+            report_columns = [
+                "model",
+                "reference_model",
+                "fold_ids",
+                "n",
+                "df",
+                "mean_paired_rmse_difference",
+                "percentage_difference_vs_reference",
+                "ci95_lower",
+                "ci95_upper",
+                "t_statistic",
+                "p_value_raw",
+                "p_value_holm",
+                "reject_holm",
+            ]
+            print(
+                analysis.pairwise_results[report_columns].to_string(index=False, float_format="%.6g"),
+                file=file,
+            )
+            print(f"\nCompact-letter display: {analysis.letters}", file=file)
+
+    print(f"Paired model performance analysis saved to '{output_file}'")
 
 
 def load_chao2_results() -> pd.DataFrame:
@@ -200,7 +354,7 @@ def load_benchmark_results() -> pd.DataFrame:
 def add_performance_panels(
     ax1: plt.Axes,
     ax2: plt.Axes,
-    df_perf: pd.DataFrame,
+    analyses: dict[str, PairedComparisonAnalysis],
     metric: str,
     label_map: dict[str, str] | None = None,
 ) -> None:
@@ -218,22 +372,17 @@ def add_performance_panels(
     axes = [ax1, ax2]
 
     for j, (dataset, ax) in enumerate(zip(datasets, axes)):
-
+        analysis = analyses[dataset]
         box_data = []
         missing_rows = []
         experiments = list(label_map.keys())
         for experiment in experiments:
-            exp_data = df_perf[df_perf["experiment"] == experiment]
-            metric_col = f"{dataset}_{metric}"
-            data = exp_data[metric_col].values
-            finite_data = data[np.isfinite(data)]
-
-            if len(finite_data) == 0:
+            if experiment not in analysis.fold_values.columns:
                 missing_rows.append(True)
                 box_data.append(np.array([np.nan]))
             else:
                 missing_rows.append(False)
-                box_data.append(finite_data)
+                box_data.append(analysis.fold_values[experiment].to_numpy(dtype=float))
 
         bplot = ax.boxplot(
             box_data,
@@ -297,26 +446,8 @@ def add_performance_panels(
             fontsize=PLOT_STYLE["subtitle"],
         )
 
-        alpha = 0.05
-        flat_data = []
-        group_labels = []
-        for i, data in enumerate(box_data):
-            if missing_rows[i]:
-                continue
-            flat_data.extend(data)
-            group_labels.extend([experiments[i]] * len(data))
-
-        if len(set(group_labels)) > 1:
-            mc = MultiComparison(flat_data, group_labels)
-            test_results = mc.allpairtest(stats.ttest_ind, alpha=alpha)
-
-            comp_matrix = create_comp_matrix_allpair_t_test(test_results)
-            sig_matrix = pd.DataFrame(
-                (comp_matrix.to_numpy() < alpha).copy(),
-                index=comp_matrix.index,
-                columns=comp_matrix.columns,
-            )
-            letters = multcomp_letters(sig_matrix)
+        letters = analysis.letters
+        if letters:
             for i, experiment in enumerate(experiments):
                 if experiment in letters:
                     data_vals = box_data[i]
@@ -426,6 +557,12 @@ def prepare_gift_data(model: MuScaRiEnsemble) -> gpd.GeoDataFrame:
 if __name__ == "__main__":
     df_perf = load_benchmark_results()
     metric = "rmse"
+    df_perf = df_perf[df_perf["experiment"].isin(LABEL_MAP)].copy()
+    analyses = analyze_performance_panels(df_perf, list(LABEL_MAP), metric=metric)
+    pairwise_results = pd.concat(
+        [analysis.pairwise_results for analysis in analyses.values()], ignore_index=True
+    )
+    pairwise_results.to_csv(PAIRWISE_RESULTS_OUTPUT, index=False)
     
     device = "cpu"
     best_model, best_test_df, best_fold = select_best_fold_model(RUN_DIR, device)
@@ -434,24 +571,13 @@ if __name__ == "__main__":
     eva_test_data = prepare_eva_test_data(best_test_df, best_model)
     gift_dataset = prepare_gift_data(ensemble_model)
 
-    report_model_performance(df_perf, metric)
-    
-    label_map = {
-        "MuScaRi_ClimateDEM_Area": "MuScaRi\n(env. + area)",
-        "MuScaRi_Area": "MuScaRi\n(area only)",
-        "MuScaRi_ClimateDEM": "MuScaRi\n(env. only)",
-        "FFNN_ClimateDEM_Area": "FFNN\n(env. + area)",
-        "Linear_ClimateDEM_Area": "Linear\n(env. + area)",
-        "chao2_estimator": "Chao2\nestimator",
-    }
-
-    df_perf = df_perf[df_perf["experiment"].isin(label_map)].copy()
+    report_model_performance(analyses)
 
     fig, axes = plt.subplots(2, 2, figsize=(8, 7))
     ax1, ax2 = axes[0]
     ax3, ax4 = axes[1]
 
-    add_performance_panels(ax1, ax2, df_perf, metric, label_map=label_map)
+    add_performance_panels(ax1, ax2, analyses, metric, label_map=LABEL_MAP)
 
     # Plot predictions vs observations for EVA
     mask_eva = eva_test_data[["sr", "predicted_sr"]].dropna()
@@ -527,4 +653,6 @@ if __name__ == "__main__":
     plt.tight_layout()
     for output_path in FIGURE_OUTPUTS:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    fig.savefig(FIGURE_OUTPUTS[0], dpi=300, bbox_inches="tight")
+    for output_path in FIGURE_OUTPUTS[1:]:
+        shutil.copyfile(FIGURE_OUTPUTS[0], output_path)
