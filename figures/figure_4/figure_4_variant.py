@@ -5,7 +5,8 @@ import figure_4 as base
 
 
 base.FIGURE_PATH = base.OUTPUT_DIR / "figure_4_variant.pdf"
-base.CSV_PATH = base.OUTPUT_DIR / "figure_4_variant_relative_rmse_by_area.csv"
+base.PAPER_FIGURE_PATH = None
+base.CSV_PATH = base.OUTPUT_DIR / "figure_4_variant_normalized_rmse_by_area.csv"
 base.MODEL_SPECS = base.MODEL_SPECS + [
     {
         "name": "MuScaRi_ClimateDEM_Area",

@@ -158,11 +158,20 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 
     y_true = np.asarray(y_true, dtype=float).ravel()
     y_pred = np.asarray(y_pred, dtype=float).ravel()
+    if y_true.size == 0:
+        raise ValueError("Cannot compute metrics for an empty target array.")
+    mean_observed = float(np.mean(y_true))
+    if not np.isfinite(mean_observed) or mean_observed <= 0:
+        raise ValueError(
+            "Mean observed richness must be finite and positive to compute NRMSE."
+        )
+    rmse = float(root_mean_squared_error(y_true, y_pred))
     relative_bias = (y_pred - y_true) / y_true
     return {
         "r2": float(r2_score(y_true, y_pred)),
         "d2": float(d2_absolute_error_score(y_true, y_pred)),
-        "rmse": float(root_mean_squared_error(y_true, y_pred)),
+        "rmse": rmse,
+        "nrmse": rmse / mean_observed,
         "mape": float(mean_absolute_percentage_error(y_true, y_pred)),
         "mean_relative_bias": float(np.mean(relative_bias)),
         "median_relative_bias": float(np.median(relative_bias)),

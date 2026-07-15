@@ -1,4 +1,4 @@
-"""Plot EVA scale-binned relative RMSE for area-only and ClimateDEM models."""
+"""Plot EVA scale-binned normalized RMSE for area-only and ClimateDEM models."""
 from __future__ import annotations
 
 import os
@@ -22,7 +22,8 @@ SBCV_DATA_DIR = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
 ARTIFACT_ROOT = ROOT / "scripts/results/benchmark/artifacts"
 OUTPUT_DIR = Path(__file__).parent
 FIGURE_PATH = OUTPUT_DIR / "figure_4.pdf"
-CSV_PATH = OUTPUT_DIR / "figure_4_relative_rmse_by_area.csv"
+PAPER_FIGURE_PATH: Path | None = ROOT / "paper" / "figures" / "figure_4.pdf"
+CSV_PATH = OUTPUT_DIR / "figure_4_normalized_rmse_by_area.csv"
 
 DEVICE = os.environ.get("MUSCARI_FIGURE4_DEVICE", "cpu")
 FOLD_IDS = range(5)
@@ -85,10 +86,12 @@ def prepare_fold_data(path: Path, feature_names: list[str], effort_transform: st
     return df.dropna(subset=required).copy()
 
 
-def relative_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, float]:
+def normalized_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, float]:
     rmse = float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
     mean_sr = float(np.mean(y_true))
-    return rmse, mean_sr, 100.0 * rmse / mean_sr
+    if not np.isfinite(mean_sr) or mean_sr <= 0:
+        raise ValueError("Mean observed richness must be finite and positive.")
+    return rmse, mean_sr, rmse / mean_sr
 
 
 def evaluate_model_bins(spec: dict) -> list[dict]:
@@ -117,7 +120,7 @@ def evaluate_model_bins(spec: dict) -> list[dict]:
         for area_bin, group in grouped:
             y_true = group["sr"].to_numpy(dtype=float)
             y_pred = group["prediction"].to_numpy(dtype=float)
-            rmse, mean_sr, rel_rmse_pct = relative_rmse(y_true, y_pred)
+            rmse, mean_sr, nrmse = normalized_rmse(y_true, y_pred)
             bin_idx = int(area_bin)
             rows.append(
                 {
@@ -133,8 +136,8 @@ def evaluate_model_bins(spec: dict) -> list[dict]:
                     "n_samples": int(len(group)),
                     "mean_sr": mean_sr,
                     "rmse": rmse,
-                    "relative_rmse": rel_rmse_pct / 100.0,
-                    "relative_rmse_percent": rel_rmse_pct,
+                    "nrmse": nrmse,
+                    "nrmse_percent": 100.0 * nrmse,
                 }
             )
     return rows
@@ -144,8 +147,8 @@ def summarize_for_plot(results: pd.DataFrame) -> pd.DataFrame:
     grouped = results.groupby(["model_name", "model_label", "area_bin"], sort=True)
     summary = grouped.agg(
         area_center_km2=("area_center_km2", "mean"),
-        relative_rmse_percent_mean=("relative_rmse_percent", "mean"),
-        relative_rmse_percent_std=("relative_rmse_percent", "std"),
+        nrmse_percent_mean=("nrmse_percent", "mean"),
+        nrmse_percent_std=("nrmse_percent", "std"),
     )
     return summary.reset_index()
 
@@ -156,8 +159,8 @@ def plot_results(results: pd.DataFrame) -> None:
 
     for spec in MODEL_SPECS:
         data = summary[summary["model_name"] == spec["name"]].sort_values("area_bin")
-        y = data["relative_rmse_percent_mean"].to_numpy(dtype=float)
-        y_std = data["relative_rmse_percent_std"].to_numpy(dtype=float)
+        y = data["nrmse_percent_mean"].to_numpy(dtype=float)
+        y_std = data["nrmse_percent_std"].to_numpy(dtype=float)
         x = data["area_center_km2"].to_numpy(dtype=float)
 
         ax.plot(
@@ -180,20 +183,22 @@ def plot_results(results: pd.DataFrame) -> None:
 
     ax.set_xscale("log")
     ax.set_ylim(bottom=0)
-    ax.set_ylabel("Relative RMSE (%)")
+    ax.set_ylabel("NRMSE (%)")
     ax.set_xlabel(r"Spatial unit area, $A$ (km$^2$)")
     ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc="center")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(FIGURE_PATH, dpi=300, bbox_inches="tight")
+    if PAPER_FIGURE_PATH is not None:
+        fig.savefig(PAPER_FIGURE_PATH, dpi=300, bbox_inches="tight")
 
 
 def validate_results(results: pd.DataFrame) -> None:
     expected_rows = len(MODEL_SPECS) * len(list(FOLD_IDS)) * N_AREA_BINS
     if len(results) != expected_rows:
         raise ValueError(f"Expected {expected_rows} result rows, found {len(results)}.")
-    if results["relative_rmse_percent"].isna().any():
-        raise ValueError("Relative RMSE contains missing values.")
+    if results["nrmse_percent"].isna().any():
+        raise ValueError("NRMSE contains missing values.")
     if (results["n_samples"] <= 0).any():
         raise ValueError("At least one model/fold/area bin has no samples.")
 

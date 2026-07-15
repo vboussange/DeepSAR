@@ -36,7 +36,7 @@ GIFT_ASYMPTOTE_RESULTS = (
     / "gift_asymptote_evaluation_results.csv"
 )
 RUN_DIR = ROOT / "scripts" / "results" / "benchmark" / "artifacts" / MODEL_FAMILY / MODEL_HASH
-GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/da569da/compiled_data.parquet"
+GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT/418c563/compiled_data.parquet"
 PAIRWISE_RESULTS_OUTPUT = Path(__file__).with_name("model_performance_pairwise_results.csv")
 FIGURE_OUTPUTS = [
     Path(__file__).with_name("figure_3.pdf"),
@@ -146,14 +146,13 @@ def paired_model_comparisons(
     df: pd.DataFrame,
     endpoint: str,
     models: list[str],
-    metric: str = "rmse",
+    metric: str = "nrmse_percent",
     expected_folds: tuple[int, ...] = EXPECTED_FOLDS,
     alpha: float = ALPHA,
 ) -> PairedComparisonAnalysis:
     """Compare models by matched cross-validation fold with panel-wise Holm correction.
 
-    Differences use the sign convention ``model - reference_model``. Percentage
-    differences use the reference model's mean RMSE as the denominator.
+    Differences use the sign convention ``model - reference_model``.
     """
     metric_column = f"{endpoint}_{metric}"
     fold_values = _validated_fold_table(df, metric_column, models, expected_folds)
@@ -186,9 +185,9 @@ def paired_model_comparisons(
                 "fold_ids": fold_ids,
                 "n": n,
                 "df": df_t,
-                "model_mean_rmse": model_values.mean(),
-                "reference_mean_rmse": reference_mean,
-                "mean_paired_rmse_difference": mean_difference,
+                "model_mean": model_values.mean(),
+                "reference_mean": reference_mean,
+                "mean_paired_difference": mean_difference,
                 "percentage_difference_vs_reference": 100 * mean_difference / reference_mean,
                 "ci95_lower": mean_difference - ci_half_width,
                 "ci95_upper": mean_difference + ci_half_width,
@@ -230,7 +229,7 @@ def paired_model_comparisons(
 def analyze_performance_panels(
     df: pd.DataFrame,
     models: list[str],
-    metric: str = "rmse",
+    metric: str = "nrmse_percent",
 ) -> dict[str, PairedComparisonAnalysis]:
     return {
         endpoint: paired_model_comparisons(df, endpoint, models, metric=metric)
@@ -248,7 +247,7 @@ def report_model_performance(
         print("MODEL PERFORMANCE AND PAIRED STATISTICAL ANALYSIS", file=file)
         print("=" * 60, file=file)
         print(
-            "Two-sided paired t-tests use matched fold-level RMSE values. "
+            "Two-sided paired t-tests use matched fold-level NRMSE percentages. "
             "Differences are model - reference_model; Holm adjustment is applied "
             "separately within each panel.",
             file=file,
@@ -262,15 +261,15 @@ def report_model_performance(
             summary = pd.DataFrame(
                 {
                     "Experiment": analysis.fold_values.columns,
-                    "RMSE_mean": analysis.fold_values.mean(axis=0).to_numpy(),
-                    "RMSE_std": analysis.fold_values.std(axis=0, ddof=1).to_numpy(),
+                    "NRMSE_mean": analysis.fold_values.mean(axis=0).to_numpy(),
+                    "NRMSE_std": analysis.fold_values.std(axis=0, ddof=1).to_numpy(),
                     "N": analysis.fold_values.count(axis=0).to_numpy(),
                 }
             )
-            summary["RMSE"] = summary.apply(
-                lambda row: f"{row['RMSE_mean']:.4f} ± {row['RMSE_std']:.4f}", axis=1
+            summary["NRMSE (%)"] = summary.apply(
+                lambda row: f"{row['NRMSE_mean']:.4f} ± {row['NRMSE_std']:.4f}", axis=1
             )
-            print(summary[["Experiment", "RMSE", "N"]].to_string(index=False), file=file)
+            print(summary[["Experiment", "NRMSE (%)", "N"]].to_string(index=False), file=file)
             print(
                 f"\nPairwise paired t-tests "
                 f"({len(analysis.pairwise_results)}-comparison Holm family)",
@@ -283,7 +282,7 @@ def report_model_performance(
                 "fold_ids",
                 "n",
                 "df",
-                "mean_paired_rmse_difference",
+                "mean_paired_difference",
                 "percentage_difference_vs_reference",
                 "ci95_lower",
                 "ci95_upper",
@@ -322,6 +321,7 @@ def apply_asymptotic_muscari_extrapolation(df_plot: pd.DataFrame) -> pd.DataFram
         "r2": "extrap_r2",
         "d2": "extrap_d2",
         "rmse": "extrap_rmse",
+        "nrmse": "extrap_nrmse",
         "mape": "extrap_mape",
         "mean_relative_bias": "extrap_mean_relative_bias",
         "median_relative_bias": "extrap_median_relative_bias",
@@ -348,6 +348,8 @@ def load_benchmark_results() -> pd.DataFrame:
     df_muscari = apply_asymptotic_muscari_extrapolation(df_muscari)
     df_chao2 = load_chao2_results()
     df_plot = pd.concat([df_chao2, df_muscari], ignore_index=True)
+    for endpoint in ("interp", "extrap"):
+        df_plot[f"{endpoint}_nrmse_percent"] = 100.0 * df_plot[f"{endpoint}_nrmse"]
     return df_plot
 
 
@@ -411,7 +413,8 @@ def add_performance_panels(
                 element.set_color("none")
 
         ax.set_yticks(range(1, len(experiments) + 1))
-        ax.set_xlabel(f"{metric.upper()}", fontsize=PLOT_STYLE["axis_label"])
+        metric_label = "NRMSE (%)" if metric == "nrmse_percent" else metric.upper()
+        ax.set_xlabel(metric_label, fontsize=PLOT_STYLE["axis_label"])
         if dataset == "extrap":
             ax.set_xscale("log")
             ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
@@ -556,7 +559,7 @@ def prepare_gift_data(model: MuScaRiEnsemble) -> gpd.GeoDataFrame:
 
 if __name__ == "__main__":
     df_perf = load_benchmark_results()
-    metric = "rmse"
+    metric = "nrmse_percent"
     df_perf = df_perf[df_perf["experiment"].isin(LABEL_MAP)].copy()
     analyses = analyze_performance_panels(df_perf, list(LABEL_MAP), metric=metric)
     pairwise_results = pd.concat(

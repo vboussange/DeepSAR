@@ -44,7 +44,7 @@ def env_flag(name, default):
     return value.lower() not in {"0", "false", "no", "off"}
 
 
-GIFT_DATASET_ID = "da569da"
+GIFT_DATASET_ID = "418c563"
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
 
 SBCV_ID = os.environ.get("MUSCARI_SBCV_ID", "ceacce0")

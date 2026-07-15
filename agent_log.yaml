@@ -1,4 +1,62 @@
 active_experiments:
+  - name: "normalized_rmse_reporting_revision"
+    important_params:
+      task: "replace revision-facing raw RMSE with mean-normalized RMSE and regenerate affected outputs"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "7bf48811ad04989202a698957542ad870fcf7b40"
+      branch: "dev_3rd_rev"
+      sbcv_1km_dataset_id: "ceacce0"
+      sbcv_100km_dataset_id: "d0848f6"
+      canonical_gift_dataset_id: "418c563"
+      definition: "NRMSE = RMSE / mean observed richness; manuscript display in percent"
+      figure_4_normalization: "within each model, fold, and area bin"
+      scaling_train_fractions: "numpy.logspace(-4, 0, 9)"
+      scaling_model: "MuScaRi_ClimateDEM_Area"
+      scaling_folds_per_fraction: 5
+      scaling_epoch_limit: 100
+      scaling_axes: "logarithmic training fraction and NRMSE"
+      scaling_output: "scripts/results/training_fraction_scaling/ceacce0/training_fraction_scaling_results.csv"
+      scaling_mean_nrmse_percent:
+        0.0001: 146.264
+        0.001: 89.538
+        0.01: 27.922
+        0.1: 21.520
+        0.316228: 19.848
+        1.0: 17.682
+      wandb_group: null
+      use_wandb: false
+      key_findings:
+        - "The strongest 1 km EVA interpolation models have mean NRMSE near 18%."
+        - "Environment-only MuScaRi GIFT NRMSE is 29.473%, compared with 68.239% for Chao2; mean normalization changes the reported reduction from 63% raw RMSE to 57% NRMSE."
+        - "Figure 4 values are numerically unchanged because its previous relative RMSE was already RMSE divided by within-bin mean richness; terminology and output schema now use NRMSE."
+        - "Training-fraction scaling shows steep gains below 1% of generated samples and progressively smaller gains thereafter."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "figures/figure_4/figure_4.pdf"
+        - "paper/figures/SI/scaling_exp.pdf"
+        - "figures/figure_4/figure_4_normalized_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_variant_normalized_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_GIFT_variant_normalized_rmse_by_area.csv"
+      checks:
+        - "uv run python -m unittest discover -s tests: 10 tests passed"
+        - "uv run python -m py_compile on all touched Python sources"
+        - "All reporting scripts completed under uv, including idempotent NRMSE backfill, Figures 3-4, four performance tables, and Supplementary Figure S1"
+        - "Validated 200/300/75 Figure 4 rows and exact within-bin nrmse = rmse / mean_sr"
+        - "Validated all 45 scaling model-fold rows across nine fractions"
+        - "PDF text extraction confirmed NRMSE (%) on all affected main, supplementary, and variant figures; Figures 3, 4, and S1 were visually inspected"
+        - "Regenerated Supplementary Figure S1 with logarithmic x and y axes; script compilation, diff checks, and visual PDF inspection passed"
+        - "Independent external-agent review found no blocking scientific or numerical errors; pre-commit consistency findings were resolved"
+        - "Validated full-data scaling-point folds, NRMSE, model metadata, transforms, architecture, and full training fraction before benchmark reuse"
+        - "uvx codespell completed for touched manuscript, response, synthesis, and reporting sources"
+        - "git diff --check and git -C paper diff --check"
+      unavailable_checks:
+        - "LaTeX build: latexmk, pdflatex, tectonic, biber, and chktex are unavailable on gpunode04"
+      outcome: "All revision-facing RMSE reporting now uses mean-normalized RMSE while raw RMSE remains available for provenance and unchanged internal training/model-selection behavior."
+      paper_commit: "6414245aa42b7617530ea53020adf50b34c5e304"
+      next_action: "verify the committed revisions and push when ready"
   - name: "current_sub_plan_final_revision_work"
     important_params:
       task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"

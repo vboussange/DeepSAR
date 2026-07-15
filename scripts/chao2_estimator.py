@@ -149,6 +149,7 @@ for fold_id in range(n_folds):
     metrics = {
         "experiment": "chao2_estimator",
         "fold": fold_id,
+        "extrap_sr_mean": float(np.mean(y_true)),
         **{f"extrap_{k}": v for k, v in extrap_metrics.items()},
     }
     results.append(metrics)
@@ -160,7 +161,10 @@ if not metrics_df.empty:
     print("Metrics across folds:")
     print(f"R2: {metrics_df['extrap_r2'].mean():.3f} ± {metrics_df['extrap_r2'].std():.3f}")
     print(f"D2: {metrics_df['extrap_d2'].mean():.3f} ± {metrics_df['extrap_d2'].std():.3f}")
-    print(f"RMSE: {metrics_df['extrap_rmse'].mean():.3f} ± {metrics_df['extrap_rmse'].std():.3f}")
+    print(
+        f"NRMSE (%): {100 * metrics_df['extrap_nrmse'].mean():.3f} ± "
+        f"{100 * metrics_df['extrap_nrmse'].std():.3f}"
+    )
     print(f"MAPE: {metrics_df['extrap_mape'].mean():.3f} ± {metrics_df['extrap_mape'].std():.3f}")
     print(f"Median Relative Bias: {metrics_df['extrap_median_relative_bias'].mean():.3f} ± {metrics_df['extrap_median_relative_bias'].std():.3f}")
     print(f"Mean Relative Bias: {metrics_df['extrap_mean_relative_bias'].mean():.3f} ± {metrics_df['extrap_mean_relative_bias'].std():.3f}")

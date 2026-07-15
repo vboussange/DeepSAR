@@ -22,7 +22,7 @@ class Figure3StatisticsTest(unittest.TestCase):
         }
         self.df = pd.DataFrame(
             [
-                {"experiment": model, "fold": fold, "interp_rmse": value}
+                {"experiment": model, "fold": fold, "interp_nrmse_percent": value}
                 for model, model_values in values.items()
                 for fold, value in enumerate(model_values)
             ]
@@ -57,7 +57,10 @@ class Figure3StatisticsTest(unittest.TestCase):
             paired_model_comparisons(missing, "interp", ["A", "B", "C"])
 
         nonfinite = self.df.copy()
-        nonfinite.loc[(nonfinite["experiment"] == "C") & (nonfinite["fold"] == 2), "interp_rmse"] = np.nan
+        nonfinite.loc[
+            (nonfinite["experiment"] == "C") & (nonfinite["fold"] == 2),
+            "interp_nrmse_percent",
+        ] = np.nan
         with self.assertRaisesRegex(ValueError, "missing or non-finite"):
             paired_model_comparisons(nonfinite, "interp", ["A", "B", "C"])
 
@@ -88,7 +91,7 @@ class Figure3StatisticsTest(unittest.TestCase):
             {
                 "experiment": ["D"] * 5,
                 "fold": range(5),
-                "interp_rmse": [np.nan] * 5,
+                "interp_nrmse_percent": [np.nan] * 5,
             }
         )
         result = paired_model_comparisons(
@@ -110,6 +113,18 @@ class Figure3StatisticsTest(unittest.TestCase):
         self.assertEqual(len(analyses["extrap"].pairwise_results), 15)
         self.assertTrue((analyses["interp"].pairwise_results[["n", "df"]] == [5, 4]).all().all())
         self.assertTrue((analyses["extrap"].pairwise_results[["n", "df"]] == [5, 4]).all().all())
+        self.assertEqual(analyses["interp"].metric_column, "interp_nrmse_percent")
+        self.assertEqual(analyses["extrap"].metric_column, "extrap_nrmse_percent")
+
+        interpolation = analyses["interp"].pairwise_results
+        focal = interpolation[
+            (interpolation["model"] == "MuScaRi_ClimateDEM_Area")
+            & (interpolation["reference_model"] == "MuScaRi_ClimateDEM")
+        ].iloc[0]
+        self.assertAlmostEqual(focal["mean_paired_difference"], -0.483969, places=5)
+        self.assertAlmostEqual(focal["ci95_lower"], -1.038713, places=5)
+        self.assertAlmostEqual(focal["ci95_upper"], 0.070775, places=5)
+        self.assertAlmostEqual(focal["p_value_holm"], 0.145177, places=5)
 
 
 if __name__ == "__main__":

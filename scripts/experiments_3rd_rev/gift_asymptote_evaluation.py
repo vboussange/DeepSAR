@@ -27,7 +27,7 @@ from muscari.utils import (
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
-GIFT_DATASET_ID = "da569da"
+GIFT_DATASET_ID = "418c563"
 GIFT_DATA_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
 ARTIFACT_ROOT = ROOT / "scripts/results/benchmark/artifacts"
 OUTPUT_DIR = ROOT / "scripts/results/gift_asymptote_evaluation" / SBCV_DATASET_ID
@@ -187,14 +187,16 @@ def write_summary(results: pd.DataFrame) -> None:
     display_cols = [
         "model_name",
         "prediction_mode",
-        "rmse",
+        "nrmse",
         "r2",
         "median_relative_bias",
         "bias_slope_log_area",
         "pred_mean",
     ]
     table = ensemble_rows[display_cols].copy()
-    for col in ["rmse", "r2", "median_relative_bias", "bias_slope_log_area", "pred_mean"]:
+    table["nrmse"] *= 100.0
+    table = table.rename(columns={"nrmse": "nrmse_percent"})
+    for col in ["nrmse_percent", "r2", "median_relative_bias", "bias_slope_log_area", "pred_mean"]:
         table[col] = table[col].map(lambda x: f"{x:.3f}")
     markdown_table = [
         "| " + " | ".join(table.columns) + " |",

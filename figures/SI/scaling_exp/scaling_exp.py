@@ -1,64 +1,56 @@
-"""
-Plotting training sample size vs model performance
-"""
-import numpy as np
+"""Plot interpolation NRMSE against the proportion of training samples."""
 from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
+
+ROOT = Path(__file__).parents[3]
+RESULTS_PATH = (
+    ROOT
+    / "scripts/results/training_fraction_scaling/ceacce0/training_fraction_scaling_results.csv"
+)
+FIGURE_PATH = Path(__file__).with_name("scaling_exp.pdf")
+PAPER_FIGURE_PATH = ROOT / "paper/figures/SI/scaling_exp.pdf"
+
+
+def main() -> None:
+    results = pd.read_csv(RESULTS_PATH)
+    required = {"train_frac", "fold", "interp_nrmse"}
+    missing = required.difference(results.columns)
+    if missing:
+        raise ValueError(f"Missing scaling-result columns: {sorted(missing)}")
+    if results.duplicated(["train_frac", "fold"]).any():
+        raise ValueError("Duplicate training-fraction/fold rows.")
+
+    fractions = np.sort(results["train_frac"].unique())
+    fig, ax = plt.subplots(figsize=(4, 3))
+    rng = np.random.default_rng(42)
+    medians = []
+    for fraction in fractions:
+        values = 100.0 * results.loc[
+            results["train_frac"] == fraction,
+            "interp_nrmse",
+        ].to_numpy(dtype=float)
+        if len(values) != 5 or not np.isfinite(values).all():
+            raise ValueError(f"Expected five finite folds for training fraction {fraction:g}.")
+        medians.append(float(np.median(values)))
+        jitter = np.exp(rng.normal(0.0, 0.035, size=len(values)))
+        ax.scatter(fraction * jitter, values, alpha=0.6, s=10, color="#f72585", zorder=3)
+
+    ax.plot(fractions, medians, "--", color="#f72585", linewidth=1, zorder=2)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Training samples / available training plots")
+    ax.set_ylabel("NRMSE (%)")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(FIGURE_PATH, dpi=300, bbox_inches="tight")
+    fig.savefig(PAPER_FIGURE_PATH, dpi=300, bbox_inches="tight")
+    print(f"Wrote {FIGURE_PATH}")
+    print(f"Wrote {PAPER_FIGURE_PATH}")
+
+
 if __name__ == "__main__":
-    path_neural_weibull_results = Path(f"../../../scripts/results/benchmark/deep4pweibull_basearch6_0b85791_benchmark.csv")    
-    
-    # Read the data
-    df_nw = pd.read_csv(path_neural_weibull_results)
-    
-    # Create figure
-    fig, ax = plt.subplots(1, 1, figsize=(4, 3))
-    
-    metric = "rmse_gift"
-    
-    df_plot_train = df_nw[(df_nw['model'] == 'area+climate') & (df_nw['num_params'] > 4e5)]
-    train_fracs = sorted(df_plot_train['train_frac'].unique())
-    
-    means = []
-    stds = []
-    all_data = []
-
-    for train_frac in train_fracs:
-        data = df_plot_train[df_plot_train['train_frac'] == train_frac][metric].values
-        means.append(np.mean(data))
-        stds.append(np.std(data))
-        all_data.append(data)
-
-    # Create errorbar plot
-    x_pos = range(1, len(train_fracs) + 1)
-    # Create box plots
-    bplot = ax.boxplot(all_data, patch_artist=True, widths=0.6, showfliers=False)
-    
-    # Color the boxes (make them invisible except medians)
-    for patch in bplot['boxes']:
-        patch.set_facecolor('none')
-        patch.set_edgecolor("none")
-    for item in ['caps', 'whiskers']:
-        for element in bplot[item]:
-            element.set_color("none")
-    for element in bplot["medians"]:
-        element.set_color("black")
-    
-    # Add line connecting medians
-    medians = [np.median(data) for data in all_data]
-    ax.plot(x_pos, medians, '--', color="#f72585", linewidth=1, zorder=2)
-    # Add individual data points
-    for i, data in enumerate(all_data):
-        x = np.random.normal(i + 1, 0.06, size=len(data))  # Add jitter
-        ax.scatter(x, data, alpha=0.6, s=10, color="#f72585", zorder=3)
-
-    # Set labels and formatting
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels([f'$10^{{{int(np.log10(frac))}}}$' if i % 2 == 0 else '' for i, frac in enumerate(train_fracs)])
-    ax.set_xlabel('Proportion of training samples')
-    ax.set_ylabel('RMSE')
-    
-    plt.tight_layout()
-    plt.show()
-    fig.savefig(f"{Path(__file__).stem}.pdf", dpi=300, bbox_inches='tight')
+    main()

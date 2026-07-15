@@ -1,216 +1,162 @@
-"""Utilities for building LaTeX performance tables."""
+"""Generate the four final-revision NRMSE performance tables."""
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
+
 ROOT = Path(__file__).parents[3]
-BENCHMARK_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_results_ceacce0_reduced_bioclim_vars.csv"
-CHAO2_RESULTS = ROOT / "scripts" / "results" / "benchmark" / f"benchmark_chao2_results_ceacce0.csv"
+BENCHMARK_DIR = ROOT / "scripts" / "results" / "benchmark"
+GIFT_AUDIT_DIR = ROOT / "scripts" / "results" / "gift_asymptote_evaluation"
+DATASET_IDS = ("ceacce0", "d0848f6")
+CHAO2_RESULTS = BENCHMARK_DIR / "benchmark_chao2_results_ceacce0.csv"
+MODEL_ORDER = [
+    "FFNN_ClimateDEM_Area",
+    "chao2_estimator",
+    "Linear_ClimateDEM_Area",
+    "MuScaRi_Area",
+    "MuScaRi_ClimateDEM",
+    "MuScaRi_ClimateDEM_Area",
+]
+LABEL_MAP = {
+    "FFNN_ClimateDEM_Area": "FFNN",
+    "chao2_estimator": "Chao2 estimator",
+    "Linear_ClimateDEM_Area": "Linear",
+    "MuScaRi_Area": "MuScaRi",
+    "MuScaRi_ClimateDEM": "MuScaRi",
+    "MuScaRi_ClimateDEM_Area": "MuScaRi",
+}
+PREDICTOR_MAP = {
+    "FFNN_ClimateDEM_Area": "Env. + Area",
+    "chao2_estimator": "--",
+    "Linear_ClimateDEM_Area": "Env. + Area",
+    "MuScaRi_Area": "Area",
+    "MuScaRi_ClimateDEM": "Env.",
+    "MuScaRi_ClimateDEM_Area": "Env. + Area",
+}
+METRICS = ["nrmse", "mape", "median_relative_bias", "r2", "d2"]
 
-def load_benchmark_results() -> tuple[pd.DataFrame, pd.DataFrame]:
-    df_nw = pd.read_csv(BENCHMARK_RESULTS)
-    df_chao2 = pd.read_csv(CHAO2_RESULTS)
-    return df_nw, df_chao2
+
+def load_benchmark_results(dataset_id: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    models = pd.read_csv(BENCHMARK_DIR / f"benchmark_results_{dataset_id}.csv")
+    audit = pd.read_csv(
+        GIFT_AUDIT_DIR / dataset_id / "gift_asymptote_evaluation_results.csv"
+    )
+    audit = audit[
+        (audit["prediction_mode"] == "asymptotic_total")
+        & (audit["aggregation"] == "fold_member")
+    ]
+    for _, row in audit.iterrows():
+        mask = (models["experiment"] == row["model_name"]) & (
+            models["fold"] == int(row["fold"])
+        )
+        for metric in METRICS:
+            models.loc[mask, f"extrap_{metric}"] = row[metric]
+    chao2 = pd.read_csv(CHAO2_RESULTS) if dataset_id == "ceacce0" else pd.DataFrame()
+    return models, chao2
 
 
-def format_mean_std(mean: float, std: float) -> str:
-    if np.isnan(mean):
-        return "-"
-    return f"{mean:.3f} ± {std:.3f}"
-
-
-def apply_best_bold(values: dict[str, float], higher_is_better: bool) -> dict[str, str]:
-    valid_items = {k: v for k, v in values.items() if np.isfinite(v)}
-    if not valid_items:
-        return {k: "-" for k in values}
-    best_value = max(valid_items.values()) if higher_is_better else min(valid_items.values())
-    result = {}
-    for key, value in values.items():
-        if not np.isfinite(value):
-            result[key] = "-"
-        elif value == best_value:
-            result[key] = "best"
-        else:
-            result[key] = ""
-    return result
+def format_mean_std(values: pd.Series, percent: bool = False) -> tuple[str, float]:
+    values = pd.to_numeric(values, errors="coerce").dropna().to_numpy(dtype=float)
+    if not len(values):
+        return "-", np.nan
+    scale = 100.0 if percent else 1.0
+    mean = float(np.mean(values)) * scale
+    std = float(np.std(values, ddof=1)) * scale
+    return f"{mean:.3f} ± {std:.3f}", mean
 
 
 def build_performance_table(
-    df_muscari: pd.DataFrame,
-    df_chao2: pd.DataFrame,
-    dataset: str,
-    label_map: dict[str, str],
-    predictor_map: dict[str, str],
-    metrics: list[str],
+    models: pd.DataFrame,
+    chao2: pd.DataFrame,
+    endpoint: str,
 ) -> pd.DataFrame:
-    if dataset == "interp":
-        experiments = ["FFNNBatchNormExp_ClimateDEM_Area", "FFNNBatchNormExp_All", "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All"]
-        df_plot = df_muscari
-    else:
-        experiments = [
-            "FFNNBatchNormExp_All",
-            "FFNNBatchNormExp_ClimateDEM_Area",
-            "chao2_estimator",
-            "MuScaRi_Area", "MuScaRi_ClimateDEM", "MuScaRi_Landcover", "MuScaRi_ClimateDEM_Area", "MuScaRi_ClimateDEM_Landcover", "MuScaRi_Landcover_Area", "MuScaRi_All",
-        ]
-        df_plot = pd.concat([df_chao2, df_muscari], ignore_index=True)
-
+    data = pd.concat([models, chao2], ignore_index=True)
+    experiments = [
+        name
+        for name in MODEL_ORDER
+        if name in set(data["experiment"])
+        and data.loc[data["experiment"] == name, f"{endpoint}_nrmse"].notna().any()
+    ]
     rows = []
     for experiment in experiments:
+        experiment_data = data[data["experiment"] == experiment]
         row = {
-            "_experiment": experiment,
-            "model": label_map.get(experiment, experiment),
-            "Predictors": predictor_map.get(experiment, "-"),
+            "experiment": experiment,
+            "model": LABEL_MAP[experiment],
+            "predictors": PREDICTOR_MAP[experiment],
         }
-        exp_data = df_plot[df_plot["experiment"] == experiment]
-        for metric in metrics:
-            metric_col = f"{dataset}_{metric}"
-            values = exp_data[metric_col].dropna().values
-            if len(values) == 0:
-                mean_val = np.nan
-                std_val = np.nan
-            else:
-                mean_val = float(np.mean(values))
-                std_val = float(np.std(values))
-            row[metric] = format_mean_std(mean_val, std_val)
-            row[f"_{metric}_mean"] = mean_val
+        for metric in METRICS:
+            row[metric], row[f"_{metric}_mean"] = format_mean_std(
+                experiment_data[f"{endpoint}_{metric}"],
+                percent=metric == "nrmse",
+            )
         rows.append(row)
+    table = pd.DataFrame(rows)
 
-    df = pd.DataFrame(rows)
-
-    best_flags = {}
-    for metric in metrics:
-        means = df.set_index("_experiment")[f"_{metric}_mean"].to_dict()
-        if metric in {"mean_relative_bias", "median_relative_bias"}:
-            # For bias, closest to 0 is best
-            abs_means = {k: abs(v) if np.isfinite(v) else np.inf for k, v in means.items()}
-            best_flags[metric] = apply_best_bold(
-                abs_means,
-                higher_is_better=False,
-            )
-        else:
-            best_flags[metric] = apply_best_bold(
-                means,
-                higher_is_better=metric in {"r2", "d2"},
-            )
-
-    for metric in metrics:
-        for idx, experiment in df["_experiment"].items():
-            if best_flags[metric].get(experiment) == "best":
-                df.at[idx, metric] = f"\\textbf{{{df.at[idx, metric]}}}"
-
-    df = df.drop(columns=["_experiment"] + [f"_{m}_mean" for m in metrics])
-    return df
+    for metric in METRICS:
+        means = table[f"_{metric}_mean"]
+        score = means.abs() if metric == "median_relative_bias" else means
+        best = score.idxmax() if metric in {"r2", "d2"} else score.idxmin()
+        table.loc[best, metric] = f"\\textbf{{{table.loc[best, metric]}}}"
+    return table
 
 
-def render_latex_table(df: pd.DataFrame, caption: str, label: str) -> str:
-    header = (
-        "\\begin{table}\n"
-        "    \\centering\n"
-        "    \\small\n"
-        "    \\setlength{\\tabcolsep}{4pt}\n"
-        "    \\begin{tabularx}{\\textwidth}{l l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
-        "    \\toprule\n"
-        "    Model & Predictors & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ \\\\\n"
-        "    \\midrule\n"
-    )
-    rows = []
-    for _, row in df.iterrows():
-        rows.append(
-            f"    {row['model']} & {row['Predictors']} & {row['rmse']} & {row['mape']} & {row['median_relative_bias']} & {row['r2']} & {row['d2']} \\\\\n"
+def render_latex_table(table: pd.DataFrame, caption: str, label: str) -> str:
+    lines = [
+        "\\begin{table}[h!]",
+        "    \\centering",
+        "    \\small",
+        "    \\setlength{\\tabcolsep}{4pt}",
+        "    \\begin{tabularx}{\\textwidth}{l l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}",
+        "    \\toprule",
+        "    Model & Predictors & NRMSE (\\%) & MAPE & Rel. Bias & $R^2$ & $D^2$ \\\\",
+        "    \\midrule",
+    ]
+    for _, row in table.iterrows():
+        lines.append(
+            f"    {row['model']} & {row['predictors']} & {row['nrmse']} & {row['mape']} & "
+            f"{row['median_relative_bias']} & {row['r2']} & {row['d2']} \\\\"
         )
-    footer = (
-        "    \\bottomrule\n"
-        "    \\end{tabularx}\n"
-        f"    \\caption{{{caption}}}\n"
-        f"    \\label{{{label}}}\n"
-        "\\end{table}\n"
+    lines.extend(
+        [
+            "    \\bottomrule",
+            "    \\end{tabularx}",
+            f"    \\caption{{{caption}}}",
+            f"    \\label{{{label}}}",
+            "\\end{table}",
+            "",
+        ]
     )
-    return header + "".join(rows) + footer
+    return "\n".join(lines)
 
 
-def write_latex_table(df: pd.DataFrame, caption: str, label: str, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    latex = render_latex_table(df, caption, label)
-    output_path.write_text(latex)
+def main() -> None:
+    description = (
+        "NRMSE: root mean squared error divided by mean observed richness for each model and split, "
+        "reported as a percentage; "
+        "MAPE: mean absolute percentage error; Rel.\\ Bias: median relative bias, defined as "
+        "$\\mathrm{median}[(\\hat{S}-S)/S]$; $R^2$: coefficient of determination; $D^2$: fraction "
+        "of deviance explained. Lower NRMSE, MAPE, and Rel.\\ Bias (closer to 0), and higher $R^2$ "
+        "and $D^2$, indicate better performance."
+    )
+    for dataset_id in DATASET_IDS:
+        models, chao2 = load_benchmark_results(dataset_id)
+        suffix = "" if dataset_id == "ceacce0" else "_100km"
+        block_text = " using 100\\,km spatial blocks" if suffix else ""
+        for endpoint, dataset_name in (("interp", "EVA test"), ("extrap", "GIFT")):
+            table = build_performance_table(models, chao2, endpoint)
+            endpoint_label = "Interpolation" if endpoint == "interp" else "Extrapolation"
+            caption = (
+                f"{endpoint_label} performance on the {dataset_name} dataset{block_text} "
+                "(mean ± standard deviation across splits). " + description
+            )
+            label = f"tab:{endpoint}_performance{suffix}"
+            latex = render_latex_table(table, caption, label)
+            output = BENCHMARK_DIR / f"benchmark_results_{dataset_id}_{endpoint}_performance.tex"
+            output.write_text(latex)
+            print(f"Wrote {output.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
-    df_muscari, df_chao2 = load_benchmark_results()
-
-    label_map = {
-        "MuScaRi_Area": "MuScaRi",
-        "MuScaRi_ClimateDEM": "MuScaRi",
-        "MuScaRi_Landcover": "MuScaRi",
-        "MuScaRi_ClimateDEM_Area": "MuScaRi",
-        "MuScaRi_ClimateDEM_Landcover": "MuScaRi",
-        "MuScaRi_Landcover_Area": "MuScaRi",
-        "MuScaRi_All": "MuScaRi",
-        "FFNNBatchNormExp_All": "FFNN",
-        "FFNNBatchNormExp_ClimateDEM_Area": "FFNN",
-        "chao2_estimator": "Chao2 estimator",
-    }
-
-    predictor_map = {
-        "MuScaRi_Area": "Area",
-        "MuScaRi_ClimateDEM": "Env.",
-        "MuScaRi_Landcover": "Land.",
-        "MuScaRi_ClimateDEM_Area": "Env. + Area",
-        "MuScaRi_ClimateDEM_Landcover": "Env. + Land.",
-        "MuScaRi_Landcover_Area": "Land. + Area",
-        "MuScaRi_All": "Area + Env. + Land.",
-        "FFNNBatchNormExp_All": "Area + Env. + Land.",
-        "FFNNBatchNormExp_ClimateDEM_Area": "Env. + Area",
-        "chao2_estimator": "--",
-    }
-
-    df_muscari = df_muscari[df_muscari["experiment"].isin(label_map)].copy()
-
-    metrics = ["rmse", "mape", "r2", "d2", "median_relative_bias"]
-    interp_table = build_performance_table(
-        df_muscari,
-        df_chao2,
-        dataset="interp",
-        label_map=label_map,
-        predictor_map=predictor_map,
-        metrics=metrics,
-    )
-    extrap_table = build_performance_table(
-        df_muscari,
-        df_chao2,
-        dataset="extrap",
-        label_map=label_map,
-        predictor_map=predictor_map,
-        metrics=metrics,
-    )
-    
-    description = "RMSE: root mean squared error; MAPE: mean absolute percentage error; Rel.\\ Bias: median relative bias, defined as $\\mathrm{median}[(\\hat{S}-S)/S]$; $R^2$: coefficient of determination; $D^2$: fraction of deviance explained. Lower RMSE, MAPE, and Rel.\\ Bias (closer to 0), and higher $R^2$ and $D^2$, indicate better performance."
-
-    interp_caption = (
-        "Interpolation performance on the EVA test dataset (mean ± standard deviation across splits). "
-        f"{description}"
-    )
-    extrap_caption = (
-        "Extrapolation performance on the GIFT dataset under asymptotic sampling effort (mean ± standard deviation across splits). "
-        f"{description}"
-    )
-    interp_label = "tab:interp_performance"
-    extrap_label = "tab:extrap_performance"
-
-    interp_tex = render_latex_table(interp_table, caption=interp_caption, label=interp_label)
-    extrap_tex = render_latex_table(extrap_table, caption=extrap_caption, label=extrap_label)
-    print(interp_tex)
-    print(extrap_tex)
-
-    write_latex_table(
-        interp_table,
-        caption=interp_caption,
-        label=interp_label,
-        output_path=BENCHMARK_RESULTS.parent / (BENCHMARK_RESULTS.stem + "_interp_performance.tex"),
-    )
-    write_latex_table(
-        extrap_table,
-        caption=extrap_caption,
-        label=extrap_label,
-        output_path=BENCHMARK_RESULTS.parent / (BENCHMARK_RESULTS.stem + "_extrap_performance.tex"),
-    )
+    main()

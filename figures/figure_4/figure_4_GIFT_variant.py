@@ -1,4 +1,4 @@
-"""GIFT variant of Figure 4 with quantile-binned relative RMSE by area."""
+"""GIFT variant of Figure 4 with quantile-binned normalized RMSE by area."""
 from __future__ import annotations
 
 import json
@@ -13,12 +13,13 @@ import matplotlib.pyplot as plt
 import figure_4 as base
 
 
-GIFT_DATASET_ID = "da569da"
+GIFT_DATASET_ID = "418c563"
 GIFT_DATA_PATH = (
     base.ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
 )
 FIGURE_PATH = base.OUTPUT_DIR / "figure_4_GIFT_variant.pdf"
-CSV_PATH = base.OUTPUT_DIR / "figure_4_GIFT_variant_relative_rmse_by_area.csv"
+CSV_PATH = base.OUTPUT_DIR / "figure_4_GIFT_variant_normalized_rmse_by_area.csv"
+base.PAPER_FIGURE_PATH = None
 N_GIFT_BINS = 5
 MIN_BIN_SAMPLES = 30
 
@@ -97,7 +98,7 @@ def evaluate_gift_bins() -> pd.DataFrame:
             for area_bin, group in grouped:
                 y_true = group["sr"].to_numpy(dtype=float)
                 y_pred = group["prediction"].to_numpy(dtype=float)
-                rmse, mean_sr, rel_rmse_pct = base.relative_rmse(y_true, y_pred)
+                rmse, mean_sr, nrmse = base.normalized_rmse(y_true, y_pred)
                 rows.append(
                     {
                         "dataset_id": base.SBCV_DATASET_ID,
@@ -113,8 +114,8 @@ def evaluate_gift_bins() -> pd.DataFrame:
                         "n_samples": int(len(group)),
                         "mean_sr": mean_sr,
                         "rmse": rmse,
-                        "relative_rmse": rel_rmse_pct / 100.0,
-                        "relative_rmse_percent": rel_rmse_pct,
+                        "nrmse": nrmse,
+                        "nrmse_percent": 100.0 * nrmse,
                     }
                 )
     return pd.DataFrame(rows)
@@ -124,8 +125,8 @@ def summarize_for_plot(results: pd.DataFrame) -> pd.DataFrame:
     grouped = results.groupby(["model_name", "model_label", "area_bin"], sort=True)
     summary = grouped.agg(
         area_center_km2=("area_center_km2", "mean"),
-        relative_rmse_percent_mean=("relative_rmse_percent", "mean"),
-        relative_rmse_percent_std=("relative_rmse_percent", "std"),
+        nrmse_percent_mean=("nrmse_percent", "mean"),
+        nrmse_percent_std=("nrmse_percent", "std"),
     )
     return summary.reset_index()
 
@@ -137,8 +138,8 @@ def plot_results(results: pd.DataFrame) -> None:
     for spec in MODEL_SPECS:
         data = summary[summary["model_name"] == spec["name"]].sort_values("area_bin")
         x = data["area_center_km2"].to_numpy(dtype=float)
-        y = data["relative_rmse_percent_mean"].to_numpy(dtype=float)
-        y_std = data["relative_rmse_percent_std"].to_numpy(dtype=float)
+        y = data["nrmse_percent_mean"].to_numpy(dtype=float)
+        y_std = data["nrmse_percent_std"].to_numpy(dtype=float)
         ax.plot(
             x,
             y,
@@ -159,7 +160,7 @@ def plot_results(results: pd.DataFrame) -> None:
 
     ax.set_xscale("log")
     ax.set_ylim(bottom=0)
-    ax.set_ylabel("Relative RMSE (%)")
+    ax.set_ylabel("NRMSE (%)")
     ax.set_xlabel(r"GIFT area, $A$ (km$^2$)")
     ax.legend(frameon=True, fancybox=True, bbox_to_anchor=(0.5, 1.2), loc="center")
     ax.grid(True, alpha=0.3)
@@ -171,8 +172,8 @@ def validate_results(results: pd.DataFrame) -> None:
     expected_rows = len(MODEL_SPECS) * len(list(base.FOLD_IDS)) * N_GIFT_BINS
     if len(results) != expected_rows:
         raise ValueError(f"Expected {expected_rows} result rows, found {len(results)}.")
-    if results["relative_rmse_percent"].isna().any():
-        raise ValueError("Relative RMSE contains missing values.")
+    if results["nrmse_percent"].isna().any():
+        raise ValueError("NRMSE contains missing values.")
     if results.groupby("area_bin")["n_samples"].first().min() < MIN_BIN_SAMPLES:
         raise ValueError("At least one GIFT bin has too few samples.")
 
