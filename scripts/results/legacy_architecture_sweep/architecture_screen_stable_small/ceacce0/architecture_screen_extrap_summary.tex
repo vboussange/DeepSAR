@@ -1,0 +1,17 @@
+\begin{table}
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\textwidth}{l l l c >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+    \toprule
+    Architecture & Effort & Asymptote & Folds & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ & Bias slope \\
+    \midrule
+    Softplus asymptote + absolute effort & Absolute & Softplus & 5 & 1012.084 ± 642.115 & 0.619 ± 0.314 & \textbf{-0.430 ± 0.478} & -0.847 ± 1.887 & -0.212 ± 0.827 & \textbf{0.008 ± 0.015} \\
+    Exp asymptote + absolute effort & Absolute & Exponential & 5 & 1550.587 ± 495.319 & 0.892 ± 0.215 & -0.806 ± 0.389 & -2.407 ± 1.502 & -0.909 ± 0.629 & -0.010 ± 0.019 \\
+    Stable Weibull + absolute effort + log target & Absolute & Stable span & 5 & 857.418 ± 18.484 & 0.510 ± 0.023 & -0.500 ± 0.018 & 0.054 ± 0.041 & -0.036 ± 0.018 & 0.053 ± 0.016 \\
+    Stable Weibull + log coverage + log target & Log coverage & Stable span & 5 & \textbf{855.648 ± 15.448} & \textbf{0.504 ± 0.013} & -0.496 ± 0.019 & \textbf{0.058 ± 0.034} & \textbf{-0.031 ± 0.018} & 0.052 ± 0.007 \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Architecture screen results on the GIFT extrapolation dataset (mean ± standard deviation across folds). Lower RMSE, MAPE, relative bias, and residual-bias slope magnitudes are better; higher $R^2$ and $D^2$ are better.}
+    \label{tab:architecture_screen_extrap}
+\end{table}

@@ -1,10 +1,42 @@
-import matplotlib.pyplot as plt
-import pickle
 import logging
+import json
+import pickle
+import socket
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import git
+
+
+def json_ready(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if is_dataclass(value):
+        return json_ready(asdict(value))
+    if isinstance(value, dict):
+        return {str(key): json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_ready(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except (TypeError, ValueError):
+            pass
+    try:
+        json.dumps(value)
+        return value
+    except TypeError:
+        return repr(value)
+
 
 class MSELogLoss(nn.Module):
     def __init__(self, reduction='mean'):
@@ -46,3 +78,236 @@ def get_git_hash(short=True, fallback="unknown"):
     except git.InvalidGitRepositoryError:
         logging.warning("Could not determine git hash; using '%s'.", fallback)
         return fallback
+
+
+def add_effort_columns(df: pd.DataFrame, effort_transform: str) -> pd.DataFrame:
+    df = df.copy()
+    df["log_sp_unit_area"] = np.log(df["sp_unit_area"])
+    log_observed_area = np.log(df["observed_area"])
+    if effort_transform == "absolute":
+        df["log_observed_area"] = log_observed_area
+    elif effort_transform == "relative":
+        df["log_observed_area"] = log_observed_area / df["log_sp_unit_area"]
+    elif effort_transform == "coverage":
+        df["log_observed_area"] = log_observed_area - df["log_sp_unit_area"]
+    else:
+        raise ValueError("effort_transform must be 'absolute', 'relative', or 'coverage'")
+    return df
+
+
+def climate_features(df: pd.DataFrame, bioclimate_vars: list[str]) -> list[str]:
+    climate_feats = list(bioclimate_vars) + [f"std_{v}" for v in bioclimate_vars]
+    return [c for c in climate_feats if c in df.columns]
+
+
+def elevation_features(df: pd.DataFrame) -> list[str]:
+    return [c for c in ["elevation", "std_elevation"] if c in df.columns]
+
+
+def landcover_fraction_features(df: pd.DataFrame) -> list[str]:
+    def _landcover_index(name: str) -> int:
+        return int(name.split("_")[-1])
+
+    return sorted(
+        [c for c in df.columns if c.startswith("lc_frac_")],
+        key=_landcover_index,
+    )
+
+
+def environmental_features(
+    df: pd.DataFrame,
+    bioclimate_vars: list[str],
+    include_elevation: bool = True,
+    include_landcover: bool = False,
+) -> list[str]:
+    env = climate_features(df, bioclimate_vars)
+    if include_elevation:
+        env = env + elevation_features(df)
+    if include_landcover:
+        env = env + landcover_fraction_features(df)
+    return env
+
+
+def feature_sets(
+    df: pd.DataFrame,
+    bioclimate_vars: list[str],
+    include_elevation: bool = True,
+    include_landcover: bool = False,
+) -> dict[str, list[str]]:
+    env = environmental_features(
+        df,
+        bioclimate_vars,
+        include_elevation=include_elevation,
+        include_landcover=include_landcover,
+    )
+    return {
+        "area": ["log_sp_unit_area"],
+        "env": env,
+        "env_area": env + ["log_sp_unit_area"],
+    }
+
+
+def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    from sklearn.metrics import (
+        d2_absolute_error_score,
+        mean_absolute_percentage_error,
+        r2_score,
+        root_mean_squared_error,
+    )
+
+    y_true = np.asarray(y_true, dtype=float).ravel()
+    y_pred = np.asarray(y_pred, dtype=float).ravel()
+    if y_true.size == 0:
+        raise ValueError("Cannot compute metrics for an empty target array.")
+    mean_observed = float(np.mean(y_true))
+    if not np.isfinite(mean_observed) or mean_observed <= 0:
+        raise ValueError(
+            "Mean observed richness must be finite and positive to compute NRMSE."
+        )
+    rmse = float(root_mean_squared_error(y_true, y_pred))
+    relative_bias = (y_pred - y_true) / y_true
+    return {
+        "r2": float(r2_score(y_true, y_pred)),
+        "d2": float(d2_absolute_error_score(y_true, y_pred)),
+        "rmse": rmse,
+        "nrmse": rmse / mean_observed,
+        "mape": float(mean_absolute_percentage_error(y_true, y_pred)),
+        "mean_relative_bias": float(np.mean(relative_bias)),
+        "median_relative_bias": float(np.median(relative_bias)),
+    }
+
+
+def compute_log1p_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    from sklearn.metrics import (
+        d2_absolute_error_score,
+        mean_absolute_error,
+        r2_score,
+        root_mean_squared_error,
+    )
+
+    y_true = np.asarray(y_true, dtype=float).ravel()
+    y_pred = np.asarray(y_pred, dtype=float).ravel()
+    log_true = np.log1p(y_true)
+    log_pred = np.log1p(np.clip(y_pred, 0.0, None))
+    return {
+        "log1p_r2": float(r2_score(log_true, log_pred)),
+        "log1p_d2": float(d2_absolute_error_score(log_true, log_pred)),
+        "log1p_rmse": float(root_mean_squared_error(log_true, log_pred)),
+        "log1p_mae": float(mean_absolute_error(log_true, log_pred)),
+    }
+
+
+def residual_bias_slope(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    log_sp_unit_area: np.ndarray,
+) -> float:
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    relative_bias = (y_pred - y_true) / y_true
+    finite = np.isfinite(relative_bias) & np.isfinite(log_sp_unit_area)
+    if finite.sum() < 2:
+        return float("nan")
+    return float(np.polyfit(np.asarray(log_sp_unit_area)[finite], relative_bias[finite], 1)[0])
+
+
+def choose_accelerator() -> tuple[str, int | list[int], str]:
+    if torch.cuda.is_available():
+        return "gpu", 1, "cuda:0"
+    if torch.backends.mps.is_available():
+        return "mps", 1, "mps"
+    return "cpu", 1, "cpu"
+
+
+def evaluate_lit_model(lit_model, data_loader, device: str) -> tuple[np.ndarray, np.ndarray]:
+    lit_model.eval()
+    lit_model.to(device)
+    preds = []
+    targets = []
+    with torch.no_grad():
+        for x, y in data_loader:
+            x = x.to(device, non_blocking=True)
+            y_pred = lit_model(x)
+            preds.append(y_pred.cpu())
+            targets.append(y.cpu())
+
+    preds = torch.cat(preds).numpy()
+    targets = torch.cat(targets).numpy()
+
+    if lit_model.model.target_scaler:
+        preds = lit_model.model.target_scaler.inverse_transform(preds)
+        targets = lit_model.model.target_scaler.inverse_transform(targets.reshape(-1, 1))
+
+    return targets.flatten(), preds.flatten()
+
+
+def maybe_wandb_logger(
+    *,
+    use_wandb: bool,
+    project: str,
+    group: str,
+    tags: list[str],
+    name: str,
+    config: dict,
+):
+    if not use_wandb:
+        return None
+    from pytorch_lightning.loggers import WandbLogger
+
+    return WandbLogger(
+        project=project,
+        group=group,
+        tags=tags,
+        name=name,
+        config={
+            **config,
+            "git_hash": get_git_hash(),
+            "hostname": socket.gethostname(),
+        },
+    )
+
+
+def log_wandb_metrics(wandb_logger, metrics: dict[str, float]) -> None:
+    if wandb_logger is None:
+        return
+    wandb_logger.experiment.log(metrics)
+
+
+def finish_wandb(wandb_logger) -> None:
+    if wandb_logger is None:
+        return
+    import wandb
+
+    wandb.finish()
+
+
+def make_trainer(max_epochs: int, wandb_logger, lr_scheduler_patience: int):
+    import pytorch_lightning as pl
+
+    accelerator, devices, _ = choose_accelerator()
+    return pl.Trainer(
+        max_epochs=max_epochs,
+        accelerator=accelerator,
+        devices=devices,
+        enable_checkpointing=False,
+        logger=wandb_logger if wandb_logger is not None else False,
+        callbacks=[
+            pl.callbacks.EarlyStopping(
+                monitor="val_loss",
+                patience=lr_scheduler_patience * 2,
+            )
+        ],
+        enable_progress_bar=False,
+    )
+
+
+def setup_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger

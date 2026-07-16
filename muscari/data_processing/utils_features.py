@@ -14,7 +14,6 @@ BASE_DIR = Path(os.getenv('MUSCARI_DATA_DIR', Path(__file__).parent.parent.paren
 CHELSA_PATH = Path(os.getenv('CHELSA_PATH', BASE_DIR / 'raw/CHELSA/chelsav2/GLOBAL/climatologies/1981-2010/bio'))
 DEM_PATH = Path(os.getenv('DEM_PATH', BASE_DIR / 'raw/EEA_DEM/eudem_dem_3035_europe_1000m.tif'))
 LC_PATH = Path(os.getenv('LC_PATH', BASE_DIR / 'raw/Corine_Landcover/CLC2018_CLC2018_V2018_20.tif'))
-CACHE_DIR = Path(os.getenv('CACHE_DIR', BASE_DIR / 'processed/environmental_features'))
 HF_DATASET_REPO = "vboussange/muscari-data"
 ENV_FEATURES_CACHE_DIR = MUSCARI_CACHE_DIR / "environmental_features"
 
@@ -42,6 +41,16 @@ class EnvironmentalFeatureDataset():
         # Cache paths
         self.chelsa_dem_cache = self.cache_dir / 'chelsa_dem_cache.nc'
         self.lc_cache = self.cache_dir / 'landcover_cache.nc'
+
+    @staticmethod
+    def _open_dataset(path):
+        """Open a cache and restore CRS metadata from legacy cache files."""
+        dataset = xr.open_dataset(path)
+        if dataset.rio.crs is None and "spatial_ref" in dataset:
+            crs_wkt = dataset["spatial_ref"].attrs.get("crs_wkt")
+            if crs_wkt:
+                dataset.rio.write_crs(crs_wkt, inplace=True)
+        return dataset
 
     def push_to_hub(self, repo_id: str, token: str = None):
         """Upload the environmental feature caches to the Hugging Face Hub.
@@ -157,8 +166,8 @@ class EnvironmentalFeatureDataset():
         )
 
         if use_cache and instance.chelsa_dem_cache.is_file() and instance.lc_cache.is_file():
-            chelsa_dem_ds = xr.open_dataset(instance.chelsa_dem_cache)
-            lc_ds = xr.open_dataset(instance.lc_cache)
+            chelsa_dem_ds = instance._open_dataset(instance.chelsa_dem_cache)
+            lc_ds = instance._open_dataset(instance.lc_cache)
             return chelsa_dem_ds, lc_ds
 
         downloaded_chelsa = hf_hub_download(
@@ -180,12 +189,12 @@ class EnvironmentalFeatureDataset():
             print(f"  ✓ Saved to {instance.chelsa_dem_cache}")
             shutil.copy(downloaded_lc, instance.lc_cache)
             print(f"  ✓ Saved to {instance.lc_cache}")
-            chelsa_dem_ds = xr.open_dataset(instance.chelsa_dem_cache)
-            lc_ds = xr.open_dataset(instance.lc_cache)
+            chelsa_dem_ds = instance._open_dataset(instance.chelsa_dem_cache)
+            lc_ds = instance._open_dataset(instance.lc_cache)
             return chelsa_dem_ds, lc_ds
 
-        chelsa_dem_ds = xr.open_dataset(downloaded_chelsa)
-        lc_ds = xr.open_dataset(downloaded_lc)
+        chelsa_dem_ds = instance._open_dataset(downloaded_chelsa)
+        lc_ds = instance._open_dataset(downloaded_lc)
         return chelsa_dem_ds, lc_ds
 
     def _load_chelsa_dem(self, use_cache=True):
@@ -201,7 +210,7 @@ class EnvironmentalFeatureDataset():
         """
         if use_cache and self.chelsa_dem_cache.is_file():
             print(f"Loading CHELSA+DEM from cache: {self.chelsa_dem_cache}")
-            return xr.open_dataset(self.chelsa_dem_cache)
+            return self._open_dataset(self.chelsa_dem_cache)
 
         # --- Load DEM (defines the reference grid) ---
         print("Loading DEM data...")
@@ -254,7 +263,7 @@ class EnvironmentalFeatureDataset():
         # Check cache
         if use_cache and self.lc_cache.exists():
             print(f"Loading landcover from cache: {self.lc_cache}")
-            lc_ds = xr.open_dataset(self.lc_cache)
+            lc_ds = self._open_dataset(self.lc_cache)
             if lc_ds.rio.bounds() == ref_da.rio.bounds():
                 return lc_ds
             else:
@@ -267,25 +276,22 @@ class EnvironmentalFeatureDataset():
         
         with rioxarray.open_rasterio(self.lc_path, mask_and_scale=True) as da:
             lc_da = da.sel(band=1, drop=True)
-            lc_da = lc_da.rio.reproject_match(ref_da, resampling=Resampling.mode).astype(np.int16)
+            lc_da = lc_da.rio.reproject_match(ref_da, resampling=Resampling.mode)
             
             # Extract unique landcover classes from the raster
             print("Extracting unique landcover classes from raster...")
-            unique_classes = np.unique(lc_da.values)
+            valid_mask = np.isfinite(lc_da.values)
+            unique_classes = np.unique(lc_da.values[valid_mask])
                         
             # Remap landcover classes to consecutive integers
             class_mapping = {orig_class: idx for idx, orig_class in enumerate(unique_classes)}
             
             # Vectorized remapping using numpy's searchsorted
-            new_values = np.arange(len(unique_classes))
-            lc_remapped = lc_da.copy()
-            flat_values = lc_da.values.flatten()
-            indices = np.searchsorted(unique_classes, flat_values)
-            remapped_flat = new_values[indices]
-            lc_remapped.values = remapped_flat.reshape(lc_da.shape)
-            
-            # Use -9999 as fill value for int16 data
-            lc_remapped = lc_remapped.fillna(-9999).astype(np.int16)
+            remapped_values = np.full(lc_da.shape, -9999, dtype=np.int16)
+            remapped_values[valid_mask] = np.searchsorted(
+                unique_classes, lc_da.values[valid_mask]
+            ).astype(np.int16)
+            lc_remapped = lc_da.copy(data=remapped_values)
             
             # Store the mapping as attributes
             lc_remapped.attrs['class_mapping'] = str([int(k) for k in class_mapping.values()])
@@ -332,6 +338,9 @@ class EnvironmentalFeatureDataset():
                 '_FillValue': fill_value,
                 **self.COMPRESSION_ENCODING
             }
+            grid_mapping = dataset[var].encoding.get('grid_mapping')
+            if grid_mapping is not None:
+                encoding[var]['grid_mapping'] = grid_mapping
         
         # Encoding for coordinates (always float32 for precision/storage balance)
         for coord in dataset.coords:
@@ -342,14 +351,3 @@ class EnvironmentalFeatureDataset():
                 }
         
         return encoding
-
-
-if __name__ == "__main__":
-    features = EnvironmentalFeatureDataset()
-    env_features_ds, lc_ds = EnvironmentalFeatureDataset.from_hub(
-        chelsa_path=features.chelsa_path,
-        dem_path=features.dem_path,
-        lc_path=features.lc_path,
-        cache_dir=features.cache_dir,
-        use_cache=True,
-    )

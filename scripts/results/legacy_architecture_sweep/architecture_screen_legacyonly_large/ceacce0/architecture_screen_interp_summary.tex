@@ -1,0 +1,15 @@
+\begin{table}
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\textwidth}{l l l c >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+    \toprule
+    Architecture & Effort & Asymptote & Folds & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ & Bias slope \\
+    \midrule
+    Legacy Weibull + absolute effort & Absolute & Identity & 5 & \textbf{46.162 ± 2.169} & 0.495 ± 0.015 & \textbf{0.029 ± 0.011} & \textbf{0.988 ± 0.001} & \textbf{0.860 ± 0.006} & -0.037 ± 0.003 \\
+    Stable Weibull + absolute effort + log target & Absolute & Stable span & 5 & 64.544 ± 4.385 & \textbf{0.453 ± 0.018} & 0.031 ± 0.017 & 0.977 ± 0.003 & 0.822 ± 0.008 & \textbf{-0.021 ± 0.004} \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Architecture screen results on the EVA interpolation folds (mean ± standard deviation across folds). Lower RMSE, MAPE, relative bias, and residual-bias slope magnitudes are better; higher $R^2$ and $D^2$ are better.}
+    \label{tab:architecture_screen_interp}
+\end{table}

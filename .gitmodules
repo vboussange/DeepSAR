@@ -1,6 +1,9 @@
-[submodule "paper"]
-	path = paper
-	url = https://github.com/vboussange/MuScaRi_manuscript
+[submodule "legacy_paper"]
+	path = legacy_paper
+	url = git@github.com:vboussange/MuScaRi_manuscript.git
 [submodule "widget"]
 	path = widget
 	url = git@hf.co:spaces/vboussange/MuScaRi
+[submodule "overleaf_paper"]
+	path = paper
+	url = https://git@git.overleaf.com/6a47cf0a15da9af5443c3709

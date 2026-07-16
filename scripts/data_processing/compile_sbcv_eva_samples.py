@@ -15,11 +15,9 @@ This script generates training data by:
 
 import geopandas as gpd
 from pathlib import Path
-import numpy as np
 import xarray as xr
 import logging
 import json
-import random
 import os
 import multiprocessing as mp
 
@@ -28,7 +26,7 @@ from muscari.data_processing.spatial_folds import assign_checkerboard_folds
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
 from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
 from muscari.data_processing.env_feat_compilation import run_environmental_features_compilation_parallel
-from muscari.utils import get_git_hash
+from muscari.utils import get_git_hash, json_ready
 
 # Initialize logging
 logging.basicConfig(
@@ -45,7 +43,7 @@ _OUTPUT_PATH = None
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../data/processed/training_samples/sbcv",
+        "../../data/processed/training_samples/sbcv",
     ),
     "env_vars": [
         "bio1",
@@ -64,9 +62,40 @@ CONFIG = {
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
     "n_splits": 5, # number of spatial folds, should be >=3
-    "block_size": 500_000, # Block size in meters (e.g., 20km x 20km)
+    "block_size": 1_000,  # Main 1 km spatial-block dataset; edit explicitly for new datasets.
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
+
+def write_dataset_metadata(output_path: Path, dataset_id: str, df: gpd.GeoDataFrame) -> None:
+    spatial_split_counts = (
+        df["spatial_split"].value_counts().sort_index().astype(int).to_dict()
+    )
+    metadata = {
+        "dataset_id": dataset_id,
+        "generated_by": str(Path(__file__)),
+        "git_hash": get_git_hash(),
+        "n_source_plots": int(len(df)),
+        "crs": str(df.crs),
+        "bounds": [float(x) for x in df.total_bounds],
+        "spatial_folds": {
+            "method": "checkerboard",
+            "n_splits": CONFIG["n_splits"],
+            "block_size_m": CONFIG["block_size"],
+            "spatial_split_counts": spatial_split_counts,
+            "columns": ["grid_x", "grid_y", "spatial_split"],
+        },
+        "sample_generation": {
+            "ratio_samples_plots": CONFIG["ratio_samples_plots"],
+            "spunit_area_range_train_m2": CONFIG["spunit_area_range_train"],
+            "spunit_area_range_test_m2": CONFIG["spunit_area_range_test"],
+            "random_state": CONFIG["random_state"],
+            "fold_seed_policy": "random_state + fold_id",
+        },
+        "environmental_variables": CONFIG["env_vars"],
+    }
+    with open(output_path / "metadata.json", "w") as f:
+        json.dump(json_ready(metadata), f, indent=2)
+
 
 def run_sp_unit_compilation(
     df: gpd.GeoDataFrame,
@@ -74,6 +103,7 @@ def run_sp_unit_compilation(
     lc_raster: xr.Dataset,
     n_sp_units: int,
     area_range: tuple,
+    random_state: int,
     verbose: bool = CONFIG["verbose"],
     env_var_names: list = CONFIG["env_vars"],
 ) -> gpd.GeoDataFrame:
@@ -82,7 +112,11 @@ def run_sp_unit_compilation(
     """
     # Step 1: Generate spatial units and compute SR
     sp_unit_data = run_SR_compilation_ckdtree(
-        df, n_sp_units, area_range, verbose=verbose
+        df,
+        n_sp_units,
+        area_range,
+        verbose=verbose,
+        random_state=random_state,
     )
     
     # Step 2: Validate SR
@@ -116,6 +150,8 @@ def save_compiled_data(
     summary_path = output_path / f"{filename}_summary.json"
     summary = {
         "ratio_samples_plots": CONFIG["ratio_samples_plots"],
+        "spatial_block_size_m": CONFIG["block_size"],
+        "n_spatial_folds": CONFIG["n_splits"],
         "environmental_variables": CONFIG["env_vars"],
         "n_samples": len(sp_unit_data),
         "columns": list(sp_unit_data.columns),
@@ -150,6 +186,7 @@ def process_fold(fold_id: int) -> int:
     env_ds = _ENV_DS
     lc_ds = _LC_DS
     output_path = _OUTPUT_PATH
+    fold_seed = CONFIG["random_state"] + fold_id
 
     test_fold_id = fold_id
     val_fold_id = (fold_id + 1) % CONFIG["n_splits"]
@@ -170,6 +207,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(train_df)),
         area_range=CONFIG["spunit_area_range_train"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(train_data, output_path, f"fold_{fold_id}_train")
@@ -181,6 +219,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
         area_range=CONFIG["spunit_area_range_train"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(val_data, output_path, f"fold_{fold_id}_val")
@@ -192,6 +231,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)),
         area_range=CONFIG["spunit_area_range_test"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(test_data, output_path, f"fold_{fold_id}_test")
@@ -200,10 +240,6 @@ def process_fold(fold_id: int) -> int:
     return fold_id
 
 if __name__ == "__main__":
-    # Set up random seeds for reproducibility
-    random.seed(CONFIG["random_state"])
-    np.random.seed(CONFIG["random_state"])
-    
     # Set up output directory with git hash
     sha = get_git_hash()
     output_file_path = CONFIG["output_file_path"] / sha
@@ -221,6 +257,7 @@ if __name__ == "__main__":
         n_splits=CONFIG["n_splits"], 
         block_size=CONFIG["block_size"]
     )
+    write_dataset_metadata(output_file_path, sha, df)
     
     # Load environmental rasters
     logging.info("Loading environmental rasters...")
@@ -240,5 +277,5 @@ if __name__ == "__main__":
             pass
 
     with open(output_file_path / "config_used.json", 'w') as f:
-        json.dump({k: str(v) if isinstance(v, Path) else v for k, v in CONFIG.items()}, f, indent=2)
+        json.dump(json_ready(CONFIG), f, indent=2)
     logging.info("Done!")

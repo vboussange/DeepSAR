@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-from statsmodels.stats.multicomp import MultiComparison
-from statsmodels.stats.weightstats import ttest_ind
 
 def multcomp_letters(pd_comp_matrix, letters=None, reversed=False):
     """
@@ -12,7 +10,7 @@ def multcomp_letters(pd_comp_matrix, letters=None, reversed=False):
     
     n = pd_comp_matrix.shape[0]
     lvls = pd_comp_matrix.index
-    comp_matrix = pd_comp_matrix.to_numpy()
+    comp_matrix = pd_comp_matrix.to_numpy(copy=True)
 
     np.fill_diagonal(comp_matrix, False)
 
@@ -61,7 +59,7 @@ def multcomp_letters(pd_comp_matrix, letters=None, reversed=False):
     def make_ltrs(kl, ltrs):
         if kl < len(ltrs):
             return ltrs[:kl]
-        ltrecurse = [ltrs[-1] + l for l in ltrs[:-1]] + [ltrs[-1]]
+        ltrecurse = [ltrs[-1] + letter for letter in ltrs[:-1]] + [ltrs[-1]]
         return ltrs[:-1] + make_ltrs(kl - len(ltrs) + 1, ltrecurse)
 
     k_ltrs = let_mat.shape[1]
@@ -102,78 +100,9 @@ def create_comp_matrix_allpair_t_test(mc_results):
     level_indices = {level: idx for idx, level in enumerate(levels)}
 
     for row in comparisons:
-        print(row)
         group1, group2, reject = row[0], row[1], row[3]
         i, j = level_indices[group1], level_indices[group2]
         comp_matrix[i, j] = reject
         comp_matrix[j, i] = reject
 
     return pd.DataFrame(comp_matrix, index=levels, columns=levels)
-
-if __name__ == "__main__":
-    def test_tukeys_hsd():
-        # Create synthetic dataset
-        data = {
-            'group': ['A'] * 10 + ['B'] * 10 + ['C'] * 10,
-            'value': [1, 2, 1.5, 2.5, 1.2, 2.2, 1.1, 2.1, 1.3, 2.3, 5, 6, 5.5, 6.5, 5.2, 6.2, 5.1, 6.1, 5.3, 6.3, 10, 11, 10.5, 11.5, 10.2, 11.2, 10.1, 11.1, 10.3, 11.3]
-        }
-        df = pd.DataFrame(data)
-
-        # Generate CLD
-        all_data = df['value'].tolist()
-        group_labels = df['group'].tolist()
-        mc = MultiComparison(all_data, group_labels)
-        tukey_result = mc.tukeyhsd()
-        print(tukey_result.summary())
-        comp_matrix = create_comp_matrix_tukey_HSD(tukey_result)
-
-        result = multcomp_letters(comp_matrix)
-        print("Letters:", result)
-        
-    def test_paired_t_test():
-        # Create synthetic dataset
-        data = {
-            'group': ['A'] * 10 + ['B'] * 10 + ['C'] * 10,
-            'value': [1, 2, 1.5, 2.5, 1.2, 2.2, 1.1, 2.1, 1.3, 2.3, 5, 6, 5.5, 6.5, 5.2, 6.2, 5.1, 6.1, 5.3, 6.3, 10, 11, 10.5, 11.5, 10.2, 11.2, 10.1, 11.1, 10.3, 11.3]
-        }
-        df = pd.DataFrame(data)
-
-        # Generate CLD
-        all_data = df['value'].tolist()
-        group_labels = df['group'].tolist()
-        mc = MultiComparison(all_data, group_labels)
-        test_results = mc.allpairtest(ttest_ind)
-        print(test_results[0])
-        comp_matrix = create_comp_matrix_allpair_t_test(test_results)
-
-        result = multcomp_letters(comp_matrix)
-        print("Letters:", result)
-
-        
-        
-    def test_multcomp_letters():
-        threshold = 0.05
-        
-        p_matrix = np.array([
-            [1.00, 0.01, 0.20],
-            [0.01, 1.00, 0.03],
-            [0.20, 0.03, 1.00]
-        ])
-        
-        comp_matrix = p_matrix < threshold
-        
-        result = multcomp_letters(comp_matrix)
-        print("Letters:", result)
-
-        
-        p_matrix = np.array([
-            [1.00, 0.2, 0.002],
-            [0.2, 1.00, 0.1],
-            [0.02, 0.1, 1.00]
-        ])
-        
-        comp_matrix = p_matrix < threshold
-
-        result = multcomp_letters(comp_matrix)
-        print("Letters:", result)
-

@@ -1,0 +1,15 @@
+\begin{table}
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\textwidth}{l l l c >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+    \toprule
+    Architecture & Effort & Asymptote & Folds & RMSE & MAPE & Rel. Bias & $R^2$ & $D^2$ & Bias slope \\
+    \midrule
+    Stable Weibull + absolute effort + log target & Absolute & Stable span & 5 & 907.108 ± 14.820 & 0.545 ± 0.014 & -0.537 ± 0.019 & -0.058 ± 0.035 & -0.105 ± 0.020 & 0.056 ± 0.005 \\
+    Stable Weibull + log coverage + log target & Log coverage & Stable span & 5 & \textbf{876.413 ± 25.905} & \textbf{0.532 ± 0.024} & \textbf{-0.516 ± 0.023} & \textbf{0.012 ± 0.059} & \textbf{-0.068 ± 0.032} & \textbf{0.055 ± 0.013} \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Architecture screen results on the GIFT extrapolation dataset (mean ± standard deviation across folds). Lower RMSE, MAPE, relative bias, and residual-bias slope magnitudes are better; higher $R^2$ and $D^2$ are better.}
+    \label{tab:architecture_screen_extrap}
+\end{table}

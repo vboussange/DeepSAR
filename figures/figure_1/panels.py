@@ -1,9 +1,12 @@
+from pathlib import Path
+
 import numpy as np
 from scipy import ndimage
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.patches import Rectangle
+
+RNG = np.random.default_rng(42)
+OUTPUT_DIR = Path(__file__).parent
 
 # Function to create 3D blocks
 def plot_3d_env_pred(ax, data, cmap):
@@ -21,24 +24,24 @@ def plot_3d_env_pred(ax, data, cmap):
     ax.view_init(elev=30, azim=225)  
 
 fig = plt.figure()
-data = np.random.rand(40, 40)
+data = RNG.random((40, 40))
 # Add spatial autocorrelation using Gaussian filter
 data = ndimage.gaussian_filter(data, sigma=3.)
 ax1 = fig.add_subplot(projection='3d')
 custom_colors = ["#03045e","#023e8a","#0077b6","#0096c7","#00b4d8","#48cae4","#90e0ef","#ade8f4","#caf0f8"]
 custom_cmap = LinearSegmentedColormap.from_list("custom_blue", custom_colors)
 plot_3d_env_pred(ax1, data, custom_cmap)
-fig.savefig("env_preds1.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+fig.savefig(OUTPUT_DIR / "env_preds1.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 
 
 fig = plt.figure()
-data = np.random.rand(40, 40)
+data = RNG.random((40, 40))
 data = ndimage.gaussian_filter(data, sigma=3.)
 ax1 = fig.add_subplot(projection='3d')
 custom_colors = ["#2b2d42","#8d99ae","#edf2f4","#ef233c","#d90429"]
 custom_cmap = LinearSegmentedColormap.from_list("custom_blue", custom_colors)
 plot_3d_env_pred(ax1, data, custom_cmap)
-fig.savefig("env_preds2.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+fig.savefig(OUTPUT_DIR / "env_preds2.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 
 
 
@@ -86,21 +89,21 @@ for i, n_pixels in enumerate(counts, start=1):
     ax1 = fig.add_subplot(projection='3d')
     data = make_vegetation_data(grid_size, box_size=box_size, n_pixels=n_pixels, seed=40 + i)
     plot_vegetation_plots(ax1, data)
-    fig.savefig(f"vegetation_plots_{i}.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+    fig.savefig(OUTPUT_DIR / f"vegetation_plots_{i}.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 
 # Full grid (all green)
 fig = plt.figure()
 ax1 = fig.add_subplot(projection='3d')
 data = make_vegetation_data(grid_size, full=True)
 plot_vegetation_plots(ax1, data)
-fig.savefig("vegetation_plots_4.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+fig.savefig(OUTPUT_DIR / "vegetation_plots_4.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 
 # Full grid (all green)
 fig = plt.figure()
 ax1 = fig.add_subplot(projection='3d')
 data = make_vegetation_data(grid_size, grid_size, n_pixels=300, full=False)
 plot_vegetation_plots(ax1, data)
-fig.savefig("vegetation_plots.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+fig.savefig(OUTPUT_DIR / "vegetation_plots.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
 
 
 
@@ -109,4 +112,4 @@ fig = plt.figure()
 ax1 = fig.add_subplot(projection='3d')
 data = make_vegetation_data(grid_size, grid_size, n_pixels=0, full=False)
 plot_vegetation_plots(ax1, data)
-fig.savefig("vegetation_plots_empty.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)
+fig.savefig(OUTPUT_DIR / "vegetation_plots_empty.png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=-0.3)

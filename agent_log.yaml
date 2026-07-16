@@ -1,0 +1,1996 @@
+active_experiments:
+  - name: "pre_submission_source_audit"
+    important_params:
+      task: "audit and tighten repository source code before merging dev_3rd_rev into master and tagging the submission state"
+      status: "completed"
+      started: "2026-07-16"
+      completed_on: "2026-07-16"
+      audit_completed_on: "2026-07-16"
+      hostname: "gpunode04"
+      git_hash: "54e3fab6c3167323e7a46700129aaae970126ded"
+      branch: "dev_3rd_rev"
+      scope:
+        - "muscari/"
+        - "scripts/"
+        - "figures/"
+        - "tests/"
+        - "root Python packaging, runtime, and documentation files"
+      excluded_from_audit:
+        - "paper/ (context only)"
+        - "widget/ (context only)"
+        - "legacy_paper/ manuscript materials (context only)"
+      baseline_worktree: "paper submodule modified by the active Overleaf integration; preserve and exclude from audit changes"
+      execution_environment: "uv"
+      audit_priorities:
+        - "correctness and reproducibility"
+        - "stale, dead, or duplicate code"
+        - "public API and operational documentation"
+        - "hard-coded dataset and result identifiers"
+        - "test coverage and clean full-source checks"
+      corrective_runs:
+        chao2_ceacce0:
+          status: "completed"
+          started: "2026-07-16"
+          completed_on: "2026-07-16"
+          sbcv_dataset_id: "ceacce0"
+          gift_dataset_id: "418c563"
+          spatial_block_size_m: 1000
+          reason: "previous artifact used a stale 20 km fold assignment, counted duplicate plot-species rows as repeated incidences, and omitted the Chao2 finite-sample correction"
+          estimator_reference: "Chao et al. 2014, Ecological Monographs 84:45-67, Appendix C, Eq. C.5"
+          command: "uv run python scripts/chao2_estimator.py"
+          output: "scripts/results/benchmark/benchmark_chao2_results_ceacce0.csv"
+          result:
+            fold_mean_nrmse_percent: 64.976
+            fold_std_nrmse_percent: 0.666
+            previous_fold_mean_nrmse_percent: 68.239
+            previous_fold_std_nrmse_percent: 1.393
+            environment_only_muscari_reduction_percent: 54.641
+            figure_3_significance_grouping_changed: false
+          downstream_outputs:
+            - "figures/figure_3/figure_3.pdf"
+            - "figures/figure_3/model_performance_and_bias_report.txt"
+            - "figures/figure_3/model_performance_pairwise_results.csv"
+            - "scripts/results/final_revision_synthesis.md"
+      audit_outcome:
+        source_cleanup_status: "completed_and_user_approved"
+        files_reviewed: "all tracked Python, shell, notebook setup metadata, packaging, tests, figures, scripts, and source documentation outside paper/, widget/, and manuscript-only legacy_paper/"
+        net_effect: "removed stale one-off migrations, broken legacy figure/debug generators, duplicate packaging metadata, and the completed revision plan; tightened public APIs, serialization, failure handling, CRS/nodata metadata, paths, reproducibility, and documentation"
+        scientific_decisions:
+          gift_environmental_footprint: "Retain axis-aligned bounding-box summaries as the intended historical GIFT feature definition; document the convention and do not regenerate data or retrain."
+          early_stopping: "Retain stopping-epoch weights as the published training protocol; document the convention and do not retrain."
+          landcover_background: "Corine codes 0 and 999 remain legacy remapped categories; reported benchmarks and the released ensemble do not use land-cover predictors."
+          geometry_area_invariant: "No geometry/sp_unit_area mismatch occurs in any of the 1,764,540 fold rows in ceacce0 or d0848f6; retain the historical generator."
+        remaining_publication_blockers: []
+        merge_readiness: "ready_for_dev_3rd_rev_commit_master_merge_and_v0.1.0_tag"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m unittest discover -s tests -v: 19 passed"
+        - "UV_CACHE_DIR=/tmp/uv-cache uvx ruff check muscari scripts figures tests: clean"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m compileall -q muscari scripts figures tests"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv lock --check: 148 packages resolved"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv build --no-sources: sdist and wheel built successfully"
+        - "bash -n run_script.sh scripts/run_widget_local_muscari_climatedem.sh"
+        - "Loaded the selected five-member dae0789a3c87 ensemble and restored both environmental cache CRSs as EPSG:3035"
+        - "Parsed agent_log.yaml and ran git diff --check"
+        - "Regenerated and visually inspected the root Figure 3 PDF without writing its configured paper/ copy"
+      excluded_state_preserved: "paper submodule remains modified only by the pre-existing Overleaf integration and was not audited or edited"
+      release:
+        user_approved_on: "2026-07-16"
+        target_branch: "master"
+        tag: "v0.1.0"
+        description: "final release code associated with the revised manuscript"
+      next_action: "commit dev_3rd_rev, merge into master, and create annotated tag v0.1.0"
+  - name: "huggingface_best_model_publication"
+    important_params:
+      task: "publish the selected third-revision MuScaRi_ClimateDEM ensemble and version-comparison scores to vboussange/muscari"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "e01f859febfd4315390f17d8757ec1a4dec14e09"
+      branch: "dev_3rd_rev"
+      model_repository: "vboussange/muscari"
+      observed_remote_tip: "f3d680efab77fff6fa3a99ece3460147f744c0fe"
+      dataset_repository: "vboussange/muscari-data"
+      observed_dataset_remote_tip: "5ee72e34e36baee9c3f3ce8d0db89591027ce504"
+      published_model_commit: "674c3a01e4e37fb502f9d00d4eacd2f3b7a1a83c"
+      published_model_url: "https://huggingface.co/vboussange/muscari/commit/674c3a01e4e37fb502f9d00d4eacd2f3b7a1a83c"
+      published_dataset_commit: "d210a9df24dae27b3ef6f69160eea686abd3393f"
+      published_dataset_url: "https://huggingface.co/datasets/vboussange/muscari-data/commit/d210a9df24dae27b3ef6f69160eea686abd3393f"
+      publication_policy: "replace main directly in one leased commit; do not create an archive tag"
+      model_family: "MuScaRi_ClimateDEM"
+      config_hash: "dae0789a3c87"
+      architecture_variant: "legacy_maxabs_absolute_l32"
+      artifact_path: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      sbcv_dataset_id: "ceacce0"
+      artifact_gift_dataset_id: "da569da"
+      canonical_gift_dataset_id: "418c563"
+      ensemble_members: 5
+      ensemble_weights: [0.2, 0.2, 0.2, 0.2, 0.2]
+      artifact_sha256:
+        config.json: "f1ed7267098205d72631ef264bf05e560e75ab1ca9cb18d2a294ed9620ccbddf"
+        metadata.json: "552ad3a746a69b7c76a8dd1336c98a7f31f628c9f0c707b935066e1dc3e4dfe6"
+        model.safetensors: "a990f4099bd89d1bdbc85817b1ec33347ca02153cd873142b518e630947a24b5"
+      model_card_scores:
+        sbcv_test_fold_mean_nrmse_percent: "18.166 +/- 1.028"
+        gift_asymptotic_fold_mean_nrmse_percent: "29.473 +/- 4.448"
+        gift_asymptotic_uniform_ensemble_nrmse_percent: 26.136
+      authentication: "not configured at task start; require a write-capable cached token or HF_TOKEN before upload"
+      release_files:
+        - "README.md"
+        - "config.json"
+        - "metadata.json"
+        - "model.safetensors"
+      dataset_release:
+        sbcv_path: "generated_samples/sbcv/ceacce0"
+        sbcv_files: "five train, validation, and test Parquet partitions plus one summary per partition"
+        gift_path: "generated_samples/GIFT/418c563"
+        gift_files: ["compiled_data.parquet", "dataset_summary.json"]
+        total_files: 33
+        total_size_mib: 384.1
+        existing_source_data: "EVA and GIFT species matrices and environmental rasters already present on the Hub and left unchanged"
+      uploader_maintenance: "Kept scripts/data_processing/push_to_hub.py as the single orchestrator, reused one HfApi upload-folder helper for generated samples/cards/model, and retained existing dataset-class push_to_hub methods only for explicit source refreshes"
+      refresh_source_data: false
+      checks:
+        - "uv run python -m py_compile scripts/data_processing/push_to_hub.py"
+        - "uv run python scripts/data_processing/push_to_hub.py: dry run validated the selected model and release copy, reproduced two finite positive predictions, and confirmed leased model and dataset uploads with no deletions"
+        - "uv run python score audit: model-card SBCV and GIFT scores reproduce exactly from the authoritative benchmark and asymptote-evaluation CSVs"
+        - "Validated that the model card contains only public Hugging Face dataset links and no artifact, local-path, or peer-review-process language"
+        - "Dynamically discovered ceacce0 partitions, required a matching summary for every partition, and selected the available 418c563 Parquet/summary files"
+        - "Confirmed the live dataset repository already contains the EVA and GIFT species matrices and both environmental feature caches"
+        - "uv run --directory widget --extra dev pytest tests/test_resources.py tests/test_features.py tests/test_inference.py -q: 8 passed, 1 slow test skipped"
+        - "Parsed agent_log.yaml and ran git diff --check on the release files"
+        - "Published the generated datasets and model through leased, non-deleting Hub commits; the uploader verified all remote dataset sizes and reloaded the remote model for prediction equivalence"
+        - "Independent post-upload check confirmed both live tips, all 32 generated data files, both public cards, and the published performance scores"
+      unavailable_checks:
+        - "The hosted Gradio Space was not restarted; its dynamic model loader was validated locally against the release interface"
+      outcome: "Published and verified the EVA spatial cross-validation samples, GIFT total-species-richness extrapolation samples, public dataset card, and five-member uniform ClimateDEM ensemble without refreshing or deleting existing source data."
+      next_action: "none"
+  - name: "paper_overleaf_submodule_migration"
+    important_params:
+      task: "replace the active legacy manuscript submodule with the July 3 Overleaf repository and integrate post-transfer manuscript updates"
+      status: "running"
+      started: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "e01f859febfd4315390f17d8757ec1a4dec14e09"
+      branch: "dev_3rd_rev"
+      legacy_repository: "git@github.com:vboussange/MuScaRi_manuscript.git"
+      legacy_tip: "6414245aa42b7617530ea53020adf50b34c5e304"
+      transfer_commit: "e578feb00732a7e65b82057c4b046c736307ec6d"
+      overleaf_repository: "https://git@git.overleaf.com/6a47cf0a15da9af5443c3709"
+      overleaf_default_branch: "main"
+      observed_overleaf_tip: "9e235342308af605d038294386fc9f5f15f6bf55"
+      overleaf_upload_commit: "9370e42ac1a1cbe87fa4d93ab4cf313c28dee082"
+      baseline_verification: "The five integration files are byte-identical between e578feb and the Overleaf upload; eleven legacy-only planning or build artifacts were intentionally absent from Overleaf."
+      integration_policy: "apply the combined d42b958..6414245 delta for only the five approved files as one commit; do not merge histories"
+      authentication: "Overleaf token supplied through the Git credential helper; no secret stored in repository configuration"
+      submodule_layout:
+        legacy_paper: "GitHub manuscript pinned at 6414245"
+        paper: "Overleaf main based on 9e23534"
+      integration_branch: "codex/integrate-legacy-paper-2026-07-15"
+      integration_commit: "38ee56e3fd7cfa7f00e37a4680714369b16bae7f"
+      figure_5_follow_up_commit: "610199fd103b7968d738115228156c48d418e0b1"
+      reviewer_response_follow_up_commit: "032d0746e08e9114031a34eab5fcf1a6b6b6f71d"
+      reviewer_reference_follow_up_commit: "158dd13f43d342d4261dc1058abcb70411eee570"
+      reviewer_metrics_follow_up_commit: "5f85ffbcdec74bed09d5280a5e3f3b197b902d22"
+      source_commits:
+        - "9e10881 Update Figure 3 Chao2 baseline"
+        - "00d3634 strenghtened analysis"
+        - "20cccd1 strengthened stats analyses"
+        - "6414245 Report normalized RMSE in revision manuscript"
+      conflict_resolution: "Resolved main.tex and response_to_reviewers_3rd_rev.md hunk by hunk, retaining non-superseded Overleaf prose and applying the later legacy statistical reporting; no whole-file side was accepted."
+      figure_4_revision:
+        status: "completed"
+        reason: "The canonical Figure 4 script and PDF included only the area-only and environment-only MuScaRi variants; the combined environment-and-area model existed only in a variant script."
+        dataset_id: "ceacce0"
+        models:
+          - "MuScaRi_Area: Area only"
+          - "MuScaRi_ClimateDEM: Environment only"
+          - "MuScaRi_ClimateDEM_Area: Environment + area"
+        metric: "NRMSE computed separately within each fold and area bin"
+        outputs:
+          - "figures/figure_4/figure_4_normalized_rmse_by_area.csv"
+          - "figures/figure_4/figure_4.pdf"
+          - "paper/figures/figure_4.pdf"
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile for the canonical and variant Figure 4 scripts and the Figure 4 test module."
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m unittest tests.test_figure_4_normalized_rmse: 3 tests passed."
+          - "Full five-fold regeneration produced 300 complete rows: 3 models x 5 folds x 20 area bins."
+          - "The area-only minus environment-only NRMSE gap was 10.095 percentage points near 100 km2 and 33.492 near 100,000 km2, validating the manuscript values rounded to 10.1 and 33.5."
+          - "Canonical root and active Overleaf Figure 4 PDFs are byte-identical; the legacy manuscript PDF remains unchanged."
+          - "Visual inspection confirmed three distinct curves and the Area only, Environment only, and Environment + area legend labels."
+        key_finding: "Both environmentally informed variants increasingly outperform the area-only model toward coarser grains, while environment-only and environment-plus-area remain close to one another."
+        next_action: "stage the regenerated Overleaf figure and synchronized text for user approval"
+      figure_5_summary_revision:
+        status: "completed"
+        started: "2026-07-15"
+        completed_on: "2026-07-15"
+        task: "verify Table S7 against the memberwise cumulative-maximum SAR data used by Figure 5 and display species accumulation rates as dS_T/dA"
+        model_id: "dae0789a3c87"
+        source_data: "figures/figure_5/SARs/SARs.pkl"
+        initial_finding: "The active manuscript table retained obsolete pre-cumulative-maximum richness values and logarithmic slopes, whereas Figure 5 uses the current pickle with memberwise cumulative maxima and finite-difference dS_T/dA."
+        postprocessing: "memberwise cumulative maximum before ensemble aggregation and finite-difference dS_T/dA calculation"
+        sampled_areas_km2:
+          richness: [26.298, 2414.443]
+          derivative_midpoints: [24.747, 2575.932]
+        corrected_values:
+          location_A: "S_T 1042.965 +/- 319.936 and 1271.092 +/- 193.298; dS_T/dA 0.000 +/- 0.000 and 0.033 +/- 0.041"
+          location_B: "S_T 1411.955 +/- 403.613 and 1846.146 +/- 377.772; dS_T/dA 0.000 +/- 0.000 and 0.020 +/- 0.031"
+          location_C: "S_T 1177.249 +/- 428.738 and 1283.894 +/- 343.020; dS_T/dA 0.123 +/- 0.247 and 0.000 +/- 0.000"
+        outputs:
+          - "paper/figures/figure_5.png"
+          - "paper/figures/SI/figure_rstd.pdf"
+          - "paper/main.tex"
+          - "paper/response_to_reviewers_3rd_rev.md"
+        checks:
+          - "Validated that all five ensemble-member SARs are monotonic after cumulative-maximum postprocessing and that stored slopes equal memberwise finite differences in species/km2."
+          - "Verified Table S7 rows against figures/figure_5/SARs/SARs.pkl and updated the prose to the same rounded values."
+          - "Regenerated Figure 5 and its supplementary standard-deviation figure under uv using dS_T/dA rasters and visually inspected both outputs."
+        outcome: "Table S7, Figure 5, the supplementary uncertainty map, and manuscript prose now report the same cumulative-maximum S_T predictions and finite-difference dS_T/dA quantity."
+      cross_validation_terminology:
+        status: "completed"
+        policy:
+          fold: "one of the five cross-validation repetitions and its fold-level result"
+          partition: "the training, validation, or test subset within a fold"
+          block_group: "one of the five fixed spatial-block assignments rotated among partitions"
+        scope: "active Overleaf manuscript and third-revision response, supplementary table generators and generated tables, and spatial-blocking figure source and PDF legend"
+        outcome: "Replaced ambiguous reader-facing split terminology throughout the active revision; internal code uses of split for string parsing or train/validation/test mappings remain unchanged."
+        figure_regeneration: "Regenerated figures/SI/datasets/figure_samples.pdf under uv using the available EVA preprocessing plot-data fallback, synchronized it to paper/figures/SI/figure_samples.pdf, and visually verified the partition labels."
+      response_argument_restoration: "Restored the Overleaf rationale for the reviewer question about the environment-only model: environmental-covariate standard deviations correlate with spatial extent (Pearson r=0.47--0.69), so environmental summaries convey scale information even without explicit area input."
+      response_location_placeholders: "Restored the Overleaf response-letter convention of LXXX or LXXX-LXXX manuscript locations; removed all [MAIN: ...] annotations while retaining figure and table references."
+      response_linear_baseline_argument: "Restored the Overleaf response structure for the conventional baseline and aligned its rationale with the main text: the log-linear versus same-input FFNN interpolation gap assesses the importance of nonlinearity, while failure of both direct baselines under extrapolation highlights the structured rarefaction decoder."
+      response_shapley_replacement_argument: "Restored the Overleaf two-paragraph response explaining that the scale-binned analysis asks a predictive rather than attributional question, reports the validated three-model mean NRMSE and widening coarse-grain gap, connects the pattern to mapping uncertainty, and retains the correlation and causal-interpretation caveats."
+      response_passive_sampling_argument: "Restored the Overleaf two-paragraph response on passive sampling versus area per se and added an explicit opening link to the preceding attribution answer: predictor correlation prevents the Shapley analysis from separating those mechanisms causally."
+      response_tense_audit: "Applied all five recommendations from the independent tense audit: present perfect for completed manuscript revisions, while retaining present tense for current manuscript content and past tense for experiments and observed results."
+      checks:
+        - "Confirmed the Overleaf main lease remained 9e23534 after fetching."
+        - "Exactly six files are staged in the Overleaf submodule, with no deletions or unresolved index entries: the original five integration files plus the spatial-blocking PDF requested by the terminology revision."
+        - "The three staged PDFs are byte-identical to the final legacy_paper versions."
+        - "Manuscript text assertions confirmed normalized-RMSE values, Holm-adjusted comparisons, preserved Overleaf-only context, and absence of conflict markers and obsolete raw-RMSE claims."
+        - "The scale-binned Results retain the Overleaf wording and structure while updating the two-model scope and NRMSE definition; the widening 10.1-to-33.5 percentage-point gap, normalization caveat, citations, and area-environment correlation caveat are preserved."
+        - "The opening two Discussion paragraphs retain the Overleaf content and structure, with only the validated 57% NRMSE reduction replacing the obsolete 63% raw-RMSE reduction."
+        - "Cross-validation terminology audit: fold denotes a cross-validation repetition, partition denotes its training/validation/test subsets, and block group denotes the fixed spatial assignment; no reader-facing uses of split remain."
+        - "Regenerated the four benchmark performance tables and the fold sample-count table under uv after updating their terminology."
+        - "Regenerated and visually inspected the spatial-blocking supplementary PDF; its legend now uses partition rather than split, and the root and active-paper copies are byte-identical."
+        - "git diff --cached --check in the Overleaf submodule"
+      unavailable_checks:
+        - "A local TeX build is unavailable because latexmk, pdflatex, and bibtex are not installed; require successful compilation in Overleaf after push."
+      current_step: "Overleaf integration, Figure 5, sampling-effort response, and line-reference commits created locally; not yet pushed"
+      next_action: "push the local manuscript commits to Overleaf main as a fast-forward after explicit publication approval, then verify Overleaf compilation before publishing the root branch"
+  - name: "normalized_rmse_reporting_revision"
+    important_params:
+      task: "replace revision-facing raw RMSE with mean-normalized RMSE and regenerate affected outputs"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "7bf48811ad04989202a698957542ad870fcf7b40"
+      branch: "dev_3rd_rev"
+      sbcv_1km_dataset_id: "ceacce0"
+      sbcv_100km_dataset_id: "d0848f6"
+      canonical_gift_dataset_id: "418c563"
+      definition: "NRMSE = RMSE / mean observed richness; manuscript display in percent"
+      figure_4_normalization: "within each model, fold, and area bin"
+      scaling_train_fractions: "numpy.logspace(-4, 0, 9)"
+      scaling_model: "MuScaRi_ClimateDEM_Area"
+      scaling_folds_per_fraction: 5
+      scaling_epoch_limit: 100
+      scaling_axes: "logarithmic training fraction and NRMSE"
+      scaling_output: "scripts/results/training_fraction_scaling/ceacce0/training_fraction_scaling_results.csv"
+      scaling_mean_nrmse_percent:
+        0.0001: 146.264
+        0.001: 89.538
+        0.01: 27.922
+        0.1: 21.520
+        0.316228: 19.848
+        1.0: 17.682
+      wandb_group: null
+      use_wandb: false
+      key_findings:
+        - "The strongest 1 km EVA interpolation models have mean NRMSE near 18%."
+        - "Environment-only MuScaRi GIFT NRMSE is 29.473%, compared with 68.239% for Chao2; mean normalization changes the reported reduction from 63% raw RMSE to 57% NRMSE."
+        - "Figure 4 values are numerically unchanged because its previous relative RMSE was already RMSE divided by within-bin mean richness; terminology and output schema now use NRMSE."
+        - "Training-fraction scaling shows steep gains below 1% of generated samples and progressively smaller gains thereafter."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "figures/figure_4/figure_4.pdf"
+        - "paper/figures/SI/scaling_exp.pdf"
+        - "figures/figure_4/figure_4_normalized_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_variant_normalized_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_GIFT_variant_normalized_rmse_by_area.csv"
+      checks:
+        - "uv run python -m unittest discover -s tests: 10 tests passed"
+        - "uv run python -m py_compile on all touched Python sources"
+        - "All reporting scripts completed under uv, including idempotent NRMSE backfill, Figures 3-4, four performance tables, and Supplementary Figure S1"
+        - "Validated 200/300/75 Figure 4 rows and exact within-bin nrmse = rmse / mean_sr"
+        - "Validated all 45 scaling model-fold rows across nine fractions"
+        - "PDF text extraction confirmed NRMSE (%) on all affected main, supplementary, and variant figures; Figures 3, 4, and S1 were visually inspected"
+        - "Regenerated Supplementary Figure S1 with logarithmic x and y axes; script compilation, diff checks, and visual PDF inspection passed"
+        - "Independent external-agent review found no blocking scientific or numerical errors; pre-commit consistency findings were resolved"
+        - "Validated full-data scaling-point folds, NRMSE, model metadata, transforms, architecture, and full training fraction before benchmark reuse"
+        - "uvx codespell completed for touched manuscript, response, synthesis, and reporting sources"
+        - "git diff --check and git -C paper diff --check"
+      unavailable_checks:
+        - "LaTeX build: latexmk, pdflatex, tectonic, biber, and chktex are unavailable on gpunode04"
+      outcome: "All revision-facing RMSE reporting now uses mean-normalized RMSE while raw RMSE remains available for provenance and unchanged internal training/model-selection behavior."
+      paper_commit: "6414245aa42b7617530ea53020adf50b34c5e304"
+      next_action: "verify the committed revisions and push when ready"
+  - name: "current_sub_plan_final_revision_work"
+    important_params:
+      task: "follow CURRENT_SUB_PLAN.md through final experiment checks and writing preparation"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-26"
+      hostname: "gpunode04"
+      git_hash: "2de8c2c"
+      branch: "dev_3rd_rev"
+      plan_path: "CURRENT_SUB_PLAN.md"
+      sbcv_1km_dataset_id: "ceacce0"
+      sbcv_100km_dataset_id: "d0848f6"
+      sbcv_100km_local_status: "present with 5 train, 5 validation, and 5 test parquet files"
+      sbcv_100km_block_size_m: 100000
+      phase_1_log_linear_fix:
+        status: "completed"
+        completed_on: "2026-06-25"
+        files_changed:
+          - "scripts/benchmark.py"
+          - "CURRENT_SUB_PLAN.md"
+        changes:
+          - "Added MUSCARI_USE_WANDB and MUSCARI_SBCV_ID overrides while preserving existing defaults."
+          - "Extended Linear_ClimateDEM_Area rows with train, validation, test, GIFT, interpolation, and extrapolation metrics."
+          - "Added log1p metrics, residual-bias slopes, sample counts, and prediction-range diagnostics for the log-linear baseline."
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile scripts/benchmark.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig MUSCARI_SMOKE_TEST=1 MUSCARI_USE_WANDB=0 uv run python scripts/benchmark.py"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated non-null linear train/val/test/GIFT/interp/extrap smoke metrics and alias equality"
+          - "git diff --check -- scripts/benchmark.py"
+        audit:
+          subagent: "019eff8c-5415-7380-a42d-1cad69070b71"
+          finding: "No blocking issues; smoke evidence is schema-level only and should not be cited as scientific validation."
+        outcome: "The log-linear benchmark failure was partly a reporting-schema issue. Corrected rows now expose the same primary split metrics as neural benchmark rows, while preserving the Ridge baseline definition."
+      phase_2_sbcv_100km_dataset:
+        status: "completed"
+        completed_on: "2026-06-26"
+        dataset_id: "d0848f6"
+        dataset_path: "data/processed/training_samples/sbcv/d0848f6"
+        evidence:
+          parquet_counts:
+            train: 5
+            val: 5
+            test: 5
+          summary_json_count: 15
+          config_used_block_size_m: 100000
+          metadata_json_present: false
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... verified d0848f6 fold parquet counts and config_used.json block_size=100000"
+        outcome: "The planned 100 km SBCV dataset is present locally, so no regeneration from compile_sbcv_eva_samples.py is needed."
+      phase_3_sbcv_100km_benchmark:
+        status: "completed"
+        started: "2026-06-26"
+        completed_on: "2026-06-26"
+        dataset_id: "d0848f6"
+        command: "MUSCARI_SBCV_ID=d0848f6 ./run_script.sh scripts/benchmark.py benchmark_d0848f6"
+        output: "scripts/results/benchmark/benchmark_results_d0848f6.csv"
+        stdout_log: "stdout/benchmark_d0848f6_benchmark.out"
+        models:
+          - "MuScaRi_Area"
+          - "MuScaRi_ClimateDEM"
+          - "MuScaRi_ClimateDEM_Area"
+          - "FFNN_ClimateDEM_Area"
+          - "Linear_ClimateDEM_Area"
+        output_rows: 25
+        folds_per_model: 5
+        gift_dataset_id_used: "da569da"
+        gift_dataset_equivalence_note: "da569da and canonical 418c563 compiled GIFT parquet files have identical shape, columns, non-geometry values, CRS, and geometries locally; byte sizes differ."
+        mean_rmse:
+          MuScaRi_ClimateDEM_Area:
+            test: 92.916
+            gift: 513.718
+          MuScaRi_ClimateDEM:
+            test: 97.929
+            gift: 578.796
+          MuScaRi_Area:
+            test: 156.781
+            gift: 782.893
+          FFNN_ClimateDEM_Area:
+            test: 97.465
+            gift: 2129.284
+          Linear_ClimateDEM_Area:
+            test: 146.103
+            gift: 92918.445
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated 25 rows, 5 folds per planned model, no missing primary RMSE metrics, and corrected linear alias metrics"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed local da569da and 418c563 compiled GIFT datasets are equivalent in data content and geometry"
+        audit:
+          subagent: "019f020c-f0ad-7310-a1d0-fe829538b14b"
+          finding: "CSV is complete; commit needed force-added ignored CSV and cautious interpretation because ClimateDEM+Area improves aggregate GIFT performance but not every fold."
+        key_finding: "On 100 km SBCV, MuScaRi_ClimateDEM_Area has the best aggregate GIFT RMSE and bias calibration, followed by MuScaRi_ClimateDEM. The improvement is not uniform across folds. The corrected log-linear baseline has reasonable SBCV test RMSE but catastrophic GIFT extrapolation."
+        outcome: "Completed the planned 100 km SBCV robustness benchmark for the selected architecture and corrected linear baseline."
+      phase_4_result_synthesis:
+        status: "completed"
+        completed_on: "2026-06-26"
+        outputs:
+          - "scripts/results/final_revision_synthesis.md"
+          - "scripts/results/benchmark/benchmark_results_ceacce0.csv"
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache MUSCARI_USE_WANDB=0 uv run python - <<'PY' ... recomputed only Linear_ClimateDEM_Area rows for ceacce0 and merged them into the existing benchmark CSV"
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated ceacce0 and d0848f6 benchmark row counts, folds, primary metrics, and linear aliases"
+        key_finding: "The final synthesis confirms ClimateDEM is best for 1 km GIFT extrapolation, ClimateDEM+Area is best on aggregate for the 100 km robustness benchmark, and the corrected log-linear baseline fails catastrophically on GIFT despite finite predictions."
+        outcome: "Created a compact synthesis artifact for manuscript and response writing, and corrected the ceacce0 linear benchmark rows without retraining neural models."
+
+completed_experiments:
+  - name: "branch_cleanup_master_topology_follow_up"
+    important_params:
+      task: "restore remote master after it was advanced back to the archived misplaced-master tip"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "734c56b7ef63e7b59ceddaf5a0f0e523fce1463f"
+      branch: "dev_3rd_rev"
+      observed_remote_master: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+      intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+      archive_tag: "archive/misplaced-master-2026-07-14"
+      method: "exact force-with-lease"
+      scope: "leave dev_3rd_rev and the manuscript submodule untouched"
+      verification:
+        - "The exact force-with-lease accepted only the observed 6e3bdff remote tip and restored master to 0842ba0."
+        - "Live GitHub HEAD and refs/heads/master both resolved to 0842ba0 after the repair."
+        - "The pushed archive tag still peeled to 6e3bdff."
+        - "Local and remote dev_3rd_rev refs were not changed by the repair."
+      outcome: "The intended stable master topology was restored on GitHub without altering development or manuscript branch content."
+      next_action: "commit this follow-up log after user approval"
+  - name: "tighten_figure_3_benchmark_statistics"
+    important_params:
+      task: "implement TIGHTENING_STATS_PLAN.md"
+      status: "completed"
+      started: "2026-07-15"
+      completed_on: "2026-07-15"
+      hostname: "gpunode04"
+      git_hash: "242d2a6559816e7181efeb4c27982abe54162bcc"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      sensitivity_dataset_id: "d0848f6"
+      inference_unit: "five predefined spatial cross-validation splits"
+      endpoints:
+        - "interp_rmse"
+        - "extrap_rmse"
+      adjustment: "Holm within each Figure 3 performance panel"
+      alpha: 0.05
+      family_sizes:
+        interpolation: 10
+        extrapolation: 15
+      outputs:
+        - "figures/figure_3/model_performance_pairwise_results.csv"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      focal_contrasts:
+        interpolation_combined_minus_environment_only:
+          mean_paired_rmse_difference: -1.261513
+          ci95: [-2.677571, 0.154546]
+          holm_adjusted_p: 0.137387
+          reject: false
+        extrapolation_combined_minus_environment_only:
+          mean_paired_rmse_difference: 80.144279
+          ci95: [-41.139739, 201.428297]
+          holm_adjusted_p: 0.140464
+          reject: false
+      compact_letters:
+        interpolation: "combined=a, area-only=b, environment-only=a, FFNN=a, linear=c"
+        extrapolation: "combined=a, area-only=b, environment-only=a, FFNN=c, linear=d, Chao2=e"
+      sensitivity_finding: "The d0848f6 asymptotic GIFT aggregate ordering reverses the 1 km direction: environment plus area improves mean fold RMSE by 80.17 species relative to environment only, with improvement in three of five folds. The manuscript now describes sensitivity to spatial blocking rather than robustness of the ordering."
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py tests/test_figure_3_statistics.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m unittest discover -s tests -p 'test_figure_3_statistics.py' -v: 5 tests passed"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py: regenerated from full ceacce0 benchmark and Chao2 inputs"
+        - "Executable assertions matched the saved 25-row pairwise CSV to recomputed results, verified n=5 and df=4, focal manuscript values, letter decisions, and byte-identical root/manuscript PDFs."
+        - "Rendered and visually inspected Figure 3 with pypdfium2; model membership, missing Chao2 interpolation row, fold points, and letters agree with the statistical table."
+        - "git diff --check and git -C paper diff --check"
+      unavailable_checks:
+        - "The required latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex check could not run because latexmk and all alternative TeX engines are unavailable on gpunode04."
+      outcome: "Figure 3 reporting and compact letters now share one validated matched-fold paired t-test implementation with panel-wise Holm adjustment. The manuscript and rebuttal state the working independence approximation and avoid treating non-significance as equivalence."
+      next_action: "obtain user verification of the staged root and nested-paper changes before committing"
+  - name: "branch_cleanup_phase_3_master_reconciliation"
+    important_params:
+      task: "selectively port misplaced master changes to dev_3rd_rev, archive master, and restore the intended branch topology"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      git_hash: "e0642d88aca2364fcfdfadf39f1eea71b1d7036e"
+      branch: "dev_3rd_rev"
+      misplaced_master_tip: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+      intended_master_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+      archive_tag: "archive/misplaced-master-2026-07-14"
+      remote_url: "git@github.com:vboussange/MuScaRi.git"
+      current_step: "completed"
+      port_group_1:
+        source_commits:
+          - "113e10f"
+          - "selected hunks from 0d384db"
+        changes:
+          - "Updated the paper submodule URL to SSH."
+          - "Moved projection-error resolution labels to the column headers."
+          - "Pointed the feature-correlation script to ceacce0."
+          - "Removed an unused Torch import and corrected the scaling-axis label typo."
+          - "Applied 25 km2 and 2,500 km2 typography to the current dS/dA Figure 5 source and table."
+        omitted_as_superseded:
+          - "The alternate AGENTS.md from 0d384db and 124a06f."
+          - "The three-model Figure 4 rewrite, which conflicts with the verified two-model manuscript analysis."
+          - "Legacy Figure 5 computation logic superseded by the centered-window uniform-ensemble implementation."
+        checks:
+          - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile ... for all touched SI and Figure 5 scripts plus unchanged Figure 4."
+          - "Ran the ceacce0 feature-correlation script and generated a non-empty verification PDF in /tmp."
+          - "Ran Figure 4 end to end; its 200-row CSV was byte-identical and verification-only PDF byte churn was discarded."
+          - "Generated a synthetic Figure 5 SAR table and validated the updated units and dS/dA notation."
+          - "Synchronized the paper submodule URL and confirmed the submodule is clean."
+          - "git diff --check"
+        unavailable_checks:
+          - "Projection-error rendering: data/processed/projections/ceacce0 is absent."
+          - "Scaling experiment runtime: the legacy benchmark CSV is absent."
+        commit: "e965d80 Reconcile misplaced figure script fixes"
+      port_group_2:
+        source_commit: "6e3bdff"
+        file: "TIGHTENING_STATS_PLAN.md"
+        policy: "preserve the plan verbatim without implementing its statistical changes in this branch-cleanup phase"
+        commit: "f1e6a64 Add statistical tightening plan"
+      master_archive:
+        tag: "archive/misplaced-master-2026-07-14"
+        target: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+        status: "pushed and verified before rewriting master"
+      master_repair:
+        expected_lease: "6e3bdff9bb8e30b37fb16a736e0ed162181538c2"
+        restored_tip: "0842ba0e7736a806c3ebd865afcd65b8effc7311"
+        method: "exact force-with-lease"
+        verification: "local master, origin/master, origin/HEAD, and remote master all resolved to 0842ba0"
+      deleted_branches:
+        - "local dev_3rd_rev_reparametrization at 74e2b84; it was 22 commits behind dev_3rd_rev with no unique commits"
+      outcome: "Useful master changes were selectively ported to dev_3rd_rev, superseded changes remain recoverable through the archive tag, remote master was safely restored to its intended stable tip, and the merged local reparameterization branch was removed."
+      next_action: "commit this reconciliation log after user approval, then implement TIGHTENING_STATS_PLAN.md as a separate scientific task"
+  - name: "branch_cleanup_phase_2_writing_branch_reconciliation"
+    important_params:
+      task: "selectively preserve useful writing-branch content and retire the outer paper_3rd_revision_writing branch"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      starting_git_hash: "2d3042251d39028422d84d86532f22899730edeb"
+      branch: "dev_3rd_rev"
+      writing_branch_tip: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
+      archive_tag: "archive/paper_3rd_revision_writing-2026-06-26"
+      archive_tag_target: "24a6658a3c74fc5cf5c256592e7bad4d5419bb89"
+      archive_status: "annotated tag pushed and peeled target verified before branch deletion"
+      branch_retirement:
+        local: "deleted"
+        remote: "deleted"
+        nested_manuscript_branches: "retained"
+      commits:
+        paper: "9e10881 Update Figure 3 Chao2 baseline"
+        figure_and_chao2: "34f7a83 Update Figure 3 benchmark panels and Chao2 baseline"
+        gift_audit_and_synthesis: "5787e69 Record final GIFT audit and manuscript updates"
+      checks:
+        - "Full Chao2 regeneration produced five canonical folds with RMSE 1258.533 +/- 13.102."
+        - "Full Figure 3 regeneration loaded real Chao2 fold rows and synchronized root/manuscript PDFs."
+        - "d0848f6 GIFT audit validated 36 rows, unique model/mode/aggregation/fold keys, and complete RMSE values."
+        - "ceacce0 and d0848f6 synthesis values matched benchmark and GIFT audit sources."
+        - "Root and paper diff checks passed; the paper submodule was clean and pushed."
+        - "dev_3rd_rev was pushed through 5787e69 before the writing branch was deleted."
+        - "The remote archive tag resolved to 24a6658 after deletion; local and remote outer writing branch refs were absent."
+      warnings:
+        - "The root origin reports that the repository moved from vboussange/DeepSAR to vboussange/MuScaRi; pushes still succeeded through the existing URL."
+      outcome: "Canonical Chao2 and GIFT result artifacts were preserved on dev_3rd_rev, the manuscript pointer was updated to the pushed Figure 3 commit, and the confusing outer writing branch was archived as a tag and removed locally and remotely."
+      next_action: "Commit this branch-retirement log after user approval, then reconcile the misplaced origin/master commits in a separate phase."
+  - name: "branch_cleanup_phase_1_dirty_worktree"
+    important_params:
+      task: "classify and verify the dirty dev_3rd_rev worktree before branch reconciliation"
+      status: "completed"
+      started: "2026-07-14"
+      completed_on: "2026-07-14"
+      hostname: "gpunode04"
+      git_hash: "2d3042251d39028422d84d86532f22899730edeb"
+      branch: "dev_3rd_rev"
+      classified_groups:
+        figure_3_and_cld:
+          files:
+            - "figures/figure_3/figure_3.py"
+            - "figures/figure_3/figure_3.pdf"
+            - "figures/figure_3/model_performance_and_bias_report.txt"
+            - "muscari/cld.py"
+          staging_status: "committed as 34f7a83 after replacing the synthetic Chao2 fallback with canonical fold results"
+        gift_100km_and_manuscript:
+          files:
+            - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+            - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_summary.md"
+            - "scripts/results/final_revision_synthesis.md"
+            - "paper"
+            - "agent_log.yaml"
+          staging_status: "paper pointer committed with 34f7a83; remaining 100 km GIFT artifacts, synthesis, and log prepared as a second commit"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py muscari/cld.py scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated all ceacce0/d0848f6 synthesis values against benchmark and GIFT asymptote CSVs"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated the d0848f6 CSV schema, expected 36 rows, unique keys, and complete RMSE values"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated Figure 3 model membership and asymptotic metric loading"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... validated compact-letter generation without mutating the input matrix"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python ... parsed agent_log.yaml"
+        - "git diff --check"
+        - "git -C paper diff --check"
+      warnings:
+        - "The ignored d0848f6 results CSV is a required scientific result artifact and should be force-added with the second group rather than left unversioned."
+        - "PDF rendering utilities were unavailable; Figure 3 regenerated successfully, its numeric report was byte-identical, and the pre-existing synchronized root/manuscript PDF was retained to avoid verification-only PDF byte churn."
+        - "The existing Figure 3 code still uses independent-samples pairwise tests; the statistical-tightening plan on origin/master proposes a later paired-fold Holm analysis."
+      outcome: "The dirty worktree was reproduced and divided into two reviewable groups; phase 2 reconciled the first group with canonical Chao2 folds before committing it."
+      next_action: "Commit the verified 100 km GIFT audit, synthesis, and logging group after user approval."
+  - name: "manuscript_replace_fused_gift_table_with_100km"
+    important_params:
+      task: "replace the fused EVA+GIFT 100 km performance table/reference with 100 km spatial-block tables matching the earlier performance-table style"
+      status: "completed"
+      started: "2026-07-01"
+      completed_on: "2026-07-01"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "c146e09"
+      dataset_ids:
+        sbcv_1km: "ceacce0"
+        sbcv_100km: "d0848f6"
+        gift: "da569da/418c563 equivalent local compiled data"
+      important_parameters:
+        block_size_m: 100000
+        table_value_sources:
+          - "scripts/results/benchmark/benchmark_results_d0848f6.csv"
+          - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+      files_changed:
+        - "paper/main.tex"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "agent_log.yaml"
+      changes:
+        - "Replaced the fused 100 km EVA+GIFT table with separate 100 km EVA interpolation and GIFT extrapolation tables using the same metric columns as the preceding performance tables."
+        - "Updated the Results references from tab:robust_100km to tab:interp_performance_100km and tab:extrap_performance_100km."
+        - "Updated the reviewer-response placeholder from a singular supplementary table to plural supplementary tables."
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated updated 100 km labels, references, and table values against d0848f6 benchmark/asymptote-audit CSVs"
+        - "git diff --check -- agent_log.yaml && git -C paper diff --check"
+      warnings:
+        - "A full LaTeX build was not run because latexmk, tectonic, and pdflatex are unavailable in this environment."
+      outcome: "The manuscript now reports the 100 km robustness results as separate EVA interpolation and GIFT extrapolation tables, matching the style of the preceding performance tables."
+  - name: "figure_3_typography_unbold_models_titles"
+    important_params:
+      task: "remove bold styling from Figure 3 model labels and performance-panel titles"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Removed math-bold styling from the MuScaRi env.+area y-axis label."
+        - "Set Interpolation/Extrapolation performance titles to normal font weight."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 now leaves model labels and performance-panel titles unbolded; only panel letters retain bold styling."
+  - name: "figure_3_cld_position_refinement"
+    important_params:
+      task: "move Figure 3 compact-letter-display labels below-right of each central summary bar"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Changed Figure 3 CLD placement from a fixed right-axis lane to row-local positions just below and to the right of each central summary bar."
+        - "Used an additive offset on the interpolation panel and a multiplicative log-aware offset on the GIFT extrapolation panel."
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed panel c/d relative-bias diagnostics remained sane"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 CLD labels now live below-right of the central summary bars, matching the placement style requested for previous figures."
+  - name: "figure_3_panel_bias_and_letters_fix"
+    important_params:
+      task: "diagnose and fix Figure 3 panel c/d bias annotations and panel b statistical-letter placement"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      changes:
+        - "Pointed Figure 3 panel c/d generation to the benchmark artifact MuScaRi_ClimateDEM/dae0789a3c87 instead of the stale train/ceacce0 checkpoint directory."
+        - "Loaded fold checkpoints with the saved MuScaRi batchnorm, asymptote-transform, and Weibull-parameterization settings."
+        - "Dropped GIFT rows only against the ensemble feature columns and target, rather than using a broad all-column dropna."
+        - "Anchored statistical letters at row centers using blended axes/data coordinates and added right-side x-axis padding, stabilizing panel b on a log RMSE axis."
+      diagnostics:
+        panel_c:
+          fold: 0
+          median_relative_bias: 0.021
+          r2: 0.988
+        panel_d:
+          median_relative_bias: 0.066
+          r2: 0.784
+      outputs:
+        - "figures/figure_3/figure_3.pdf"
+        - "paper/figures/figure_3.pdf"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py muscari/cld.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed panel c/d median relative bias and R2 are sane and Figure 3 loader uses asymptotic MuScaRi GIFT metrics"
+        - "git diff --check && git -C paper diff --check"
+      outcome: "Figure 3 no longer shows near-minus-one relative-bias artifacts in panels c/d, and panel b statistical letters are placed in a stable right-side lane."
+  - name: "manuscript_revision_plan_completion"
+    important_params:
+      task: "address every actionable checkbox in paper/REVISION_PLAN.md, verify manuscript/response consistency, and run external subagent audit"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2d30422"
+      paper_git_hash: "bb0a094"
+      dataset_ids:
+        sbcv_1km: "ceacce0"
+        sbcv_100km: "d0848f6"
+      files_changed:
+        - "paper/main.tex"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "paper/REVISION_PLAN.md"
+        - "figures/figure_3/figure_3.py"
+        - "figures/figure_3/figure_3.pdf"
+        - "figures/figure_3/model_performance_and_bias_report.txt"
+        - "paper/figures/figure_3.pdf"
+        - "muscari/cld.py"
+        - "scripts/results/final_revision_synthesis.md"
+        - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+        - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_summary.md"
+        - "agent_log.yaml"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_3/figure_3.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_3/figure_3.py figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py scripts/experiments_3rd_rev/gift_asymptote_evaluation.py muscari/cld.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uvx codespell -L MAPE paper/main.tex paper/response_to_reviewers_3rd_rev.md"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... static label/reference/citation/graphic audit"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed Figure 3 loader includes Linear_ClimateDEM_Area, Chao2 fallback, and asymptotic MuScaRi GIFT RMSE values"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... confirmed EVA/GIFT richness context, Figure 4 relative RMSE, and ceacce0/d0848f6 asymptotic benchmark values"
+        - "git diff --check"
+        - "git -C paper diff --check"
+      audit:
+        first_subagent: "019f18a5-f09f-7661-b4da-83163d676d51"
+        first_findings_resolved:
+          - "Updated Figure 3 source to use asymptotic MuScaRi GIFT metrics, include the log-linear baseline, use a log-scaled GIFT RMSE axis, and tolerate the absent archived Chao2 CSV with an explicit manuscript-summary fallback."
+          - "Removed stale Introduction wording that claimed ablation studies disentangle causal contributions."
+          - "Clarified the response to the Figure 3 R2 concern by separating high EVA interpolation R2 from lower GIFT extrapolation R2."
+          - "Updated scripts/results/final_revision_synthesis.md date to 2026-06-30."
+        final_subagent: "019f18a5-f09f-7661-b4da-83163d676d51"
+        final_finding: "No remaining findings in the requested audit scope."
+      warnings:
+        - "A full LaTeX build was not run because latexmk, pdflatex, tectonic, biber, and chktex are unavailable in this environment."
+        - "The archived fold-level Chao2 CSV is absent locally; Figure 3 uses an explicit fallback preserving the manuscript's Chao2 RMSE mean and sample standard deviation."
+      outcome: "All REVISION_PLAN.md checkboxes are completed with manuscript, response, Figure 3, Figure 5, and result-synthesis consistency checks. The first external audit findings were addressed before the final audit loop."
+  - name: "figure_5_layout_refinement_callouts_sar_typography"
+    important_params:
+      task: "refine Figure 5 layout so callout labels avoid maps, SAR panels are shorter/wider, and typography matches template weight hierarchy"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2a2f02a"
+      model_family: "MuScaRi_ClimateDEM"
+      model_hash: "dae0789a3c87"
+      changes:
+        - "Moved Figure 5 map callout labels to fixed whitespace positions while retaining leader lines to site markers."
+        - "Shortened the SAR panel row and widened it to fill more horizontal space."
+        - "Moved A1/A2, B1/B2, and C1/C2 SAR reference labels above the axes."
+        - "Removed bold styling from default titles and axis/colorbar labels; retained bold styling only for panel and site indices."
+        - "Matched the column-title font size to the bottom x-axis label size."
+      outputs:
+        - "figures/figure_5/figure_5_panels.{pdf,png,svg}"
+        - "paper/figures/figure_5.{pdf,png,svg}"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figure_5_panels.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_5/figure_5_panels.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python - <<'PY' ... validated manuscript and debug figure outputs and 2400x3000 PNG size"
+        - "git diff --check -- agent_log.yaml figures/figure_5/figure_5_panels.py && git -C paper diff --check -- figures/figure_5.png"
+        - "Visually inspected paper/figures/figure_5.png."
+      outcome: "Figure 5 layout now keeps callout text off the raster maps, uses a shorter/wider SAR row with top reference labels, and applies bold weight only to indices."
+  - name: "figure_5_final_template_dS_dA_redesign"
+    important_params:
+      task: "redesign Figure 5 to match figure_5_template.png and report dS/dA in species/km2"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2a2f02a"
+      dataset_id: "ceacce0"
+      model_family: "MuScaRi_ClimateDEM"
+      model_hash: "dae0789a3c87"
+      model_path: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      changes:
+        - "Changed Figure 5 accumulation maps from dlogS/dlogA-style rasters to finite-difference dS/dA rasters in species/km2."
+        - "Generated dS/dA and std_dS/dA rasters from memberwise nonnegative differences between 1x and 2x window predictions."
+        - "Kept centered, always_xy location windows and memberwise cumulative maxima for displayed nested SAR curves."
+        - "Changed SAR table accumulation-rate columns to dS_T/dA finite differences in species/km2."
+        - "Rebuilt the Figure 5 compositor as a final manuscript layout matching figure_5_template.png, with map rows, callouts, colorbars, SAR panels, and direct manuscript outputs."
+        - "Removed the Figure 5 trim workaround from paper/main.tex and updated Figure 5 wording/table values."
+      outputs:
+        - "data/processed/projections/dae0789a3c87/SR_raster_dae0789a3c87_5000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/std_SR_raster_dae0789a3c87_5000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/dS_dA_raster_dae0789a3c87_5000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/std_dS_dA_raster_dae0789a3c87_5000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/SR_raster_dae0789a3c87_50000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/std_SR_raster_dae0789a3c87_50000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/dS_dA_raster_dae0789a3c87_50000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/std_dS_dA_raster_dae0789a3c87_50000m.{tif,png}"
+        - "figures/figure_5/SARs/SARs.pkl"
+        - "figures/figure_5/SARs/SARs.pdf"
+        - "figures/figure_5/SARs/SARs_table.tex"
+        - "figures/figure_5/figure_5_panels.{pdf,png,svg}"
+        - "paper/figures/figure_5.{pdf,png,svg}"
+        - "paper/main.tex"
+      table_values:
+        A:
+          ST_25km2: "1042.965 +/- 319.936"
+          ST_2500km2: "1271.092 +/- 193.298"
+          dS_dA_25km2: "0.000 +/- 0.000"
+          dS_dA_2500km2: "0.033 +/- 0.041"
+        B:
+          ST_25km2: "1411.955 +/- 403.613"
+          ST_2500km2: "1846.146 +/- 377.772"
+          dS_dA_25km2: "0.000 +/- 0.000"
+          dS_dA_2500km2: "0.020 +/- 0.031"
+        C:
+          ST_25km2: "1177.249 +/- 428.738"
+          ST_2500km2: "1283.894 +/- 343.020"
+          dS_dA_25km2: "0.123 +/- 0.247"
+          dS_dA_2500km2: "0.000 +/- 0.000"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_5/calculate_SR_dSR.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python calculate_sar.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figure_5_panels.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py"
+        - "git diff --check -- agent_log.yaml figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py figures/figure_5/SARs/SARs_table.tex && git -C paper diff --check -- main.tex"
+        - "Validated expected SR, std_SR, dS_dA, and std_dS_dA rasters for 5 km and 50 km; dS/dA rasters are finite and nonnegative."
+        - "Validated SARs.pkl has slope_units=species/km2 and zero decreasing steps for all three mean SAR curves."
+        - "Validated paper/figures/figure_5.png exists at 2400x3000 px and visually inspected it against the template."
+        - "Parsed agent_log.yaml successfully."
+      warnings:
+        - "Numpy emitted degrees-of-freedom warnings while computing raster standard deviations near sparse/masked cells."
+        - "xarray emitted future warnings about Dataset.dims return type."
+        - "Full LaTeX compilation was not run in this pass; the manuscript include path and trim removal were checked in source."
+      key_finding: "The redesigned Figure 5 now directly renders the final template-style layout and maps interpretable dS/dA rates in species/km2 for the environment-only dae0789a3c87 ensemble."
+      outcome: "Completed the Figure 5 redesign and regenerated manuscript-facing figure/table outputs without manual composition."
+  - name: "figure_5_centered_monotone_sar_fix"
+    important_params:
+      task: "center Figure 5 SAR windows, enforce monotone nested SAR curves, and correct the accumulation-rate derivative"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2a2f02a"
+      dataset_id: "ceacce0"
+      model_family: "MuScaRi_ClimateDEM"
+      model_hash: "dae0789a3c87"
+      changes:
+        - "Changed location-specific SAR feature extraction from corner-anchored to centered square windows."
+        - "Used explicit lon/lat transformation with always_xy=True."
+        - "Applied memberwise cumulative maxima before aggregating location-specific SAR curves."
+        - "Changed accumulation-rate rasters from dS/dlinear-distance to dlogS/dlogA."
+        - "Updated Figure 5 panels, SAR table, and manuscript values."
+      outputs:
+        - "data/processed/projections/dae0789a3c87/*_raster_dae0789a3c87_5000m.{tif,png}"
+        - "data/processed/projections/dae0789a3c87/*_raster_dae0789a3c87_50000m.{tif,png}"
+        - "figures/figure_5/SARs/SARs.pkl"
+        - "figures/figure_5/SARs/SARs.pdf"
+        - "figures/figure_5/SARs/SARs_table.tex"
+        - "figures/figure_5/figure_5_panels.{pdf,png,svg}"
+        - "paper/main.tex"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_5/calculate_SR_dSR.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python calculate_sar.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figure_5_panels.py"
+        - "Validated SAR pickle metadata, zero decreasing steps for all three mean SAR curves, raster ranges, and PNG dimensions."
+        - "Visually inspected figures/figure_5/figure_5_panels.png."
+      warnings:
+        - "Matplotlib emitted the existing set_ticklabels() warning in figure_5_panels.py."
+        - "Numpy emitted degrees-of-freedom warnings while computing window standard deviations near sparse/masked cells."
+      key_finding: "Centering the windows and enforcing memberwise monotonicity removes the Veluwezoom decrease between 25 and 2500 km2."
+      outcome: "Figure 5 now reports centered monotone location-specific SARs and log-log species accumulation-rate maps."
+  - name: "figure_5_panel_generation"
+    important_params:
+      task: "generate Figure 5 projection rasters, SAR intermediates, and panel files"
+      status: "completed"
+      started: "2026-06-30"
+      completed_on: "2026-06-30"
+      hostname: "gpunode04"
+      git_hash: "2a2f02a"
+      dataset_id: "ceacce0"
+      model_family: "MuScaRi_ClimateDEM"
+      model_hash: "dae0789a3c87"
+      model_path: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      manuscript_note: "Used the environment-only ensemble model specified for Figure 5 in paper/main.tex."
+      outputs:
+        - "data/processed/projections/dae0789a3c87/SR_raster_dae0789a3c87_5000m.tif"
+        - "data/processed/projections/dae0789a3c87/SR_raster_dae0789a3c87_50000m.tif"
+        - "data/processed/projections/dae0789a3c87/dSR_dlogA_raster_dae0789a3c87_5000m.tif"
+        - "data/processed/projections/dae0789a3c87/dSR_dlogA_raster_dae0789a3c87_50000m.tif"
+        - "figures/figure_5/SARs/SARs.pkl"
+        - "figures/figure_5/SARs/SARs.pdf"
+        - "figures/figure_5/SARs/SARs_table.tex"
+        - "figures/figure_5/figure_5_panels.pdf"
+        - "figures/figure_5/figure_5_panels.png"
+        - "figures/figure_5/figure_5_panels.svg"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figures/figure_5/calculate_SR_dSR.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python calculate_sar.py"
+        - "UV_CACHE_DIR=/tmp/uv-cache MPLCONFIGDIR=/tmp/mplconfig uv run python figure_5_panels.py"
+        - "Validated raster, SAR, and PNG dimensions/ranges; visually inspected figures/figure_5/figure_5_panels.png."
+        - "git diff --check -- agent_log.yaml figures/figure_5/calculate_SR_dSR.py figures/figure_5/calculate_sar.py figures/figure_5/figure_5_panels.py"
+      warnings:
+        - "Matplotlib emitted set_ticklabels() warnings in figure_5_panels.py; output files were still created."
+        - "Numpy emitted degrees-of-freedom warnings while computing per-window standard deviations near sparse/masked cells."
+      outcome: "Figure 5 panel files now use the manuscript environment-only MuScaRi_ClimateDEM ensemble dae0789a3c87 instead of the one-fold ceacce0 train directory."
+  - name: "sync_sbcv_100km_d0848f6"
+    important_params:
+      task: "copy the 100 km SBCV dataset d0848f6 from gpunode05 to the current machine"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-26"
+      hostname: "gpunode04"
+      git_hash: "2de8c2c"
+      branch: "dev_3rd_rev"
+      source_host: "gpunode05"
+      source_path: "/home/boussang/deepSAR/data/processed/training_samples/sbcv/d0848f6"
+      destination_path: "data/processed/training_samples/sbcv/d0848f6"
+      dataset_id: "d0848f6"
+      block_size: "100 km"
+      verification: "Local copy has 5 train, 5 validation, and 5 test parquet files; config_used.json records block_size=100000."
+  - name: "figure_4_eva_scale_binned_relative_rmse"
+    important_params:
+      task: "replace Shapley-based Figure 4 with an EVA test-set scale-binned relative RMSE comparison of MuScaRi_Area and MuScaRi_ClimateDEM"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "7bd96e2"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      models:
+        - "MuScaRi_Area/ac733d9bd2f6"
+        - "MuScaRi_ClimateDEM/dae0789a3c87"
+        - "MuScaRi_ClimateDEM_Area/ad74a3020281"
+      binning: "20 equal-width bins in log spatial-unit area over 4 to 1e6 km2"
+      gift_variant_binning: "5 quantile bins in log GIFT area, 35 to 36 samples per bin"
+      outputs:
+        - "figures/figure_4/figure_4.pdf"
+        - "figures/figure_4/figure_4_relative_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_variant.pdf"
+        - "figures/figure_4/figure_4_variant_relative_rmse_by_area.csv"
+        - "figures/figure_4/figure_4_GIFT_variant.pdf"
+        - "figures/figure_4/figure_4_GIFT_variant_relative_rmse_by_area.csv"
+      output_rows: 200
+      variant_output_rows: 300
+      gift_variant_output_rows: 75
+      no_missing_relative_rmse: true
+      mean_relative_rmse_percent:
+        MuScaRi_Area: 54.107
+        MuScaRi_ClimateDEM: 33.381
+        MuScaRi_ClimateDEM_Area: 32.365
+      gift_mean_relative_rmse_percent:
+        MuScaRi_Area: 45.753
+        MuScaRi_ClimateDEM: 33.355
+        MuScaRi_ClimateDEM_Area: 34.227
+      checks:
+        - "uv run python -m py_compile figures/figure_4/figure_4.py figures/figure_4/figure_4_variant.py figures/figure_4/figure_4_GIFT_variant.py"
+        - "uv run python figures/figure_4/figure_4.py"
+        - "uv run python figures/figure_4/figure_4_variant.py"
+        - "uv run python figures/figure_4/figure_4_GIFT_variant.py"
+        - "uv run python - <<'PY' ... validated 200 rows, 20 bins per model/fold, no missing relative RMSE values, and non-empty one-page PDF"
+        - "uv run python - <<'PY' ... validated figure_4_variant has 300 rows and GIFT variant has 75 rows with 35 to 36 samples per bin"
+        - "git diff --check"
+    key_finding: "Across EVA test-set area bins, MuScaRi_ClimateDEM has lower mean relative RMSE than MuScaRi_Area, with the gap widening toward larger spatial units."
+    outcome: "Replaced the Figure 4 Shapley script with an EVA scale-binned relative RMSE plotting script and generated main, EVA three-model variant, and GIFT-binned variant PDF/CSV outputs."
+  - name: "gift_asymptote_evaluation_ceacce0"
+    important_params:
+      task: "add and run a standalone audit comparing finite full-area GIFT predictions against true asymptotic predict_sr_tot predictions for existing ceacce0 benchmark artifacts"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "59d12fb"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      models:
+        - "MuScaRi_Area/ac733d9bd2f6"
+        - "MuScaRi_ClimateDEM/dae0789a3c87"
+        - "MuScaRi_ClimateDEM_Area/ad74a3020281"
+      output_dir: "scripts/results/gift_asymptote_evaluation/ceacce0"
+      outputs:
+        - "scripts/results/gift_asymptote_evaluation/ceacce0/gift_asymptote_evaluation_results.csv"
+        - "scripts/results/gift_asymptote_evaluation/ceacce0/gift_asymptote_evaluation_summary.md"
+      command: "uv run python scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+      uniform_ensemble_rmse:
+        MuScaRi_Area:
+          finite_full_area: 807.766
+          asymptotic_total: 807.768
+        MuScaRi_ClimateDEM:
+          finite_full_area: 407.409
+          asymptotic_total: 409.584
+        MuScaRi_ClimateDEM_Area:
+          finite_full_area: 511.574
+          asymptotic_total: 511.838
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+        - "uv run python scripts/experiments_3rd_rev/gift_asymptote_evaluation.py"
+    key_finding: "For the selected ceacce0 MuScaRi benchmark artifacts, true asymptotic predict_sr_tot GIFT predictions are almost identical to finite full-area predictions with observed_area set to sp_unit_area. ClimateDEM remains the best of the audited models under both modes."
+    outcome: "Added a standalone GIFT asymptote audit script and wrote metric and Markdown summary outputs."
+  - name: "default_uniform_ensemble_mean"
+    important_params:
+      task: "make uniform ensemble averaging the repository default after the ensemble weighting analysis"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      affected_defaults:
+        - "MuScaRiEnsemble.from_models"
+        - "MuScaRiEnsemble.from_folds"
+        - "TrainConfig.use_validation_weights"
+        - "scripts/project.py export path"
+        - "widget pretrained model loading"
+      selected_export: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      selected_export_weights: "0.2;0.2;0.2;0.2;0.2"
+      opt_in_validation_weighting:
+        project: "MUSCARI_PROJECT_USE_VALIDATION_WEIGHTS=1"
+        widget: "MUSCARI_ENSEMBLE_WEIGHTING=artifact"
+      checks:
+        - "uv run python -m py_compile muscari/muscari_ensemble.py muscari/trainer.py scripts/project.py scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "cd widget && uv run python -m py_compile muscari_widget/resources.py tests/test_resources.py"
+        - "uv run python - <<'PY' ... validated MuScaRiEnsemble.from_folds defaults to uniform and explicit use_validation_weights=True still uses inverse-val-RMSE-squared weights"
+        - "cd widget && uv run --extra dev pytest tests/test_resources.py -q"
+        - "MUSCARI_PROJECT_RUN_DIR=... MUSCARI_PROJECT_MODEL_NAME=... MUSCARI_PROJECT_EXPORT_OVERWRITE=1 MUSCARI_PROJECT_SMOKE=1 uv run python scripts/project.py"
+        - "uv run python - <<'PY' ... validated selected ensemble_pretrained export loads with uniform weights and metadata use_validation_weights=false"
+        - "cd widget && uv run --extra dev pytest -m 'not slow'"
+        - "git diff --check"
+        - "cd widget && git diff --check"
+    key_finding: "Uniform averaging is now the default ensemble aggregation path in core model loading, training config metadata, projection export, and widget inference."
+    outcome: "Validation-RMSE weighting remains available only by explicit opt-in; the selected local MuScaRi_ClimateDEM ensemble_pretrained export was rewritten to uniform weights."
+  - name: "ensemble_weighting_analysis_ceacce0"
+    important_params:
+      task: "compare uniform, inverse validation RMSE, and inverse validation RMSE squared ensemble aggregation for the selected MuScaRi_ClimateDEM benchmark artifact"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_model: "MuScaRi_ClimateDEM"
+      selected_run_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      output_dir: "scripts/results/ensemble_weighting_analysis/ceacce0"
+      outputs:
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_results.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_weights.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_std_summary.csv"
+        - "scripts/results/ensemble_weighting_analysis/ceacce0/ensemble_weighting_summary.md"
+      command: "uv run python scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+      strategies:
+        - "uniform"
+        - "inverse_val_rmse"
+        - "inverse_val_rmse_squared"
+      best_gift_strategy: "uniform"
+      uniform_gift_rmse: 407.409
+      inverse_val_rmse_squared_gift_rmse: 408.928
+      best_interpolation_strategy: "inverse_val_rmse_squared"
+      uniform_interpolation_rmse: 43.460
+      inverse_val_rmse_squared_interpolation_rmse: 43.419
+      inverse_val_rmse_squared_effective_n: 4.982
+      inverse_val_rmse_squared_gift_mean_std_ratio_to_uniform: 1.0048
+      inverse_val_rmse_squared_interpolation_mean_std_ratio_to_uniform: 0.9997
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "uv run python scripts/experiments_3rd_rev/ensemble_weighting_analysis.py"
+        - "uv run python - <<'PY' ... validated strategies, splits, numeric metric/std columns, weight sums, and inverse_val_rmse_squared weights against MuScaRiEnsemble.from_folds"
+        - "git diff --check"
+    key_finding: "Uniform averaging gives the best GIFT RMSE for the selected artifact. Validation-RMSE-squared weighting slightly improves combined SBCV test RMSE but worsens GIFT RMSE and leaves effective ensemble size nearly unchanged at 4.982."
+    outcome: "Added a standalone ensemble-weighting analysis script and wrote performance, weight, standard-deviation, and Markdown summary artifacts."
+  - name: "project_and_serve_muscari_climatedem"
+    important_params:
+      task: "project the best benchmark model and run the widget locally with local model weights and local environmental features"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_model: "MuScaRi_ClimateDEM"
+      benchmark_run_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      projection_model_name: "benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87"
+      export_dir: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87/ensemble_pretrained"
+      projection_path: "data/processed/projections/benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87"
+      projection_command: "MUSCARI_PROJECT_RUN_DIR=/home/boussang/DeepSAR/scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87 MUSCARI_PROJECT_MODEL_NAME=benchmark_muscari_climatedem_legacy_maxabs_absolute_l32_dae0789a3c87 ./run_script.sh scripts/project.py project_muscari_climatedem"
+      projection_pid: 2663312
+      projection_stdout: "stdout/project_muscari_climatedem_project.out"
+      projection_resolutions_m: [2000, 8000, 64000, 128000]
+      country_data: "data/raw/NaturalEarth/ne_10m_admin_0_countries.shp"
+      widget_launcher: "scripts/run_widget_local_muscari_climatedem.sh"
+      widget_pid: 2782709
+      widget_stdout: "stdout/widget_local_muscari_climatedem.out"
+      widget_url: "http://127.0.0.1:7860"
+      checks:
+        - "uv run python -m py_compile scripts/project.py"
+        - "MUSCARI_PROJECT_RUN_DIR=... MUSCARI_PROJECT_MODEL_NAME=... MUSCARI_PROJECT_EXPORT_OVERWRITE=1 MUSCARI_PROJECT_SMOKE=1 uv run python scripts/project.py"
+        - "uv run python - <<'PY' ... validated exported ensemble files, metadata, and one positive prediction"
+        - "PYTHONPATH=scripts uv run python - <<'PY' ... validated NaturalEarth file has all 44 EVA country NAME_EN matches"
+        - "MUSCARI_DEVICE=cpu MUSCARI_MODEL_PATH=... MUSCARI_FEATURES_DIR=... uv run python - <<'PY' ... validated widget local resources and predict_geojson"
+        - "cd widget && uv run --extra dev pytest -m 'not slow'"
+        - "uv run python - <<'PY' ... validated four projection GeoTIFFs/PNGs and projection metadata"
+        - "git diff --check"
+        - "cd widget && git diff --check"
+    key_finding: "The best benchmark model exports cleanly as a local five-fold MuScaRiEnsemble and projects successfully when clipped with the newly added NaturalEarth country data."
+    outcome: "Projected SR rasters at 2, 8, 64, and 128 km and launched the widget locally using local model weights and local environmental feature files."
+  - name: "benchmark_legacy_maxabs_absolute_l32"
+    important_params:
+      task: "align benchmark neural architectures with the best factorial-screen variant and launch the full benchmark"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "cda1d9c"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      selected_architecture: "legacy_maxabs_absolute_l32"
+      weibull_parameterization: "legacy"
+      target_transform: "maxabs"
+      asymptote_transform: "absolute"
+      effort_transform: "absolute"
+      layer_label: "l32"
+      layer_size_base: 32
+      layer_sizes: "32;128;512;512;128;32"
+      output_csv: "scripts/results/benchmark/benchmark_results_ceacce0.csv"
+      artifact_root: "scripts/results/benchmark/artifacts"
+      launch_command: "./run_script.sh scripts/benchmark.py benchmark_legacy_maxabs_absolute_l32"
+      pid: 418960
+      pgid: 418960
+      sid: 418960
+      stdout_path: "stdout/benchmark_legacy_maxabs_absolute_l32_benchmark.out"
+      wandb_project: "muscari-third-revision"
+      wandb_group: "benchmark_ceacce0"
+      rows: 25
+      best_extrapolation_model: "MuScaRi_ClimateDEM"
+      best_extrapolation_rmse: 458.834
+      best_model_config_hash: "dae0789a3c87"
+      checks:
+        - "uv run python -m py_compile scripts/benchmark.py"
+        - "uv run python - <<'PY' ... validated all neural benchmark initializers construct SELECTED_LAYER_SIZES"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "uv run python - <<'PY' ... validated smoke CSV columns and neural artifact summaries store legacy_maxabs_absolute_l32 layer metadata"
+        - "git diff --check"
+    key_finding: "MuScaRi_ClimateDEM performed best among benchmark models on GIFT extrapolation RMSE."
+    outcome: "Full benchmark completed and wrote scripts/results/benchmark/benchmark_results_ceacce0.csv. The selected projection/widget artifact is MuScaRi_ClimateDEM/dae0789a3c87."
+  - name: "architecture_screen_factorial_ceacce0"
+    important_params:
+      task: "run and summarize the committed 16-variant factorial architecture screen"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "7aa27e4"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      factors:
+        weibull_parameterization: ["legacy", "stable"]
+        target_transform: ["maxabs", "log1p_max"]
+        asymptote_transform: ["absolute", "softplus"]
+        layer_size_base: [32, 128]
+        effort_transform: "absolute"
+      launch_command: "./run_script.sh scripts/experiments_3rd_rev/architecture_screen.py factorial"
+      pid: 357961
+      pgid: 357961
+      sid: 357961
+      wandb_project: "muscari-third-revision"
+      wandb_group: "architecture_screen_factorial_ceacce0"
+      stdout_path: "stdout/factorial_architecture_screen.out"
+      output_path: "scripts/results/architecture_screen_factorial/ceacce0"
+      raw_results: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_results_ceacce0.csv"
+      variant_summary: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_factorial_variant_summary.csv"
+      factor_summary: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_factorial_factor_summary.csv"
+      rows: 80
+      variants: 16
+      folds_per_variant: 5
+      best_gift_rmse_variant: "legacy_maxabs_absolute_l32"
+      best_gift_rmse: 547.914
+      runner_up_gift_rmse_variant: "legacy_maxabs_absolute_l128"
+      runner_up_gift_rmse: 566.617
+      checks:
+        - "uv run python - <<'PY' ... validated 80 rows, 16 variants, 5 folds per variant, and no missing key metrics"
+        - "uv run python - <<'PY' ... wrote variant and factor summaries from raw factorial CSV"
+    key_finding: "Legacy Weibull with maxabs target scaling and absolute asymptote dominates the factorial sweep on GIFT extrapolation. The l32 variant gives the best GIFT RMSE and lowest median relative bias; l128 gives slightly better interpolation RMSE."
+    outcome: "Full factorial sweep completed and summary CSVs were generated for variant-level and factor-level comparisons."
+  - name: "proper_architecture_screen_factorial"
+    important_params:
+      task: "configure architecture_screen.py for a full factorial architecture sweep"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      factors:
+        weibull_parameterization: ["legacy", "stable"]
+        target_transform: ["maxabs", "log1p_max"]
+        asymptote_transform: ["absolute", "softplus"]
+        layer_size_base: [32, 128]
+        effort_transform: "absolute"
+      variant_count: 16
+      output_path: "scripts/results/architecture_screen_factorial/ceacce0"
+      smoke_output: "scripts/results/architecture_screen_factorial/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated 16 unique factorial variants with absolute effort"
+        - "uv run python - <<'PY' ... validated absolute asymptote transform for legacy and stable MuScaRi forward/total predictions"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV has all 16 factor combinations and required metadata/log metrics"
+        - "git diff --check"
+    key_finding: "The stable parameterization previously ignored asymptote_transform, so an absolute-vs-softplus sweep would have duplicated stable models unless the stable low/span heads used the selected positive transform."
+    outcome: "Configured a 16-variant architecture_screen_factorial sweep and added MuScaRi asymptote_transform='absolute'. Legacy asymptotes and stable low/span heads now use the selected absolute/softplus positive transform."
+  - name: "architecture_screen_variant_layer_sizes"
+    important_params:
+      task: "store architecture_screen.py layer sizes at the variant level and emit them in screen result rows"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      target_script: "scripts/experiments_3rd_rev/architecture_screen.py"
+      layer_sizes: "128;512;2048;2048;512;128"
+      smoke_output: "scripts/results/architecture_screen_legacy_log1p_max/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      aggregate_output: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      files:
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated every active VARIANTS entry has layer_sizes and build_config forwards them"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV contains layer_sizes and log1p metric columns"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated aggregate has layer-size and log1p summary columns with 16 rows"
+        - "git diff --check"
+    key_finding: "The screen was still using the global LAYER_SIZES constant for config/model metadata, so layer size was not part of each variant definition."
+    outcome: "Each active and commented architecture-screen variant now carries layer_sizes, and run_variant/build_config use the variant-owned value for model construction, Trainer config, W&B config, metadata, and CSV rows."
+  - name: "log_sr_architecture_screen_metrics"
+    important_params:
+      task: "track log-transformed species-richness performance in shared Trainer outputs used by architecture_screen.py"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      target_script: "scripts/experiments_3rd_rev/architecture_screen.py"
+      metrics_added:
+        - "log1p_rmse"
+        - "log1p_mae"
+        - "log1p_r2"
+        - "log1p_d2"
+      smoke_output: "scripts/results/architecture_screen_legacy_log1p_max/ceacce0/architecture_screen_results_ceacce0_smoke.csv"
+      aggregate_output: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      aggregate_rows: 16
+      files:
+        - "muscari/utils.py"
+        - "muscari/trainer.py"
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/utils.py muscari/trainer.py scripts/experiments_3rd_rev/aggregate_screen_results.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... compute_log1p_metrics returned finite log metrics with a negative prediction clipped to zero"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... validated smoke CSV contains train/val/test/gift/interp/extrap log1p metric columns"
+        - "uv run python - <<'PY' ... validated aggregate has interp/extrap log1p summary columns and 16 rows"
+        - "git diff --check"
+    key_finding: "Architecture-screen metrics are assembled in Trainer._evaluate_splits, so adding log-SR diagnostics there exposes them automatically in fold CSVs and W&B logs."
+    outcome: "Added log1p SR RMSE, MAE, R2, and D2 metrics to shared evaluation output. New architecture-screen runs now write train/val/test/gift/interp/extrap log1p metrics; historical aggregate rows include empty log columns until their source screens are rerun."
+  - name: "aggregate_architecture_screen_results"
+    important_params:
+      task: "aggregate architecture screen fold-level CSVs into one numeric comparison table"
+      status: "completed"
+      started: "2026-06-25"
+      completed_on: "2026-06-25"
+      hostname: "gpunode04"
+      git_hash: "ece6ec6"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      input_glob: "scripts/results/architecture_*/ceacce0/architecture_screen_results_ceacce0.csv"
+      output_csv: "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+      source_screens:
+        - "architecture_screen"
+        - "architecture_screen_legacyonly_large"
+        - "architecture_screen_stable"
+        - "architecture_screen_stable_maxabs_large"
+        - "architecture_screen_stable_small"
+        - "architecture_screen_stable_small_full_covariates"
+      covariate_sets:
+        env_area: 11
+        env_area_full_lc: 63
+      layer_size_sets:
+        large: "128;512;2048;2048;512;128"
+        small: "32;128;512;512;128;32"
+      output_rows: 15
+      files:
+        - "scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "scripts/results/aggregate_screen_results/ceacce0/aggregate_screen_results_ceacce0.csv"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python scripts/experiments_3rd_rev/aggregate_screen_results.py"
+        - "uv run python - <<'PY' ... validated required columns, unique source_screen/model_type/covariates_used/layer_sizes rows, expected layer-size sets, numeric metric columns, and 15 output rows"
+        - "git diff --check"
+    key_finding: "Architecture screens contain 15 source-screen/model/covariate combinations, with repeated stable variants preserved by source_screen provenance."
+    outcome: "Added a reproducible aggregation script and generated a numeric aggregate CSV sorted by covariate set, GIFT RMSE, and interpolation RMSE. The aggregate now tracks small and large model layer sizes."
+  - name: "trainer_export_to_project"
+    important_params:
+      task: "remove Trainer export_pretrained option and move ensemble_pretrained export into project.py"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/project.py"
+        - "scripts/benchmark.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/data_processing/push_to_hub.py"
+        - "README.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/benchmark.py scripts/experiments_3rd_rev/architecture_screen.py scripts/project.py scripts/data_processing/push_to_hub.py"
+        - "MUSCARI_PROJECT_SMOKE=1 MUSCARI_PROJECT_RUN_DIR=/tmp/muscari_project_export_smoke.* uv run python scripts/project.py"
+        - "MUSCARI_SMOKE_TEST=1 WANDB_MODE=offline uv run python scripts/benchmark.py"
+        - "grep search found no export_pretrained/export_ensemble_pretrained in live Python or README files"
+    key_finding: "The Trainer export flag duplicated project/publishing concerns and forced benchmark-specific exceptions for non-MuScaRi checkpoints."
+    outcome: "Trainer now only owns fold training, checkpoints, and internal summaries. scripts/project.py creates or refreshes ensemble_pretrained from fold checkpoints, removes generated README.md, writes public-safe metadata, and then loads the exported ensemble for projection."
+  - name: "benchmark_artifact_hash_fix"
+    important_params:
+      task: "fix benchmark artifact collisions across model experiments"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_root: "scripts/results/benchmark/artifacts/<experiment_name>"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/benchmark.py"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/benchmark.py"
+        - "MUSCARI_SMOKE_TEST=1 WANDB_MODE=offline uv run python scripts/benchmark.py"
+        - "uv run python - <<'PY' ... MuScaRiEnsemble.from_pretrained('scripts/results/benchmark/artifacts/88ff58dbbca2/ensemble_pretrained') returned one model"
+        - "git diff --check"
+    key_finding: "The config hashes differed by experiment, but Trainer._resolve_run_folder cached the first derived hash folder in the shared TrainConfig, so later benchmark experiments collided with the first experiment's artifacts. The smoke run also showed that FFNN checkpoints cannot be exported through MuScaRiEnsemble.from_folds."
+    outcome: "Trainer now recomputes derived artifact folders per run unless an explicit run_folder was provided. Benchmark artifacts are written under scripts/results/benchmark/artifacts/<experiment_name>/<config_hash>, smoke runs can overwrite their own artifacts, and pretrained export is handled by scripts/project.py."
+  - name: "public_export_metadata_scrub"
+    important_params:
+      task: "strip public ensemble_pretrained exports of README and confidential metadata"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "5fe9438"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_path: "scripts/results/train/53584e40b98a/ensemble_pretrained"
+      files:
+        - "muscari/trainer.py"
+        - "scripts/results/train/53584e40b98a/ensemble_pretrained/metadata.json"
+        - "scripts/results/train/53584e40b98a/ensemble_pretrained/README.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py"
+        - "grep -nE 'home/boussang|hostname|wandb|cuda|mps|cpu|checkpoint|run_folder|export_dir|path_|split_paths|rows|bias_slopes|flat_metrics|run_id|group|devices|README' scripts/results/train/53584e40b98a/ensemble_pretrained/metadata.json || true"
+    key_finding: "PyTorchModelHubMixin creates a README.md by default and the previous metadata.json embedded the full internal training summary, including local paths, hostname, device list, W&B IDs, checkpoint paths, and fold split details."
+    outcome: "Trainer export now deletes README.md and writes a public-only metadata.json containing dataset IDs, model/training/feature metadata, ensemble weights, safe tensor filenames, and per-fold metrics only. The existing 53584e40b98a export was refreshed with the scrubbed metadata."
+  - name: "unified_trainer_refactor"
+    important_params:
+      task: "replace split Benchmarker/train.py paths with a unified Trainer, checkpoint metadata, and ensemble pretrained export"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "1d2c40a"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "da569da"
+      artifact_identity: "canonical config hash"
+      export_owner: "muscari.trainer.Trainer"
+      project_py_behavior: "load existing ensemble_pretrained artifact only"
+      files:
+        - "muscari/trainer.py"
+        - "muscari/benchmarker.py"
+        - "scripts/train.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/benchmark.py"
+        - "scripts/project.py"
+        - "scripts/data_processing/push_to_hub.py"
+        - "README.md"
+        - "scripts/experiments_3rd_rev/bias_investigation/scale_bias_hypotheses.md"
+        - "agent_log.yaml"
+      checks:
+        - "uv run python -m py_compile muscari/trainer.py scripts/experiments_3rd_rev/architecture_screen.py scripts/benchmark.py scripts/project.py scripts/data_processing/push_to_hub.py"
+        - "WANDB_MODE=offline uv run python - <<'PY' ... one-fold Trainer smoke wrote /tmp/muscari_trainer_smoke/fold_0.pth, config.json, ensemble_pretrained/model.safetensors, and metadata.json"
+        - "uv run python - <<'PY' ... MuScaRiEnsemble.from_pretrained round-trip predicted 8 rows from the smoke export"
+        - "MUSCARI_PROJECT_SMOKE=1 MUSCARI_PROJECT_RUN_DIR=/tmp/muscari_trainer_smoke uv run python scripts/project.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "git diff --check"
+      pre_existing_dirty_worktree:
+        - "scripts/results/architecture_screen/ceacce0/architecture_screen_extrap_summary.tex"
+        - "scripts/results/architecture_screen/ceacce0/architecture_screen_interp_summary.tex"
+        - "untracked scripts/results/architecture_screen_* directories"
+    key_finding: "Training and benchmarking had diverged: Benchmarker owned parallel fold execution and GIFT/interpolation evaluation, while scripts/train.py owned final checkpoints and ensemble export. The unified Trainer now owns both behaviors and exposes artifact export through config-hash run metadata."
+    outcome: "Added muscari.trainer.Trainer with parallel/sequential fold scheduling, train/val/test/GIFT metrics, checkpoint summaries, config-hash metadata, and ensemble_pretrained safetensors export. Architecture and benchmark scripts now use Trainer; project.py and push_to_hub.py load existing exported artifacts; scripts/train.py and muscari/benchmarker.py were removed."
+    next_actions:
+      - "Run the full final training for the selected config, then point scripts/project.py at that config-hash run directory to build ensemble_pretrained and projections."
+  - name: "train_script_feature_config_alignment"
+    important_params:
+      task: "align scripts/train.py with the feature-config abstraction and current MuScaRi training hooks"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "76fddc5"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "scripts/train.py"
+        - "agent_log.yaml"
+      selected_feature_config: "env_area_full_lc"
+      selected_feature_count: 63
+      checks:
+        - "uv run python -m py_compile scripts/train.py"
+        - "uv run python - <<'PY' ... resolved env_area_full_lc against real SBCV parquet data and verified 63 selected features including landcover fractions and elevation"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/train.py"
+        - "git diff --check"
+    key_finding: "The training script had drifted behind the architecture-screen path: feature selection was still hardcoded to the older climate+DEM helper and the newer target-transform / Weibull-parameterization hooks were not threaded through training."
+    outcome: "scripts/train.py now selects predictors through the same small FEATURE_CONFIGS pattern as the architecture screen, defaults to the requested full-covariate configuration, records the feature config in run metadata, and forwards target_transform plus weibull_parameterization into training and evaluation dataloaders."
+  - name: "feature_config_cleanup"
+    important_params:
+      task: "simplify architecture screen feature configs and add explicit elevation toggle"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/utils.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+      checks:
+        - "uv run python -m py_compile muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "uv run python - <<'PY' ... resolved FEATURE_CONFIGS against real parquet data and verified elevation/landcover toggles"
+    key_finding: "The feature config only needs bioclimate vars plus boolean include_elevation/include_landcover switches; a separate feature_set_name field was redundant."
+    outcome: "Removed feature_set_name metadata, kept a single FEATURE_GROUP selector, and added explicit include_elevation support in the utility feature path and architecture screen configs."
+  - name: "architecture_screen_full_covariates"
+    important_params:
+      task: "extend the architecture screen feature selection to support full bioclimate, elevation, and landcover predictors"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/utils.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      selected_feature_config: "env_area_full_lc"
+      selected_feature_count: 63
+      checks:
+        - "uv run python -m py_compile muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... resolved env_area_full_lc to 63 features including 46 lc_frac_* columns"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "The dataset exposes 46 landcover fraction predictors in addition to the full bioclimate and elevation summaries. A small named feature-config layer is enough to make swapping feature sets easy without changing the training code."
+    outcome: "Architecture screen now selects predictors through FEATURE_CONFIGS, with env_area_full_lc using all requested bioclimate variables, elevation features, landcover fractions, and log_sp_unit_area."
+    next_actions:
+      - "Run the full covariate screen and compare against the smaller stable screen if needed."
+  - name: "stable_weibull_log_target_normalization"
+    important_params:
+      task: "add optional log-target normalization for stable Weibull architecture-screen variants"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      branch: "dev_3rd_rev"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/scaler_serialization.py"
+        - "muscari/dataset.py"
+        - "muscari/benchmarker.py"
+        - "muscari/muscari.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      normalization: "stable variants use Log1pMaxScaler; legacy variants keep MaxAbsScaler"
+      checks:
+        - "uv run python -m py_compile muscari/scaler_serialization.py muscari/dataset.py muscari/muscari.py muscari/benchmarker.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... Log1pMaxScaler serialization, inverse-transform, and stable-head initialization smoke check"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "MaxAbs target scaling maps the fold-0 median richness to about 0.025, whereas log1p scaling maps it to about 0.565. The smoke run completed and stable_abs improved from near-zero underprediction to finite one-epoch GIFT metrics with median relative bias around 0.023."
+    outcome: "Added a serializable Log1pMaxScaler and wired target_transform='log1p_max' only into stable_abs and stable_coverage architecture-screen variants."
+    next_actions:
+      - "Run the full architecture screen to judge convergence under log-target normalization."
+  - name: "weibull_reparameterization_screen"
+    important_params:
+      task: "add a compact stable Weibull parameterization to the architecture screen"
+      status: "completed"
+      started: "2026-06-05"
+      completed_on: "2026-06-05"
+      hostname: "gpunode04"
+      git_hash: "74e2b842fc243e3e3f07cd39510422134b0fd375"
+      branch: "dev_3rd_rev_reparametrization"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "muscari/utils.py"
+        - "muscari/trainer.py"
+        - "muscari/muscari_ensemble.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+      variants_added:
+        - "stable_abs"
+        - "stable_coverage"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/utils.py muscari/trainer.py muscari/muscari_ensemble.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... synthetic stable Weibull positivity, monotonicity, asymptote, and coverage-coordinate smoke check"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "The stable head runs end-to-end and avoids the legacy log-of-MinMax effort coordinate. One-epoch smoke metrics are numerically finite but underpredict GIFT strongly, so full training is needed to judge convergence and calibration."
+    outcome: "Created branch dev_3rd_rev_reparametrization and added stable_abs/stable_coverage architecture-screen variants with explicit Weibull parameterization metadata."
+    next_actions:
+      - "Run the full architecture screen and compare convergence, finite-effort EVA metrics, GIFT finite-full-area metrics, and true asymptote diagnostics."
+  - name: "ensemble_pretrained_export"
+    important_params:
+      task: "remove single-model mixin export and save one ensemble pretrained artifact after training"
+      status: "completed"
+      started: "2026-06-05T10:34:00Z"
+      completed_on: "2026-06-05T10:38:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/train.py"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/muscari_ensemble.py scripts/train.py"
+        - "uv run python - <<'PY' ... synthetic fold checkpoints -> MuScaRiEnsemble.from_folds -> save_pretrained/from_pretrained smoke check"
+        - "git diff --check"
+    key_finding: "The pretrained export should belong to the trained ensemble rather than individual MuScaRi fold models, so the fold loop should only write raw checkpoints and the final export should happen once all folds are available."
+    outcome: "MuScaRi no longer inherits PyTorchModelHubMixin; scripts/train.py now writes fold checkpoints during training and then saves a single `ensemble_pretrained` artifact via MuScaRiEnsemble.save_pretrained after training completes."
+    next_actions:
+      - "Rerun training to materialize the ensemble_pretrained directory in the current run folder."
+  - name: "mixin_pretrained_export_revision"
+    important_params:
+      task: "revise pretrained export to use PyTorchModelHubMixin and commit-scoped run directories"
+      status: "completed"
+      started: "2026-06-05T10:15:00Z"
+      completed_on: "2026-06-05T10:21:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "muscari/muscari_ensemble.py"
+        - "muscari/scaler_serialization.py"
+        - "scripts/train.py"
+        - "scripts/data_processing/push_to_hub.py"
+      checks:
+        - "uv run python -m py_compile muscari/scaler_serialization.py muscari/muscari.py muscari/muscari_ensemble.py scripts/train.py scripts/data_processing/push_to_hub.py"
+        - "uv run python - <<'PY' ... MuScaRi save_pretrained/from_pretrained round-trip smoke check via PyTorchModelHubMixin"
+        - "git diff --check"
+    key_finding: "The correct clean integration point is to let MuScaRi inherit PyTorchModelHubMixin and make scaler state JSON-serializable in config.json, rather than maintaining a separate local pretrained format."
+    outcome: "MuScaRi now uses the mixin-provided save_pretrained/from_pretrained path with shared scaler serialization helpers, and train outputs are written under results/train/<dataset_id>/<git_hash>."
+    next_actions:
+      - "Rerun training to materialize mixin-based pretrained directories in the new commit-scoped run folder."
+  - name: "save_pretrained_export"
+    important_params:
+      task: "export additional per-fold pretrained artifacts from scripts/train.py"
+      status: "completed"
+      started: "2026-06-05T10:05:00Z"
+      completed_on: "2026-06-05T10:09:00Z"
+      hostname: "gpunode04"
+      git_hash: "f83f5d7c346cd745252bad42ca1efac9d519c9d7"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "scripts/train.py"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py scripts/train.py"
+        - "uv run python - <<'PY' ... direct save_pretrained/from_pretrained round-trip smoke check"
+        - "git diff --check"
+    key_finding: "The training script only emitted raw .pth checkpoints, so downstream code had no directory-form pretrained bundle that could be loaded with a model-level from_pretrained API."
+    outcome: "MuScaRi now implements save_pretrained/from_pretrained using a config.json + pytorch_model.bin + preprocessors.pkl bundle, and scripts/train.py writes one fold_<id>_pretrained artifact next to each existing checkpoint."
+    next_actions:
+      - "Rerun training to materialize pretrained bundles for the current run directory."
+  - name: "ensemble_config_and_sbcv_metadata"
+    important_params:
+      task: "add unweighted ensemble option, export train config metadata, and record SBCV block size for future datasets"
+      status: "completed"
+      started: "2026-06-05T08:44:49Z"
+      completed_on: "2026-06-05T08:49:19Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari_ensemble.py"
+        - "scripts/train.py"
+        - "scripts/data_processing/compile_sbcv_eva_samples.py"
+        - "muscari/MODEL_CARD.md"
+      checks:
+        - "uv run python -m py_compile muscari/muscari_ensemble.py scripts/train.py scripts/data_processing/compile_sbcv_eva_samples.py"
+        - "uv run python - <<'PY' ... direct ensemble weighted/unweighted aggregation smoke check"
+        - "uv run python - <<'PY' ... train.py config.json writer smoke check"
+        - "uv run python - <<'PY' ... SBCV metadata.json writer smoke check"
+        - "uv run python - <<'PY' ... from_models/from_folds use_validation_weights toggle smoke check"
+        - "git diff --check"
+    key_finding: "The ensemble weighting should be an explicit ablation choice, and both checkpoint runs and future SBCV datasets need richer human-readable metadata."
+    outcome: "MuScaRiEnsemble.from_models/from_folds now accept use_validation_weights=False for uniform averaging; train.py writes run-level config.json; future SBCV exports write metadata.json and include spatial block size in fold summaries."
+    next_actions:
+      - "Regenerate training runs to produce config.json next to new checkpoints."
+      - "Regenerate future SBCV datasets when a new block size is used."
+  - name: "streamline_ensemble_aggregation"
+    important_params:
+      task: "simplify robust ensemble aggregation while retaining validation-based downweighting"
+      status: "completed"
+      started: "2026-06-05T08:30:47Z"
+      completed_on: "2026-06-05T08:32:58Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari_ensemble.py"
+        - "muscari/MODEL_CARD.md"
+        - "figures/figure_5/calculate_sar.py"
+      current_rule: "validation-RMSE inverse-squared weights with weighted mean and weighted dispersion"
+      removed:
+        - "aggregation-method registry"
+        - "MAD clipping/winsorization path"
+        - "stored member metrics in ensemble config"
+      checks:
+        - "uv run python -m py_compile muscari/muscari_ensemble.py figures/figure_5/calculate_sar.py figures/figure_5/calculate_SR_dSR.py figures/figure_5/figure_5_panels.py"
+        - "uv run python - <<'PY' ... validation-RMSE weighting, weighted aggregation, shape validation, and from_folds synthetic checkpoint smoke check"
+        - "git diff --check"
+    key_finding: "The earlier robust aggregation pass was more complex than needed. Validation-RMSE weighting alone fixes equal influence from poor fold checkpoints while keeping the ensemble API auditable."
+    outcome: "MuScaRiEnsemble now has a single aggregation path: load fold metrics, compute normalized validation weights, and use them for mean and dispersion."
+    next_actions:
+      - "Regenerate projection/SAR artifacts after retraining the positive-transform folds."
+  - name: "robust_ensemble_aggregation"
+    important_params:
+      task: "implement robust ensemble aggregation that downweights possibly unconverged fold models"
+      status: "completed"
+      started: "2026-06-05T08:11:03Z"
+      completed_on: "2026-06-05T08:24:21Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari_ensemble.py"
+        - "muscari/MODEL_CARD.md"
+        - "figures/figure_5/calculate_sar.py"
+        - "figures/figure_5/calculate_SR_dSR.py"
+        - "figures/figure_5/figure_5_panels.py"
+      aggregation_method: "robust_weighted"
+      weighting_metric: "validation RMSE, inverse squared precision weights when checkpoint metrics are available"
+      robust_rule: "per-sample median absolute deviation winsorization before weighted aggregation"
+      checks:
+        - "uv run python -m py_compile muscari/muscari_ensemble.py figures/figure_5/calculate_sar.py figures/figure_5/calculate_SR_dSR.py figures/figure_5/figure_5_panels.py"
+        - "uv run python - <<'PY' ... validation-RMSE weighting, MAD clipping, shape validation, and from_folds synthetic checkpoint smoke check"
+        - "git diff --check"
+    key_finding: "The previous ensemble API used unweighted arithmetic means and standard deviations, so a poor fold checkpoint had the same influence as a well-performing fold. The ensemble now uses validation-RMSE precision weights plus per-sample robust clipping by default."
+    outcome: "MuScaRiEnsemble defaults to robust_weighted aggregation, stores ensemble weights from fold checkpoint metrics, exposes member prediction/aggregation helpers, and Figure 5 projection scripts now use the robust ensemble API."
+    next_actions:
+      - "Regenerate projection/SAR artifacts after retraining the positive-transform folds."
+      - "For future checkpoints, save validation-loss trajectories if explicit non-convergence diagnostics are required beyond final validation RMSE."
+  - name: "remove_identity_transform_compat"
+    important_params:
+      task: "remove compatibility with the unconstrained identity asymptote transform and update scripts that referenced it"
+      status: "completed"
+      started: "2026-06-05T07:57:00Z"
+      completed_on: "2026-06-05T07:59:39Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      checks:
+        - "rg -n 'identity|current_abs|current_rel|Legacy identity|legacy.*identity' muscari scripts"
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py scripts/train.py scripts/benchmark.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... positive-output smoke check for softplus and exp transforms; identity rejection check"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "MuScaRi now accepts only softplus and exp asymptote transforms. Explicit identity configs raise ValueError, and active scripts no longer reference identity/current variants."
+    outcome: "Identity compatibility removed from the model and third-revision scripts."
+    next_actions:
+      - "Rerun full architecture screen with softplus_abs, exp_abs, softplus_rel, and exp_rel."
+  - name: "muscari_positive_parameter_transform"
+    important_params:
+      task: "fix MuScaRi parameter transformations so predicted species richness cannot be negative"
+      status: "completed"
+      started: "2026-06-05T07:50:04Z"
+      completed_on: "2026-06-05T07:55:16Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      files:
+        - "muscari/muscari.py"
+        - "muscari/trainer.py"
+        - "muscari/muscari_ensemble.py"
+        - "scripts/train.py"
+        - "scripts/benchmark.py"
+        - "scripts/experiments_3rd_rev/architecture_screen.py"
+        - "scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "scripts/experiments_3rd_rev/bias_investigation/scale_bias_hypotheses.md"
+      checks:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py scripts/train.py scripts/benchmark.py scripts/experiments_3rd_rev/architecture_screen.py scripts/experiments_3rd_rev/architecture_screen_analysis.py"
+        - "uv run python - <<'PY' ... positive-output and monotonic-curve smoke check for softplus, identity, and exp transforms"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git diff --check"
+    key_finding: "The previous identity transform allowed negative asymptotes and lower richness values. MuScaRi now constrains b > 0, c > 0, and 0 < d < c; the temporary legacy identity normalization was superseded by remove_identity_transform_compat."
+    outcome: "Forward and asymptotic MuScaRi predictions are positive under the supported transforms in the smoke checks."
+    next_actions:
+      - "Rerun full architecture screen with the softplus_abs and softplus_rel variants before choosing a final architecture."
+  - name: "bias_investigation_note"
+    important_params:
+      task: "write a Markdown summary of the scale-bias hypotheses and proposed validation experiments"
+      status: "completed"
+      started: "2026-06-05T07:40:52Z"
+      completed_on: "2026-06-05T07:42:11Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      output_path: "scripts/experiments_3rd_rev/bias_investigation/scale_bias_hypotheses.md"
+      checks:
+        - "git diff --check"
+    key_finding: "Summarized the scale-bias diagnosis into a concise investigation note with ranked hypotheses, methodological concerns, candidate fixes, and small validation experiments."
+    outcome: "Markdown note created for the third-revision bias investigation."
+    next_actions:
+      - "Implement corrected GIFT finite-full-area versus asymptote evaluation."
+      - "Add residual-by-bin diagnostic script in the same folder."
+  - name: "scale_bias_hypothesis_review"
+    important_params:
+      task: "review manuscript, training pipeline, and data generation to explain overprediction in small spatial units and underprediction in large spatial units"
+      status: "completed"
+      started: "2026-06-05T07:23:41Z"
+      completed_on: "2026-06-05T07:28:05Z"
+      hostname: "gpunode04"
+      git_hash: "e2f96ddc1e5e7aaf70cf9c665fa8056099f880ab"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      scope:
+        - "mathematical assumptions"
+        - "data generation and splitting"
+        - "model architecture and losses"
+        - "architecture_screen implications"
+      checks:
+        - "Read paper/main.tex."
+        - "Inspected muscari model, dataloader, benchmarker, trainer, and sample compilation scripts."
+        - "Ran uv-based diagnostics on ceacce0 sample distributions and current_abs checkpoint predictions."
+    key_finding: "Scale-signed bias is consistent with weak asymptote identification from very low-coverage EVA samples, strong observed-area/species-richness correlation, partial observed-area/spatial-unit-area confounding, and a benchmark/projection mismatch in which GIFT is evaluated with finite full-area effort rather than predict_sr_tot."
+    outcome: "Prepared hypotheses, fixes, and small validation experiments for the scale-bias investigation."
+    next_actions:
+      - "Correct or explicitly separate finite-full-area GIFT evaluation from asymptotic S_T evaluation."
+      - "Run small diagnostics that stratify residuals by spatial-unit area, observed effort, relative effort, and plot density."
+      - "Test compact fixes: loss reweighting by area/effort bins, relative coverage input, bounded monotone parameterization, and denser near-saturation synthetic samples."
+  - name: "architecture_screen_speedup"
+    important_params:
+      task: "reduce architecture screen CPU/DataLoader overhead and improve GPU utilization"
+      hostname: "gpunode04"
+      git_hash: "b5eaa18"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      observed_issue: "Full run spawned five fold workers plus four DataLoader workers per fold; GPU use was sporadic."
+      changes:
+        - "Set architecture screen batch size to 8192."
+        - "Set architecture screen DataLoader workers to 0 because datasets are already materialized tensors."
+        - "Pinned CUDA DataLoader memory and used non-blocking evaluation transfers."
+        - "Enabled high float32 matmul precision for CUDA fold workers."
+        - "Disabled Lightning sanity validation and per-process model summaries."
+      smoke_tests:
+        - "uv run python -m py_compile muscari/dataset.py muscari/benchmarker.py muscari/utils.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "WANDB_MODE=offline MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "git --no-pager diff --check"
+    completed_on: "2026-06-04"
+    key_finding: "The run had been CPU/process-management heavy, with DataLoader subprocesses under each GPU fold worker. The optimized smoke run completed with four result rows and no leftover architecture-screen processes."
+    outcome: "Ready to relaunch the full architecture screen."
+  - name: "architecture_screen_benchmarker_revamp"
+    important_params:
+      task: "revamp scripts/experiments_3rd_rev/architecture_screen.py to use BenchmarkConfig and Benchmarker for multi-GPU fold scheduling"
+      hostname: "gpunode04"
+      git_hash: "5fbb7df"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      devices_detected:
+        - "cuda:0"
+        - "cuda:1"
+        - "cuda:2"
+        - "cuda:3"
+        - "cuda:4"
+      smoke_tests:
+        - "uv run python -m py_compile muscari/benchmarker.py scripts/experiments_3rd_rev/architecture_screen.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+    completed_on: "2026-06-04"
+    key_finding: "The architecture screen now uses Benchmarker; smoke mode produced four variant rows with interpolation/extrapolation metrics and residual-bias slopes. Full mode will distribute folds across detected devices."
+    outcome: "Refactor completed; ready for full architecture screen run."
+  - name: "third_revision_agent_setup"
+    important_params:
+      phase: "agent_and_logging_files"
+      files:
+        - "AGENT.md"
+        - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "No prior agent guide or log file existed in the root project."
+    outcome: "Created shared guidance and initialized the revision workflow log."
+  - name: "third_revision_experiment_scripts_initial"
+    important_params:
+      phase: "experiments"
+      task: "initial optional wandb support and lightweight revision experiment scripts before user cleanup request"
+      wandb_project: "muscari-third-revision"
+      smoke_tests:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py scripts/experiments/*.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments/architecture_screen.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments/final_revision_runs.py"
+    completed_on: "2026-06-04"
+    key_finding: "The initial smoke paths worked, but the user requested a branch cleanup and a simpler script layout before any new commit."
+    outcome: "Superseded by third_revision_refactor_cleanup."
+  - name: "third_revision_refactor_cleanup"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "move work off master, rename experiment folder, remove duplicate revision scripts, and use benchmark.py/train.py as manuscript entrypoints"
+      smoke_tests:
+        - "uv run python -m py_compile muscari/muscari.py muscari/trainer.py muscari/muscari_ensemble.py muscari/benchmarker.py scripts/benchmark.py scripts/train.py scripts/experiments_3rd_rev/*.py"
+        - "git diff --check"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/experiments_3rd_rev/architecture_screen.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/benchmark.py"
+        - "MUSCARI_SMOKE_TEST=1 uv run python scripts/train.py"
+    completed_on: "2026-06-04"
+    key_finding: "Cleaned disabled-wandb smoke paths passed. benchmark.py now owns the manuscript benchmark smoke path, train.py can retrain the selected ensemble, and d0848f6 is still missing locally."
+    outcome: "Awaiting user verification before committing."
+  - name: "third_revision_experiment_utility_cleanup"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "remove dedicated 100 km compilation script and move shared revision helpers into the source package"
+      files:
+        removed:
+          - "scripts/experiments_3rd_rev/compile_sbcv_100km.py"
+        moved:
+          - "scripts/experiments_3rd_rev/revision_utils.py -> muscari/revision_utils.py"
+        updated:
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "The 100 km data can be generated from existing data-processing scripts, and shared helper code belongs in muscari/ rather than the experiment-script directory."
+    outcome: "Focused smoke checks passed; awaiting user verification before committing."
+  - name: "third_revision_utils_merge"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "merge third-revision helper functions into the existing muscari/utils.py module"
+      files:
+        removed:
+          - "muscari/revision_utils.py"
+        updated:
+          - "muscari/utils.py"
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "The temporary revision utility module duplicated the role of muscari/utils.py and imported back into it for git metadata."
+    outcome: "Smoke checks passed; awaiting user verification before committing."
+  - name: "third_revision_utils_consolidation"
+    important_params:
+      branch: "dev_3rd_rev"
+      task: "keep experiment-specific feature constants in scripts and reuse muscari/utils.py helpers across benchmark and train paths"
+      files:
+        updated:
+          - "muscari/utils.py"
+          - "muscari/benchmarker.py"
+          - "scripts/benchmark.py"
+          - "scripts/chao2_estimator.py"
+          - "scripts/train.py"
+          - "scripts/experiments_3rd_rev/architecture_screen.py"
+          - "AGENT.md"
+          - "agent_log.yaml"
+    completed_on: "2026-06-04"
+    key_finding: "BIOCLIMATE_VARS belongs to experiment scripts, while effort transforms, metrics, Lightning evaluation, feature-list helpers, and wandb setup are reusable utilities."
+    outcome: "Smoke checks passed; committed on dev_3rd_rev."
+
+failed_experiments:
+  - name: "architecture_screen_ceacce0"
+    important_params:
+      status: "failed"
+      started: "2026-06-04T13:36:16Z"
+      failed_on: "2026-06-04"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "ec6cc1a"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      block_size: "1 km"
+      architecture_variants:
+        - "current_abs"
+        - "exp_abs"
+        - "current_rel"
+        - "exp_rel"
+      feature_set: "env + area"
+      wandb_group: "architecture_screen_ceacce0"
+      stdout_path: "stdout/third_rev_architecture_screen.out"
+      output_path: "scripts/results/architecture_screen/ceacce0"
+    reason: "Cancelled intentionally by user before completion so the full architecture screen can be run on another host."
+
+next_actions:
+  - "Decide whether the final third-revision architecture should prioritize current_abs for interpolation or current_rel for extrapolation and bias behavior, then update benchmark.py/train.py constants if needed."
+  - "Run the full architecture screen on ceacce0 from commit ec6cc1a on the target host and summarize GIFT RMSE, interpolation RMSE, and residual-bias slopes."
+  - "Generate the 100 km SBCV dataset from existing data-processing scripts or sync d0848f6 if it remains unavailable."
+  - "Revise manuscript and reviewer response after experiment outputs are available."
+
+notes:
+  - "2026-06-04: Initialized shared agent guidance and logging for the third-revision workflow."
+  - "2026-06-04: Added wandb to pyproject.toml and refreshed uv.lock."
+  - "2026-06-04: Added commit-and-pause protocol to AGENT.md per user instruction."
+  - "2026-06-04: Removed commit 620acf0 from master by moving master back to 0842ba0 and created branch dev_3rd_rev."
+  - "2026-06-04: Removed duplicate chao2_revision.py and final_revision_runs.py; benchmark.py is now the manuscript benchmark entrypoint."
+  - "2026-06-04: Removed compile_sbcv_100km.py and moved revision helper functions into muscari/revision_utils.py."
+  - "2026-06-04: Merged revision helper functions into muscari/utils.py and removed the temporary revision_utils module."
+  - "2026-06-04: Moved BIOCLIMATE_VARS back to experiment scripts and consolidated duplicate helper usage across train, benchmark, Chao2, benchmarker, and architecture screen."
+  - "2026-06-04: Started full architecture screen architecture_screen_ceacce0 from commit ec6cc1a in screen session muscari_arch_screen."
+  - "2026-06-04: Checked local SBCV datasets; d0848f6 is not present, so the 100 km dataset must be synced or generated from scripts/data_processing/compile_sbcv_eva_samples.py."
+  - "2026-06-04: Cancelled local architecture_screen_ceacce0 run and terminated screen session muscari_arch_screen so it can be rerun on another host."
+  - "2026-06-05: Added scripts/experiments_3rd_rev/architecture_screen_analysis.py to summarize the successful ceacce0 run with CSV/LaTeX tables and a comparison figure."

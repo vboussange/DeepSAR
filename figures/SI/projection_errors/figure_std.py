@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import rioxarray
-import numpy as np
 import geopandas as gpd
 from pathlib import Path
 from muscari.plotting import CMAP_BR
@@ -18,7 +17,7 @@ rcparams = {
 plt.rcParams.update(rcparams)
 
 
-MODEL_NAME = "ceacce0"
+MODEL_NAME = "dae0789a3c87"
 RESOLUTIONS_M = (5_000, 50_000)
 
 # Constants for file paths
@@ -76,15 +75,6 @@ def plot_raster(ax, rast, cmap, cbar_kwargs, norm=None, **kwargs):
     ax.set_axis_off()
 
 
-def relative_std(std_rast, mean_rast, denominator_abs=False):
-    denominator = np.abs(mean_rast) if denominator_abs else mean_rast
-    return ((std_rast / denominator) * 100).where(np.abs(denominator) > 1e-12)
-
-
-def area_label(resolution_m):
-    area_km2 = (resolution_m / 1000) ** 2
-    return f"{area_km2:g}"
-
 if __name__ == '__main__':
     # Load data
     if not RAST_PATH.exists():
@@ -95,8 +85,6 @@ if __name__ == '__main__':
     world = gpd.read_file(ROOT / "data" / "raw" / "NaturalEarth" / "ne_10m_admin_0_countries.shp")
     europe = world[world.CONTINENT == 'Europe'].to_crs('EPSG:3035')
     europe_geom = europe.geometry
-
-    Path("panels").mkdir(exist_ok=True)
 
     rolling_kwargs = {'x': 2, 'y': 2, 'center': False, 'min_periods': 2}
 
@@ -109,8 +97,7 @@ if __name__ == '__main__':
 
         sr_mean = preprocess_raster(get_raster(rast_dict, "SR", res), europe_geom, rolling_kwargs, coarsen_factor)
         sr_std = preprocess_raster(get_raster(rast_dict, "std_SR", res), europe_geom, rolling_kwargs, coarsen_factor)
-        dsr_mean = preprocess_raster(get_raster(rast_dict, "dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
-        dsr_std = preprocess_raster(get_raster(rast_dict, "std_dSR_dlogA", res), europe_geom, rolling_kwargs, coarsen_factor)
+        dsr_std = preprocess_raster(get_raster(rast_dict, "std_dS_dA", res), europe_geom, rolling_kwargs, coarsen_factor)
 
         std_sr = sr_std
         std_dsr = dsr_std
@@ -130,7 +117,7 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{d\\log A}$',
+            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{dA}$\n(species km$^{-2}$)',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }
@@ -154,9 +141,10 @@ if __name__ == '__main__':
 
         sr_ax.set_aspect('equal')
         dsr_ax.set_aspect('equal')
-        sr_ax.set_title(f'SR | Area = {area_label(res)} km$^2$', y=-0.22)
-        dsr_ax.set_title(f'dSR/dlogA | Area = {area_label(res)} km$^2$', y=-0.22)
 
-    # plt.tight_layout()
+    ax_sr_low.set_title('5 x 5 km$^2$', y=1.02)
+    ax_sr_high.set_title('50 x 50 km$^2$', y=1.02)
+
+    plt.tight_layout()
     fig.subplots_adjust(wspace=0.)
-    fig.savefig("figure_rstd.pdf", dpi=300, transparent=True)
+    fig.savefig(Path(__file__).with_name("figure_rstd.pdf"), dpi=300, transparent=True)

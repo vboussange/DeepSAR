@@ -71,8 +71,10 @@ class GIFTDataset:
         import tempfile
         from huggingface_hub import HfApi
 
-        print("Building environmental caches from source before upload…")
+        print("Building species matrix from source before upload…")
         df = self.from_source(
+            data_dir=self.data_dir,
+            cache_dir=self.cache_dir,
             use_cache=False,
         )
 
@@ -133,12 +135,13 @@ class GIFTDataset:
         species_matrix = np.zeros((n_plots, n_species), dtype=np.bool_)
         species_matrix[row_indices, col_indices] = True
         
-        assert plot_gdf.crs == "EPSG:3035", f"Expected plot_gdf CRS to be EPSG:3035, got {plot_gdf.crs}"
+        if plot_gdf.crs != "EPSG:3035":
+            raise ValueError(f"Expected plot_gdf CRS to be EPSG:3035, got {plot_gdf.crs}")
         df = pd.DataFrame({
             'area_m2': plot_gdf.geometry.area.values,
             'geometry': plot_gdf.geometry.values,
         })
-        df = gpd.GeoDataFrame(df, geometry='geometry')
+        df = gpd.GeoDataFrame(df, geometry='geometry', crs=plot_gdf.crs)
 
         print(f"  Matrix shape: {species_matrix.shape} ({n_plots} plots × {n_species} species)")
         print(f"  Sparsity: {100 * (1 - species_matrix.sum() / species_matrix.size):.2f}%")
@@ -190,19 +193,3 @@ class GIFTDataset:
             return cls._set_species_list_attr(gpd.read_parquet(dest))
 
         return cls._set_species_list_attr(gpd.read_parquet(downloaded))
-
-        
-if __name__ == "__main__":
-    dataset = GIFTDataset()
-    plot_data = dataset.read_plot_data()
-    species_data = dataset.read_species_data()
-    df = GIFTDataset.from_hub(
-        data_dir=dataset.data_dir,
-        cache_dir=dataset.cache_dir,
-        use_cache=True,
-    )
-    
-    obs_areas = df['area_m2'].values
-    species_list = df.attrs['species_list']
-    species_matrix = df[species_list].values
-    print(f"Loaded {len(df)} plots with {len(species_list)} species")

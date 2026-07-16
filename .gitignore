@@ -31,6 +31,8 @@ reports/*
 *.svg
 benchmark_results*.tex
 *.json
+wandb/*
+*.safetensors
 
 
 ## Core latex/pdflatex auxiliary files:
@@ -66,4 +68,3 @@ benchmark_results*.tex
 *.gpkg
 
 .python-version
-uv.lock

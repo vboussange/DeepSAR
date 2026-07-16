@@ -48,8 +48,10 @@ To install dependencies and set up the environment, ensure you have `uv` install
 ```bash
 uv sync
 uv pip install torch --torch-backend=auto
-uv pip install -e .
 ```
+
+`uv sync` installs MuScaRi in editable mode. The second command selects the
+PyTorch build appropriate for the host hardware.
 
 ## Data
 
@@ -118,7 +120,18 @@ env_ds, lc_ds = EnvironmentalFeatureDataset.from_source()
 To retrain the `MuScaRi` models, follow these steps:
 
 1. Compile training and test samples with `compile_sbcv_eva_samples.py` and `compile_gift_samples.py`.
-2. Train the ensemble model with `scripts/train.py`. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
+2. Train fold models with `muscari.trainer.Trainer`; checkpoints and the internal training summary are written under the config-hash run directory. Run `scripts/project.py` for that run directory to build the public `ensemble_pretrained/` artifact and generate projections. The main architecture is `MuScaRi`, and ensembles are handled by `MuScaRiEnsemble`.
+
+Long-running scripts can be launched with `./run_script.sh SCRIPT [PREFIX]`;
+stdout and process identifiers are written under `stdout/`.
+
+## Tests
+
+Run the regression tests from the repository root:
+
+```bash
+uv run python -m unittest discover -s tests -v
+```
 
 ## Citations
 

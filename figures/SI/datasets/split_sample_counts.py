@@ -15,8 +15,11 @@ def load_fold_counts(sbcv_path: Path) -> pd.DataFrame:
         val_path = sbcv_path / f"fold_{fold_id}_val.parquet"
         test_path = sbcv_path / f"fold_{fold_id}_test.parquet"
 
-        if not (train_path.exists() and val_path.exists() and test_path.exists()):
-            continue
+        missing = [path for path in (train_path, val_path, test_path) if not path.exists()]
+        if missing:
+            raise FileNotFoundError(
+                f"Missing fold {fold_id} input files: {[str(path) for path in missing]}"
+            )
 
         n_train = len(gpd.read_parquet(train_path))
         n_val = len(gpd.read_parquet(val_path))
@@ -42,7 +45,7 @@ def render_latex_table(df: pd.DataFrame) -> str:
         "    \\setlength{\\tabcolsep}{6pt}\n"
         "    \\begin{tabularx}{\\textwidth}{l >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X >{\\centering\\arraybackslash}X}\n"
         "    \\toprule\n"
-        "    Split & Train & Validation & Test \\\\\n"
+        "    Fold & Train & Validation & Test \\\\\n"
         "    \\midrule\n"
     )
     rows = []
@@ -53,7 +56,7 @@ def render_latex_table(df: pd.DataFrame) -> str:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{Sample counts per training, validation, and test datasets for each training/validation/test split.}\n"
+        "    \\caption{Sample counts in the training, validation, and test partitions of each cross-validation fold.}\n"
         "    \\label{tab:fold_sample_counts}\n"
         "\\end{table}\n"
     )

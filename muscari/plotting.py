@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import pickle
 import seaborn as sns
 import numpy as np
 import scipy.stats as stats
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.multicomp import MultiComparison
 from muscari.cld import create_comp_matrix_allpair_t_test, multcomp_letters
 from matplotlib.colors import LinearSegmentedColormap
