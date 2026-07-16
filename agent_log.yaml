@@ -1,4 +1,27 @@
 active_experiments:
+  - name: "detach_independent_paper_widget_repositories"
+    important_params:
+      task: "stop the MuScaRi parent repository from pinning paper and widget revisions while preserving both local repositories"
+      status: "completed"
+      started: "2026-07-16"
+      completed_on: "2026-07-16"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "42b41a49cf78ab8172a3a551d3eb4a3099540ab9"
+      branch: "master"
+      scope:
+        - "remove the paper and widget gitlinks from the parent index"
+        - "remove their .gitmodules entries and stale local submodule configuration"
+        - "ignore /paper/ and /widget/ in the parent repository"
+        - "preserve both standalone nested Git repositories without modifying their contents"
+      retained_submodule: "legacy_paper remains pinned as the archived manuscript snapshot"
+      outcome: "the parent tracks no paper or widget revision; both directories remain independent ignored Git repositories, while legacy_paper remains the sole submodule"
+      checks:
+        - "Parent index contains no paper or widget gitlink and git submodule status lists only legacy_paper."
+        - "Parent ignore rules match paper/main.tex and widget/app.py."
+        - "paper and widget retain clean standalone Git worktrees and their own origin remotes."
+        - "Stale paper/widget submodule sections were removed from the parent local Git configuration."
+        - "AGENTS.md documents the canonical commands for cloning paper and widget after reinstalling MuScaRi."
+      next_action: "user review of staged parent repository changes before commit"
   - name: "pre_submission_source_audit"
     important_params:
       task: "audit and tighten repository source code before merging dev_3rd_rev into master and tagging the submission state"

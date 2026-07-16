@@ -18,11 +18,26 @@ large frameworks, hidden configuration layers, or clever abstractions.
 - `scripts/experiments_3rd_rev/`: lightweight third-revision experiment scripts. Keep
   hyperparameters as top-level constants.
 - `figures/`: scripts used to generate main and supplementary figures.
+- `paper/` and `widget/`: independent local Git repositories ignored by this
+  parent repository. Their revisions are not pinned here, and a fresh MuScaRi
+  clone does not create either directory.
 - `paper/main.tex`: manuscript source. Match its technical style and notation.
 - `paper/response_to_reviewers.md`: style reference for reviewer responses.
 - `paper/response_to_reviewers_3rd_rev.md`: active third-revision response.
+- `legacy_paper/`: archived manuscript submodule retained at its release commit.
 - `agent_log.yaml`: shared task and experiment log. Update it whenever a task or
   experiment starts or ends.
+
+After cloning or reinstalling MuScaRi, recreate the independent repositories
+from the MuScaRi root:
+
+```bash
+git clone https://git@git.overleaf.com/6a47cf0a15da9af5443c3709 paper
+git clone git@hf.co:spaces/vboussange/MuScaRi widget
+```
+
+Manage branches, pulls, and commits from within each repository. The MuScaRi
+parent repository deliberately does not record their revisions.
 
 ## Current Data And Result IDs
 

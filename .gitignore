@@ -1,6 +1,11 @@
 .vscode/
 envs
 .conda
+
+# Independent repositories maintained outside this parent Git history.
+/paper/
+/widget/
+
 *.pyc
 data/**
 !data/**/*.txt
