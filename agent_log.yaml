@@ -1,4 +1,24 @@
 active_experiments:
+  - name: "muscari_v0.1.1_release"
+    important_params:
+      task: "release MuScaRi v0.1.1 after detaching the independent paper and widget repositories"
+      status: "completed"
+      started: "2026-07-16"
+      completed_on: "2026-07-16"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "a44dcd4fc9c016cddd70e40ae163f9094691cd7b"
+      branch: "master"
+      previous_version: "0.1.0"
+      release_version: "0.1.1"
+      release_scope: "repository-layout patch release; no model, data, or scientific-code changes"
+      downstream_action: "pin the independent Hugging Face widget deployment to Git tag v0.1.1"
+      outcome: "project metadata and uv.lock identify MuScaRi 0.1.1; the package is ready for the annotated v0.1.1 Git tag"
+      checks:
+        - "UV_CACHE_DIR=/private/tmp/uv-cache uv run python -m unittest discover -s tests -v: 19 passed"
+        - "UV_CACHE_DIR=/private/tmp/uv-cache uv lock --check: 148 packages resolved"
+        - "UV_CACHE_DIR=/private/tmp/uv-cache uv build --no-sources: built muscari-0.1.1.tar.gz and muscari-0.1.1-py3-none-any.whl"
+        - "git diff --check and YAML parsing passed"
+      next_action: "create and push the release commit and annotated v0.1.1 tag, then pin the independent widget deployment"
   - name: "detach_independent_paper_widget_repositories"
     important_params:
       task: "stop the MuScaRi parent repository from pinning paper and widget revisions while preserving both local repositories"
