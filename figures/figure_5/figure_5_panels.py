@@ -277,7 +277,7 @@ def plot_sar_panel(ax, loc, dict_sar, show_ylabel=False):
     if show_ylabel:
         ax.set_ylabel("Predicted species\nrichness ($S_T$)", fontsize=11)
     else:
-        ax.set_yticklabels([])
+        ax.tick_params(labelleft=False)
     ax.tick_params(axis="both", labelsize=8, width=1.0, length=3)
     for spine in ax.spines.values():
         spine.set_linewidth(1.0)
@@ -285,9 +285,9 @@ def plot_sar_panel(ax, loc, dict_sar, show_ylabel=False):
 
 def save_figure(fig):
     outputs = [
-        Path("figure_5_panels.pdf"),
-        Path("figure_5_panels.png"),
-        Path("figure_5_panels.svg"),
+        Path(__file__).parent / "figure_5_panels.pdf",
+        Path(__file__).parent / "figure_5_panels.png",
+        Path(__file__).parent / "figure_5_panels.svg",
         ROOT / "paper" / "figures" / "figure_5.pdf",
         ROOT / "paper" / "figures" / "figure_5.png",
         ROOT / "paper" / "figures" / "figure_5.svg",

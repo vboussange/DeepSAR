@@ -7,7 +7,6 @@ import torch
 import numpy as np
 import xarray as xr
 from pathlib import Path
-import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
 
@@ -36,20 +35,6 @@ def create_raster(X_map, ypred):
     rast = rast.rio.write_crs("EPSG:3035")
     return rast
 
-def plot_raster(rast, label, ax, cmap, vmin=None, vmax=None):
-        # world.boundary.plot(ax=ax, linewidth=0.1, edgecolor='black')
-        cbar_kwargs = {'orientation':'horizontal', 'shrink':0.6, 'aspect':40, "label":"","pad":0.05, "location":"bottom"} #if display_cbar else {}
-        # rolling window for smoothing
-        rast.where(rast > 0.).plot(ax=ax,
-                                    cmap=cmap, 
-                                    cbar_kwargs=cbar_kwargs, 
-                                    vmin=vmin, 
-                                    vmax=vmax)
-        ax.set_title(label)
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-        
-        
 def create_features(model, env_dataset, lc_dataset, res):
     # see: https://docs.xarray.dev/en/stable/generated/xarray.DataArray.coarsen.html
     resolution = abs(env_dataset.rio.resolution()[0])

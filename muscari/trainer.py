@@ -178,6 +178,7 @@ class Trainer:
         gift_df = gpd.read_parquet(self.gift_path)
         gift_df = self._add_effort_columns(gift_df)
         gift_df = gift_df.replace([np.inf, -np.inf], np.nan)
+        # Keep a common complete-case cohort across benchmark feature sets.
         gift_df.dropna(inplace=True)
         return gift_df
 
@@ -209,6 +210,7 @@ class Trainer:
                 "sbcv_path": self.sbcv_path,
                 "gift_dataset_id": self.gift_path.parent.name if self.gift_path else None,
                 "gift_path": self.gift_path,
+                "gift_complete_case_policy": "all_columns" if self.gift_path else None,
             },
             "experiment": experiment_name,
             "features": {
@@ -342,6 +344,7 @@ class Trainer:
                 "sbcv_path": self.sbcv_path,
                 "gift_dataset_id": self.gift_path.parent.name if self.gift_path else None,
                 "gift_path": self.gift_path,
+                "gift_complete_case_policy": "all_columns" if self.gift_path else None,
                 "metadata_files": self._metadata_files(),
                 "fold_files": self._fold_files(),
             },
@@ -456,6 +459,7 @@ class Trainer:
             num_sanity_val_steps=0,
         )
         lightning_trainer.fit(lit_model, train_loader, val_loader)
+        # Retain stopping-epoch weights to reproduce the published training protocol.
         return lit_model
 
     def _read_fold_data(self, fold_id: int, train_frac: float):
@@ -653,6 +657,7 @@ class Trainer:
         train_frac: float,
         run_context: dict[str, Any],
     ):
+        wandb_logger = None
         try:
             if self.config.torch_num_threads is not None:
                 torch.set_num_threads(self.config.torch_num_threads)
@@ -772,12 +777,17 @@ class Trainer:
                 fold_summary["checkpoint_path"] = str(checkpoint_path)
             if wandb_logger is not None:
                 log_wandb_metrics(wandb_logger, result_row)
-                finish_wandb(wandb_logger)
             logger.info("Completed fold %s on device %s", fold_id, device)
             return {"row": result_row, "fold_summary": json_ready(fold_summary)}
-        except Exception as exc:
-            logger.error("Error processing fold %s on device %s: %s", fold_id, device, exc)
-            return None
+        except Exception:
+            logger.exception("Error processing fold %s on device %s", fold_id, device)
+            raise
+        finally:
+            if wandb_logger is not None:
+                try:
+                    finish_wandb(wandb_logger)
+                except Exception:
+                    logger.exception("Failed to finish wandb run for fold %s", fold_id)
 
     def run(
         self,
@@ -848,9 +858,9 @@ class Trainer:
                     fold_id = future_to_fold[future]
                     try:
                         result = future.result()
-                    except Exception as exc:
-                        logger.error("Fold %s generated an exception: %s", fold_id, exc)
-                        continue
+                    except Exception:
+                        logger.exception("Fold %s generated an exception", fold_id)
+                        raise
                     if result is not None:
                         rows.append(result["row"])
                         fold_summaries.append(result["fold_summary"])

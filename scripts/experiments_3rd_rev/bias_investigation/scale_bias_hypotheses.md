@@ -4,6 +4,11 @@ Date: 2026-06-05
 Dataset: `ceacce0`
 GIFT dataset: `418c563`
 
+Status: historical diagnostic note. The finite-versus-asymptotic evaluation
+requested below is implemented in
+`scripts/experiments_3rd_rev/gift_asymptote_evaluation.py`; final revision
+results report the asymptotic audit explicitly.
+
 ## Observed Behaviour
 
 Exploratory MuScaRi predictions show a scale-signed residual pattern: the model
@@ -244,7 +249,7 @@ mismatch.
 
 Start with fixes that preserve the current style and keep changes local:
 
-- Add a corrected GIFT asymptote evaluation path to `Trainer`.
+- Keep the standalone corrected GIFT asymptote audit synchronized with final artifacts.
 - Report finite full-area and asymptote metrics separately.
 - Add residual diagnostics by area, effort, coverage, and plot density.
 - Try area-effort loss reweighting before changing architecture.
@@ -258,7 +263,7 @@ tables for all architecture variants.
 
 ## Suggested Priority
 
-1. Correct GIFT evaluation and regenerate architecture-screen summaries.
+1. Completed: correct GIFT evaluation and regenerate architecture-screen summaries.
 2. Produce residual-by-bin tables and plots for existing checkpoints.
 3. Run one-fold area-effort reweighting.
 4. Run one-fold same-unit multi-effort generation.

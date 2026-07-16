@@ -5,14 +5,11 @@ This script performs the following operations:
 1. Loads processed EVA data and raw GIFT data.
 2. Cleans GIFT species names and filters for resolved species.
 3. Crops GIFT plots to the study area extent.
-4. Calculates species richness (SR) and observed area for each plot (habitat-agnostic).
-5. Creates a filtered dataset where GIFT plots are restricted to species present in the EVA dataset.
-6. Saves both unfiltered and filtered datasets to parquet and GeoPackage files.
+4. Restricts GIFT records to species represented in the processed EVA data.
+5. Saves the filtered species and plot tables as parquet files.
 """
 
 import pandas as pd
-import numpy as np
-from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
 from eva_preprocessing import clean_species_name
@@ -67,7 +64,7 @@ if __name__ == "__main__":
     assert len(gift_plot_df) == len(gift_plot_df["record_id"].unique())
     assert set(gift_plot_df.record_id).issubset(set(gift_species_df.record_id)), "Plot IDs mismatch between plots and species"
 
-    # Save habitat agnostic data
+    # Save the EVA-aligned GIFT data.
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
     gift_species_df.to_parquet(OUTPUT_FOLDER / "species_data.parquet")
     gift_plot_df.to_parquet(OUTPUT_FOLDER / "plot_data.parquet")

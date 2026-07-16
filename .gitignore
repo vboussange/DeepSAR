@@ -68,4 +68,3 @@ wandb/*
 *.gpkg
 
 .python-version
-uv.lock

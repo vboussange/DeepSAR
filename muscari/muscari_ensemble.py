@@ -19,8 +19,10 @@ def _normalize_weights(weights: Optional[list], n_models: int) -> list[float]:
     weights = np.asarray(weights, dtype=float)
     if weights.shape != (n_models,):
         raise ValueError("ensemble_weights must have one value per model")
-    if not np.isfinite(weights).all() or weights.sum() <= 0:
-        raise ValueError("ensemble_weights must be finite and sum to a positive value")
+    if not np.isfinite(weights).all() or np.any(weights < 0) or weights.sum() <= 0:
+        raise ValueError(
+            "ensemble_weights must be finite, non-negative, and sum to a positive value"
+        )
     weights = weights / weights.sum()
     return weights.tolist()
 
@@ -90,6 +92,12 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         super().__init__()
         if n_models <= 0:
             raise ValueError("n_models must be positive")
+        for name, scalers in (
+            ("feature_scalers", feature_scalers),
+            ("target_scalers", target_scalers),
+        ):
+            if scalers is not None and len(scalers) != n_models:
+                raise ValueError(f"{name} must have one entry per model")
         self.n_models = n_models
         self.layer_sizes = layer_sizes
         self.feature_names = feature_names
@@ -136,7 +144,8 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
         use_validation_weights: bool = False,
     ) -> "MuScaRiEnsemble":
         """Build an ensemble from a list of already-trained :class:`MuScaRi` models."""
-        assert models, "models list must not be empty"
+        if not models:
+            raise ValueError("models list must not be empty")
         m0 = models[0]
         muscari_batchnorm = getattr(m0, "ffnn_batchnorm", False)
         asymptote_transform = getattr(m0, "asymptote_transform", "softplus")
@@ -144,6 +153,22 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
 
         # Infer layer_sizes from the first model's architecture
         layer_sizes = [block.linear.out_features for block in m0.ffnn.fully_connected_layers]
+
+        for model in models[1:]:
+            model_layer_sizes = [
+                block.linear.out_features for block in model.ffnn.fully_connected_layers
+            ]
+            if model.feature_names != m0.feature_names:
+                raise ValueError("Feature names differ across ensemble members")
+            if model_layer_sizes != layer_sizes:
+                raise ValueError("Layer sizes differ across ensemble members")
+            for attribute, expected in (
+                ("ffnn_batchnorm", muscari_batchnorm),
+                ("asymptote_transform", asymptote_transform),
+                ("weibull_parameterization", weibull_parameterization),
+            ):
+                if getattr(model, attribute, None) != expected:
+                    raise ValueError(f"{attribute} differs across ensemble members")
 
         def _to_dict(scaler):
             return scaler_to_dict(scaler) if scaler is not None else None
@@ -205,7 +230,8 @@ class MuScaRiEnsemble(nn.Module, PyTorchModelHubMixin, library_name="muscari"):
                 feature_names_ref = feature_names
                 config_ref = checkpoint.get("config")
             else:
-                assert feature_names_ref == feature_names, "Feature names differ across folds"
+                if feature_names_ref != feature_names:
+                    raise ValueError("Feature names differ across folds")
             config = checkpoint["config"]
             model = MuScaRi(
                 config.layer_sizes,

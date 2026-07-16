@@ -27,7 +27,7 @@ FINAL_BENCHMARK_PATH = (
 
 TRAIN_FRACTIONS = np.logspace(-4, 0, 9)
 FOLD_IDS = list(range(5))
-DEVICES = ["cuda:0"] * len(FOLD_IDS)
+DEVICES = []  # Let TrainConfig discover each available accelerator once.
 BIOCLIMATE_VARS = ["bio1", "pet_penman_mean", "sfcWind_mean", "bio12"]
 LAYER_SIZES = symmetric_arch(6, base=32, factor=4)
 N_EPOCHS = 100
@@ -116,6 +116,8 @@ def train_fraction(fraction: float, features: list[str]) -> pd.DataFrame:
             "architecture_variant": ARCHITECTURE_VARIANT,
             "effort_transform": EFFORT_TRANSFORM,
             "asymptote_transform": ASYMPTOTE_TRANSFORM,
+            "weibull_parameterization": WEIBULL_PARAMETERIZATION,
+            "target_transform": TARGET_TRANSFORM,
             "model_family": "MuScaRi",
             "batch_size": BATCH_SIZE,
             "learning_rate": LEARNING_RATE,
@@ -178,9 +180,18 @@ def main() -> None:
             if not existing.empty
             else existing
         )
-        if len(existing_fraction) == len(FOLD_IDS):
+        complete_folds = (
+            set(existing_fraction["fold"].astype(int)) == set(FOLD_IDS)
+            if not existing_fraction.empty
+            else False
+        )
+        if len(existing_fraction) == len(FOLD_IDS) and complete_folds:
             print(f"Reusing completed fraction {fraction:g}", flush=True)
             continue
+        if not existing_fraction.empty:
+            print(f"Discarding partial fraction {fraction:g} before rerunning", flush=True)
+            existing = existing[~np.isclose(existing["train_frac"], fraction)].copy()
+            completed = [existing] if not existing.empty else []
         if np.isclose(fraction, 1.0):
             benchmark = pd.read_csv(FINAL_BENCHMARK_PATH)
             benchmark = benchmark[benchmark["experiment"] == "MuScaRi_ClimateDEM_Area"].copy()

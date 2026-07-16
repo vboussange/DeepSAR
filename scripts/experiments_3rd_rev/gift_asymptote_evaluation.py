@@ -63,6 +63,7 @@ def prepare_gift_data(feature_names: list[str], effort_transform: str) -> pd.Dat
     df["observed_area"] = df["sp_unit_area"]
     df = add_effort_columns(df, effort_transform)
     df = df.replace([np.inf, -np.inf], np.nan)
+    # Use one complete-case cohort so metrics remain comparable across feature sets.
     df = df.dropna()
 
     required = ["sr", "sp_unit_area", "observed_area", "log_sp_unit_area", "log_observed_area"]
@@ -132,7 +133,11 @@ def fold_ids_for_run(run_dir: Path) -> list[int]:
 def evaluate_model(model_name: str, config_hash: str) -> list[dict]:
     run_dir = ARTIFACT_ROOT / model_name / config_hash
     config = load_config(run_dir)
-    ensemble = MuScaRiEnsemble.from_folds(run_dir, device=DEVICE)
+    ensemble = MuScaRiEnsemble.from_folds(
+        run_dir,
+        device=DEVICE,
+        use_validation_weights=False,
+    )
     fold_ids = fold_ids_for_run(run_dir)
     feature_names = list(ensemble.feature_names)
     effort_transform = config["model"]["effort_transform"]

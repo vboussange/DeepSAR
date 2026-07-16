@@ -1,7 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -eu
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 SCRIPT [PREFIX]" >&2
+    exit 2
+fi
 
 file="$1"
-prefix="$2"
+prefix="${2:-}"
+
+if [ ! -f "$file" ]; then
+    echo "Script not found: $file" >&2
+    exit 2
+fi
 
 namesim_with_ext=$(basename "$file")
 namesim="${namesim_with_ext%.*}"

@@ -102,6 +102,10 @@ Species column names are anonymized tokens (e.g. `sp_00042`) that are consistent
 |----------|------|-------------|
 | `landcover` | categorical (int16) | Corine Land Cover 2018 class code |
 
+The legacy cache retains source background codes `0` and `999` as remapped
+categories. The reported MuScaRi benchmarks and released ensemble do not use
+land-cover fractions as predictors.
+
 #### Generated samples
 
 | Path | Description |

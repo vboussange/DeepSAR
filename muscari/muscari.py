@@ -150,9 +150,9 @@ class MuScaRi(nn.Module):
                 x = self.feature_scaler.transform(x)
             x = torch.tensor(x, dtype=torch.float32).to(next(self.parameters()).device)
             x = x[:, 1:]  # drop the dummy log_observed_area column
-            y_pred = self._predict_sr_tot(x)
+            y_pred = self._predict_sr_tot(x).cpu().numpy()
             if self.target_scaler is not None:
-                y_pred = self.target_scaler.inverse_transform(y_pred.cpu().numpy())
+                y_pred = self.target_scaler.inverse_transform(y_pred)
             return y_pred
 
     @staticmethod

@@ -1,7 +1,4 @@
-"""
-Plotting figure 2 'prediction power of climate, area, and both on SR'.
-Keeps the original experiments and correlation plots.
-"""
+"""Generate Figure 3 performance comparisons and prediction diagnostics."""
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -378,6 +375,7 @@ def add_performance_panels(
         box_data = []
         missing_rows = []
         experiments = list(label_map.keys())
+        rng = np.random.default_rng(42 + j)
         for experiment in experiments:
             if experiment not in analysis.fold_values.columns:
                 missing_rows.append(True)
@@ -402,7 +400,7 @@ def add_performance_panels(
         for i, data in enumerate(box_data):
             if missing_rows[i]:
                 continue
-            y = np.random.normal(i + 1, 0.06, size=len(data))
+            y = rng.normal(i + 1, 0.06, size=len(data))
             ax.scatter(data, y, alpha=0.6, s=10, color=color, zorder=3)
 
         for patch in bplot["boxes"]:

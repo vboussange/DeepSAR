@@ -94,6 +94,12 @@ def prepare_fold_data(path: Path, feature_names: list[str], effort_transform: st
 
 
 def normalized_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float, float]:
+    y_true = np.asarray(y_true, dtype=float).reshape(-1)
+    y_pred = np.asarray(y_pred, dtype=float).reshape(-1)
+    if y_true.shape != y_pred.shape or not y_true.size:
+        raise ValueError("Observed and predicted richness must have the same non-empty shape.")
+    if not np.isfinite(y_true).all() or not np.isfinite(y_pred).all():
+        raise ValueError("Observed and predicted richness must be finite.")
     rmse = float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
     mean_sr = float(np.mean(y_true))
     if not np.isfinite(mean_sr) or mean_sr <= 0:

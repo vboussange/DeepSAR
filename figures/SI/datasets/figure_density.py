@@ -1,14 +1,13 @@
-import torch
-from pathlib import Path
-import seaborn as sns
 import matplotlib.pyplot as plt
-import pandas as pd
 import geopandas as gpd
-import numpy as np
+from pathlib import Path
 
 from muscari.plotting import CMAP_BR
 from muscari.data_processing.utils_eva import EVADataset
-from scipy.ndimage import gaussian_filter
+
+ROOT = Path(__file__).parents[3]
+COUNTRY_DATA = ROOT / "data" / "raw" / "NaturalEarth" / "ne_10m_admin_0_countries.shp"
+OUTPUT_PATH = Path(__file__).with_name("figure_density.pdf")
 
 def load_and_preprocess_data():
     plot_gdf = EVADataset.from_source()
@@ -18,7 +17,7 @@ def load_and_preprocess_data():
 
 if __name__ == "__main__":
     plot_gdf = load_and_preprocess_data()
-    world = gpd.read_file("../../../data/raw/NaturalEarth/ne_10m_admin_0_countries.shp")
+    world = gpd.read_file(COUNTRY_DATA)
     
     # extract x and y coordinates of each plot
     xs = plot_gdf.geometry.x.values
@@ -60,4 +59,4 @@ if __name__ == "__main__":
     hb.set_rasterized(True)
 
     ax.set_axis_off()
-    fig.savefig("figure_density.pdf", dpi=300, transparent=True)
+    fig.savefig(OUTPUT_PATH, dpi=300, transparent=True)

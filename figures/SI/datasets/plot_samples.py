@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 
 from muscari.data_processing.utils_eva import EVADataset
-from muscari.plotting import COLORS_BR
 from muscari.data_processing.spatial_folds import assign_checkerboard_folds
 
 SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"

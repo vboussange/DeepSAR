@@ -32,6 +32,8 @@ def scale_features_targets(
     target_scaler=None,
     target_transform="maxabs",
 ):
+    if (feature_scaler is None) != (target_scaler is None):
+        raise ValueError("feature_scaler and target_scaler must be provided together")
     features = gdf[["log_observed_area"] + feature_names].values.astype(np.float32)
     target = gdf["sr"].values.astype(np.float32)
 

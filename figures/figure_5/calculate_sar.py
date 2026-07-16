@@ -156,9 +156,7 @@ def export_sar_table(locations, window_sizes, output_path: Path) -> None:
 
     
 if __name__ == "__main__":
-    # creating X_maps for different resolutions
-    seed = 1
-    output_dir = Path("SARs")
+    output_dir = Path(__file__).parent / "SARs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -166,14 +164,6 @@ if __name__ == "__main__":
 
     env_ds, lc_ds, res_env_pixel = load_environmental_features(model)
 
-    
-    # dict_SAR = {"loc1": {"coords": (45.1, 6.3), #lat, long # old lat long
-    #                    "SRs": [],},
-    #           "loc2": {"coords": (53, 8.4),
-    #                    "SRs": [],},
-    #         "loc3": {"coords": (42.1, -5),
-    #                    "SRs": [],}
-    #         }
     
     dict_SAR = {"loc1": {"coords": (49.66, 16.00), # Žďárské vrchy Protected Landscape Area
                        "SRs": [],},
@@ -208,17 +198,6 @@ if __name__ == "__main__":
             # predictions
             SRs = model.predict_members_sr_tot(features).T
             dict_SAR[loc]["SRs"].append(SRs)
-            
-            ## predictions FIXME: legacy code
-            # feature_scaler = checkpoint["feature_scalers"][0]
-            # target_scaler = checkpoint["target_scalers"][0]
-            # X = features[["log_observed_area"] + model.feature_names].values
-            # X = feature_scaler.transform(X)
-            # with torch.no_grad():
-            #     X = torch.tensor(X, dtype=torch.float32).to(next(model.parameters()).device)
-            #     ys = np.concatenate([m._predict_sr_tot(X[:, 1:]).cpu().numpy() for m in model.models], axis=1) # predicting asymptote, no need to feed log_observed_area
-            #     SRs = target_scaler.inverse_transform(ys.T).T # inverse transform to get back to original scale
-            # dict_SAR[loc]["SRs"].append(SRs[0])  # SRs[0] since we have only one sample
         
         # Convert to numpy array with shape (len(window_sizes), len(model.models))
         dict_SAR[loc]["SRs"] = np.concatenate(dict_SAR[loc]["SRs"], axis=0)
@@ -228,7 +207,6 @@ if __name__ == "__main__":
         slope_members = np.diff(dict_SAR[loc]["SRs"], axis=0) / np.diff(area_km2)[:, None]
         dict_SAR[loc]["slope"] = model.aggregate_member_predictions(slope_members.T)
         dict_SAR[loc]["std_slope"] = model.get_member_prediction_dispersion(slope_members.T)
-        # dict_SAR[loc]["SRs"] = np.array(dict_SAR[loc]["SRs"]) # FIXME: legacy code
             
     dict_SAR["log_area"] = log_area
     dict_SAR["slope_area_km2"] = slope_area_km2

@@ -104,6 +104,7 @@ NOT_RECORDED = "not_recorded"
 
 def result_paths() -> list[Path]:
     paths = sorted(RESULTS_ROOT.glob(INPUT_GLOB))
+    paths += sorted((RESULTS_ROOT / "legacy_architecture_sweep").glob(INPUT_GLOB))
     if not paths:
         raise FileNotFoundError(f"No architecture screen result CSVs matched {RESULTS_ROOT / INPUT_GLOB}")
     return paths

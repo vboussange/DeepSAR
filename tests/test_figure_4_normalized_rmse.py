@@ -30,6 +30,14 @@ class Figure4NormalizedRmseTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "finite and positive"):
             normalized_rmse(np.array([-1.0, 1.0]), np.array([0.0, 0.0]))
 
+    def test_rejects_mismatched_empty_or_nonfinite_inputs(self):
+        with self.assertRaisesRegex(ValueError, "same non-empty shape"):
+            normalized_rmse(np.array([1.0, 2.0]), np.array([1.0]))
+        with self.assertRaisesRegex(ValueError, "same non-empty shape"):
+            normalized_rmse(np.array([]), np.array([]))
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            normalized_rmse(np.array([1.0]), np.array([np.nan]))
+
 
 if __name__ == "__main__":
     unittest.main()

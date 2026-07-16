@@ -1,4 +1,84 @@
 active_experiments:
+  - name: "pre_submission_source_audit"
+    important_params:
+      task: "audit and tighten repository source code before merging dev_3rd_rev into master and tagging the submission state"
+      status: "completed"
+      started: "2026-07-16"
+      completed_on: "2026-07-16"
+      audit_completed_on: "2026-07-16"
+      hostname: "gpunode04"
+      git_hash: "54e3fab6c3167323e7a46700129aaae970126ded"
+      branch: "dev_3rd_rev"
+      scope:
+        - "muscari/"
+        - "scripts/"
+        - "figures/"
+        - "tests/"
+        - "root Python packaging, runtime, and documentation files"
+      excluded_from_audit:
+        - "paper/ (context only)"
+        - "widget/ (context only)"
+        - "legacy_paper/ manuscript materials (context only)"
+      baseline_worktree: "paper submodule modified by the active Overleaf integration; preserve and exclude from audit changes"
+      execution_environment: "uv"
+      audit_priorities:
+        - "correctness and reproducibility"
+        - "stale, dead, or duplicate code"
+        - "public API and operational documentation"
+        - "hard-coded dataset and result identifiers"
+        - "test coverage and clean full-source checks"
+      corrective_runs:
+        chao2_ceacce0:
+          status: "completed"
+          started: "2026-07-16"
+          completed_on: "2026-07-16"
+          sbcv_dataset_id: "ceacce0"
+          gift_dataset_id: "418c563"
+          spatial_block_size_m: 1000
+          reason: "previous artifact used a stale 20 km fold assignment, counted duplicate plot-species rows as repeated incidences, and omitted the Chao2 finite-sample correction"
+          estimator_reference: "Chao et al. 2014, Ecological Monographs 84:45-67, Appendix C, Eq. C.5"
+          command: "uv run python scripts/chao2_estimator.py"
+          output: "scripts/results/benchmark/benchmark_chao2_results_ceacce0.csv"
+          result:
+            fold_mean_nrmse_percent: 64.976
+            fold_std_nrmse_percent: 0.666
+            previous_fold_mean_nrmse_percent: 68.239
+            previous_fold_std_nrmse_percent: 1.393
+            environment_only_muscari_reduction_percent: 54.641
+            figure_3_significance_grouping_changed: false
+          downstream_outputs:
+            - "figures/figure_3/figure_3.pdf"
+            - "figures/figure_3/model_performance_and_bias_report.txt"
+            - "figures/figure_3/model_performance_pairwise_results.csv"
+            - "scripts/results/final_revision_synthesis.md"
+      audit_outcome:
+        source_cleanup_status: "completed_and_user_approved"
+        files_reviewed: "all tracked Python, shell, notebook setup metadata, packaging, tests, figures, scripts, and source documentation outside paper/, widget/, and manuscript-only legacy_paper/"
+        net_effect: "removed stale one-off migrations, broken legacy figure/debug generators, duplicate packaging metadata, and the completed revision plan; tightened public APIs, serialization, failure handling, CRS/nodata metadata, paths, reproducibility, and documentation"
+        scientific_decisions:
+          gift_environmental_footprint: "Retain axis-aligned bounding-box summaries as the intended historical GIFT feature definition; document the convention and do not regenerate data or retrain."
+          early_stopping: "Retain stopping-epoch weights as the published training protocol; document the convention and do not retrain."
+          landcover_background: "Corine codes 0 and 999 remain legacy remapped categories; reported benchmarks and the released ensemble do not use land-cover predictors."
+          geometry_area_invariant: "No geometry/sp_unit_area mismatch occurs in any of the 1,764,540 fold rows in ceacce0 or d0848f6; retain the historical generator."
+        remaining_publication_blockers: []
+        merge_readiness: "ready_for_dev_3rd_rev_commit_master_merge_and_v0.1.0_tag"
+      checks:
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m unittest discover -s tests -v: 19 passed"
+        - "UV_CACHE_DIR=/tmp/uv-cache uvx ruff check muscari scripts figures tests: clean"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv run python -m compileall -q muscari scripts figures tests"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv lock --check: 148 packages resolved"
+        - "UV_CACHE_DIR=/tmp/uv-cache uv build --no-sources: sdist and wheel built successfully"
+        - "bash -n run_script.sh scripts/run_widget_local_muscari_climatedem.sh"
+        - "Loaded the selected five-member dae0789a3c87 ensemble and restored both environmental cache CRSs as EPSG:3035"
+        - "Parsed agent_log.yaml and ran git diff --check"
+        - "Regenerated and visually inspected the root Figure 3 PDF without writing its configured paper/ copy"
+      excluded_state_preserved: "paper submodule remains modified only by the pre-existing Overleaf integration and was not audited or edited"
+      release:
+        user_approved_on: "2026-07-16"
+        target_branch: "master"
+        tag: "v0.1.0"
+        description: "final release code associated with the revised manuscript"
+      next_action: "commit dev_3rd_rev, merge into master, and create annotated tag v0.1.0"
   - name: "huggingface_best_model_publication"
     important_params:
       task: "publish the selected third-revision MuScaRi_ClimateDEM ensemble and version-comparison scores to vboussange/muscari"

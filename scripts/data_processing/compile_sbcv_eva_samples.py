@@ -15,11 +15,9 @@ This script generates training data by:
 
 import geopandas as gpd
 from pathlib import Path
-import numpy as np
 import xarray as xr
 import logging
 import json
-import random
 import os
 import multiprocessing as mp
 
@@ -45,7 +43,7 @@ _OUTPUT_PATH = None
 CONFIG = {
     "output_file_path": Path(
         Path(__file__).parent,
-        f"../../data/processed/training_samples/sbcv",
+        "../../data/processed/training_samples/sbcv",
     ),
     "env_vars": [
         "bio1",
@@ -64,7 +62,7 @@ CONFIG = {
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
     "n_splits": 5, # number of spatial folds, should be >=3
-    "block_size": 500_000, # Block size in meters (e.g., 20km x 20km)
+    "block_size": 1_000,  # Main 1 km spatial-block dataset; edit explicitly for new datasets.
     "ratio_samples_plots": 1.0, # ratio of genrated train/val/test samples to raw plots, should be ~1
 }
 
@@ -91,6 +89,7 @@ def write_dataset_metadata(output_path: Path, dataset_id: str, df: gpd.GeoDataFr
             "spunit_area_range_train_m2": CONFIG["spunit_area_range_train"],
             "spunit_area_range_test_m2": CONFIG["spunit_area_range_test"],
             "random_state": CONFIG["random_state"],
+            "fold_seed_policy": "random_state + fold_id",
         },
         "environmental_variables": CONFIG["env_vars"],
     }
@@ -104,6 +103,7 @@ def run_sp_unit_compilation(
     lc_raster: xr.Dataset,
     n_sp_units: int,
     area_range: tuple,
+    random_state: int,
     verbose: bool = CONFIG["verbose"],
     env_var_names: list = CONFIG["env_vars"],
 ) -> gpd.GeoDataFrame:
@@ -112,7 +112,11 @@ def run_sp_unit_compilation(
     """
     # Step 1: Generate spatial units and compute SR
     sp_unit_data = run_SR_compilation_ckdtree(
-        df, n_sp_units, area_range, verbose=verbose
+        df,
+        n_sp_units,
+        area_range,
+        verbose=verbose,
+        random_state=random_state,
     )
     
     # Step 2: Validate SR
@@ -182,6 +186,7 @@ def process_fold(fold_id: int) -> int:
     env_ds = _ENV_DS
     lc_ds = _LC_DS
     output_path = _OUTPUT_PATH
+    fold_seed = CONFIG["random_state"] + fold_id
 
     test_fold_id = fold_id
     val_fold_id = (fold_id + 1) % CONFIG["n_splits"]
@@ -202,6 +207,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(train_df)),
         area_range=CONFIG["spunit_area_range_train"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(train_data, output_path, f"fold_{fold_id}_train")
@@ -213,6 +219,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(val_df)),
         area_range=CONFIG["spunit_area_range_train"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(val_data, output_path, f"fold_{fold_id}_val")
@@ -224,6 +231,7 @@ def process_fold(fold_id: int) -> int:
         lc_ds,
         n_sp_units=int(CONFIG["ratio_samples_plots"] * len(test_df)),
         area_range=CONFIG["spunit_area_range_test"],
+        random_state=fold_seed,
         env_var_names=CONFIG["env_vars"],
     )
     save_compiled_data(test_data, output_path, f"fold_{fold_id}_test")
@@ -232,10 +240,6 @@ def process_fold(fold_id: int) -> int:
     return fold_id
 
 if __name__ == "__main__":
-    # Set up random seeds for reproducibility
-    random.seed(CONFIG["random_state"])
-    np.random.seed(CONFIG["random_state"])
-    
     # Set up output directory with git hash
     sha = get_git_hash()
     output_file_path = CONFIG["output_file_path"] / sha

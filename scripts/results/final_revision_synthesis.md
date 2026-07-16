@@ -6,6 +6,7 @@ Date: 2026-07-15
 
 - 1 km SBCV benchmark: `scripts/results/benchmark/benchmark_results_ceacce0.csv`
 - 100 km SBCV benchmark: `scripts/results/benchmark/benchmark_results_d0848f6.csv`
+- Chao2 benchmark: `scripts/results/benchmark/benchmark_chao2_results_ceacce0.csv`
 - Figure 4 EVA scale-binned NRMSE: `figures/figure_4/figure_4_normalized_rmse_by_area.csv`
 - Training-fraction scaling: `scripts/results/training_fraction_scaling/ceacce0/training_fraction_scaling_results.csv`
 - GIFT asymptote audits: `scripts/results/gift_asymptote_evaluation/ceacce0/gift_asymptote_evaluation_results.csv` and `scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv`
@@ -21,6 +22,7 @@ Mean NRMSE across five folds, calculated as RMSE divided by mean observed richne
 | 1 km `ceacce0` | MuScaRi_Area | 59.905 +/- 1.244% | 51.728 +/- 1.585% | 0.154 | -0.225 |
 | 1 km `ceacce0` | FFNN_ClimateDEM_Area | 17.594 +/- 1.220% | 163.717 +/- 31.520% | -7.715 | 1.618 |
 | 1 km `ceacce0` | Linear_ClimateDEM_Area | 57.489 +/- 0.789% | 8226.337 +/- 730.640% | -21503.281 | 32.759 |
+| 1 km `ceacce0` | Chao2 estimator | -- | 64.976 +/- 0.666% | -0.823 | -0.598 |
 | 100 km `d0848f6` | MuScaRi_ClimateDEM_Area | 32.942 +/- 6.353% | 32.900 +/- 1.697% | 0.657 | -0.072 |
 | 100 km `d0848f6` | MuScaRi_ClimateDEM | 34.763 +/- 8.085% | 38.016 +/- 10.569% | 0.515 | 0.267 |
 | 100 km `d0848f6` | MuScaRi_Area | 55.376 +/- 4.511% | 50.147 +/- 5.072% | 0.199 | -0.028 |
@@ -34,6 +36,7 @@ Mean NRMSE across five folds, calculated as RMSE divided by mean observed richne
 - `MuScaRi_Area` is far weaker on SBCV test sets and GIFT than the environmental MuScaRi models, but it remains useful for the scale-binned diagnostic in Figure 4.
 - `FFNN_ClimateDEM_Area` matches MuScaRi-like SBCV test NRMSE but extrapolates poorly to GIFT. This supports the role of the MuScaRi accumulation-curve structure rather than a generic feed-forward predictor.
 - The corrected `Linear_ClimateDEM_Area` baseline has reasonable SBCV test NRMSE relative to `MuScaRi_Area`, but catastrophic GIFT extrapolation. This should be described as a log-linear extrapolation failure mode rather than ordinary low performance.
+- The corrected incidence-based Chao2 baseline has mean GIFT NRMSE 64.976%. The environment-only MuScaRi model reduces fold-mean NRMSE by 54.6% relative to this baseline.
 
 ## Figure 4 Diagnostic
 
@@ -67,5 +70,6 @@ The true asymptotic prediction is close to the finite full-area prediction on GI
 
 ## Provenance Caveats
 
-- The benchmark script uses GIFT dataset ID `da569da`. The project guide names `418c563` as canonical. The two local compiled GIFT parquet files have identical shape, columns, non-geometry values, CRS, and geometries, but different parquet byte sizes.
+- The archived neural benchmark artifacts were trained and evaluated with GIFT dataset ID `da569da`; the current benchmark script uses canonical ID `418c563`. The two local compiled GIFT parquet files have identical shape, columns, non-geometry values, CRS, and geometries, but different parquet byte sizes.
 - The 1 km benchmark CSV originally had incomplete linear baseline primary metrics. The linear rows were recomputed with the corrected `scripts/benchmark.py` logic and merged into `benchmark_results_ceacce0.csv` without rerunning neural models.
+- The Chao2 benchmark was regenerated on 2026-07-16 using the `ceacce0` 1 km fold configuration, unique plot-species incidences, and the finite-sample correction in Chao et al. (2014), Appendix C, Eq. C.5. The superseded artifact used a separate 20 km fold assignment, counted duplicate plot-species rows, and omitted the finite-sample factor.

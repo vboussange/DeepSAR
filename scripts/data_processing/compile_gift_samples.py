@@ -10,11 +10,8 @@ This script performs the following operations:
 
 import geopandas as gpd
 from pathlib import Path
-import numpy as np
-import xarray as xr
 import logging
 import json
-import random
 
 from muscari.data_processing.utils_gift import GIFTDataset
 from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
@@ -41,7 +38,6 @@ CONFIG = {
         "elevation",
         "landcover",
     ],
-    "random_state": 2,
     "verbose": True,
     "num_workers": 100,  # number of parallel workers for env feature compilation
 }

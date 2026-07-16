@@ -18,6 +18,12 @@ def assign_checkerboard_folds(
     Returns:
         GeoDataFrame with `grid_x`, `grid_y`, and `spatial_split` columns.
     """
+    if n_splits <= 0:
+        raise ValueError("n_splits must be positive")
+    if block_size <= 0:
+        raise ValueError("block_size must be positive")
+    if gdf.empty:
+        raise ValueError("gdf must not be empty")
     minx, miny, maxx, maxy = gdf.total_bounds
 
     grid_x = np.floor((gdf.geometry.x - minx) / block_size).astype(int)

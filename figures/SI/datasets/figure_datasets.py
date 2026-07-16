@@ -4,13 +4,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import numpy as np
-import pandas as pd
 import json
 
 from muscari.plotting import CMAP_BR
 
 SBCV_PATH = Path(__file__).parents[3] / "data" / "processed" / "training_samples" / "sbcv" / "ceacce0"
-GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "da569da" / "compiled_data.parquet"
+GIFT_PATH = Path(__file__).parents[3] / "data" / "processed" / "test_samples_GIFT" / "418c563" / "compiled_data.parquet"
 
 FOLD_ID = 0
 
@@ -22,7 +21,7 @@ def load_data():
     train_dataset["log_sp_unit_area"] = np.log(train_dataset["sp_unit_area"])
     train_dataset["log_observed_area"] = np.log(train_dataset["observed_area"])
     train_dataset["coverage"] = train_dataset["log_observed_area"] / train_dataset["log_sp_unit_area"]
-    train_dataset = train_dataset.sample(n=5000, random_state=42)  # Sample 1000 points for visualization
+    train_dataset = train_dataset.sample(n=5000, random_state=42)
     
     # Load GIFT dataset
     gift_dataset = gpd.read_parquet(GIFT_PATH)
@@ -77,7 +76,7 @@ if __name__ == "__main__":
     # Plot train dataset
     coverage = train_dataset["coverage"].values
     norm = plt.Normalize(vmin=0, vmax=1)
-    scatter = ax.scatter(
+    ax.scatter(
         np.exp(train_dataset["log_sp_unit_area"]) / 1e6,
         np.exp(train_dataset["log_sr"]),
         c=coverage,
@@ -109,5 +108,5 @@ if __name__ == "__main__":
     ax.set_xlabel("Spatial unit area (km²)")
     ax.set_ylabel("Species richness")
     ax.legend()
-    fig.savefig("figure_datasets.pdf", dpi=300, bbox_inches="tight")
+    fig.savefig(Path(__file__).with_name("figure_datasets.pdf"), dpi=300, bbox_inches="tight")
     

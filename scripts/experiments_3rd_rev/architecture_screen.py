@@ -1,5 +1,5 @@
 """
-Private architecture screen for the third MuScaRi revision.
+Run the factorial architecture screen for the third MuScaRi revision.
 
 """
 from __future__ import annotations
@@ -23,6 +23,7 @@ from muscari.utils import (
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
+# Retained to reproduce the logged factorial screen; final evaluations use 418c563.
 GIFT_DATASET_ID = "da569da"
 SBCV_SAMPLES_PATH = ROOT / "data/processed/training_samples/sbcv" / SBCV_DATASET_ID
 GIFT_SAMPLES_PATH = ROOT / "data/processed/test_samples_GIFT" / GIFT_DATASET_ID / "compiled_data.parquet"
@@ -69,7 +70,7 @@ FEATURE_CONFIGS = {
 }
 SELECTED_FEATURE_CONFIG = "env_area"
 
-USE_WANDB = True
+USE_WANDB = False
 WANDB_PROJECT = "muscari-third-revision"
 WANDB_GROUP = f"{SCREEN_NAME}_{SBCV_DATASET_ID}"
 WANDB_TAGS = [SCREEN_NAME, SBCV_DATASET_ID, SELECTED_FEATURE_CONFIG]

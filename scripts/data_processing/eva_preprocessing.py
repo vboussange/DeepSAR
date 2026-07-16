@@ -10,7 +10,7 @@ This script performs the following operations:
 """
 import pandas as pd
 import re
-from difflib import get_close_matches
+from difflib import SequenceMatcher, get_close_matches
 from tqdm import tqdm
 from pathlib import Path
 import geopandas as gpd
@@ -80,8 +80,7 @@ def find_best_match(row, reference_set: set) -> tuple[str, bool]:
         matches = get_close_matches(name, reference_set, n=1, cutoff=0.2)
         if matches:
             match = matches[0]
-            # Calculate similarity score
-            confidence = 1.0 - sum(c1 != c2 for c1, c2 in zip(name, match)) / max(len(name), len(match))
+            confidence = SequenceMatcher(None, name, match).ratio()
             potential_matches.append((match, confidence))
 
     if potential_matches:

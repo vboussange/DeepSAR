@@ -2,6 +2,7 @@
 
 Dataset: `d0848f6`
 GIFT dataset: `418c563`
+Observed-area policy: `observed_area_set_to_sp_unit_area`
 
 Uniform ensemble metrics:
 

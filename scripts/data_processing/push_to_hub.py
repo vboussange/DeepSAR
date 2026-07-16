@@ -83,15 +83,23 @@ def generated_dataset_files() -> dict[str, Path]:
     if partition_stems != summary_stems:
         raise ValueError("Spatial cross-validation partitions and summaries differ")
 
-    gift_files = sorted(GIFT_DIR.glob("*.parquet")) + sorted(
-        GIFT_DIR.glob("*_summary.json")
-    )
+    sbcv_metadata = [SBCV_DIR / "config_used.json"]
+    if (SBCV_DIR / "metadata.json").is_file():
+        sbcv_metadata.append(SBCV_DIR / "metadata.json")
+    for path in sbcv_metadata:
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing spatial cross-validation metadata: {path}")
+
+    gift_files = sorted(GIFT_DIR.glob("*.parquet")) + sorted(GIFT_DIR.glob("*_summary.json"))
+    dataset_summary = GIFT_DIR / "dataset_summary.json"
+    if not dataset_summary.is_file():
+        raise FileNotFoundError(f"Missing GIFT dataset summary: {dataset_summary}")
     if not gift_files:
         raise FileNotFoundError(f"No total-richness extrapolation samples in {GIFT_DIR}")
 
     files = {
         f"generated_samples/sbcv/{SBCV_DIR.name}/{path.name}": path
-        for path in sbcv_partitions + sbcv_summaries
+        for path in sbcv_partitions + sbcv_summaries + sbcv_metadata
     }
     files.update(
         {f"generated_samples/GIFT/{GIFT_DIR.name}/{path.name}": path for path in gift_files}
@@ -236,7 +244,12 @@ def main() -> None:
             repo_type="dataset",
             source_dir=SBCV_DIR,
             path_in_repo=f"generated_samples/sbcv/{SBCV_DIR.name}",
-            allow_patterns=["fold_*.parquet", "fold_*_summary.json"],
+            allow_patterns=[
+                "fold_*.parquet",
+                "fold_*_summary.json",
+                "config_used.json",
+                "metadata.json",
+            ],
             parent_commit=dataset_info.sha,
             commit_message="Upload EVA spatial cross-validation samples",
         )
@@ -246,7 +259,7 @@ def main() -> None:
             repo_type="dataset",
             source_dir=GIFT_DIR,
             path_in_repo=f"generated_samples/GIFT/{GIFT_DIR.name}",
-            allow_patterns=["*.parquet", "*_summary.json"],
+            allow_patterns=["*.parquet", "*_summary.json", "dataset_summary.json"],
             parent_commit=dataset_commit.oid,
             commit_message="Upload GIFT total-richness extrapolation samples",
         )

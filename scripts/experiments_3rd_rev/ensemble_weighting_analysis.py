@@ -22,6 +22,7 @@ from muscari.utils import (
 
 ROOT = Path(__file__).parents[2]
 SBCV_DATASET_ID = "ceacce0"
+# Retained to reproduce the selected artifact, which was trained against this equivalent export.
 GIFT_DATASET_ID = "da569da"
 MODEL_NAME = "MuScaRi_ClimateDEM"
 CONFIG_HASH = "dae0789a3c87"
@@ -114,6 +115,8 @@ def normalized_weights(val_rmse: np.ndarray, strategy: str) -> np.ndarray:
         raise ValueError(f"Unknown weighting strategy: {strategy}")
 
     valid = np.isfinite(raw) & (raw > 0)
+    if not valid.any():
+        raise ValueError("No finite positive validation RMSE values are available for weighting.")
     if not valid.all():
         raw = np.where(valid, raw, np.nanmedian(raw[valid]))
     return raw / raw.sum()

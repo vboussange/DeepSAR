@@ -4,16 +4,12 @@ Memory-efficient species richness computation using cKDTree.
 Spatial queries optimized for large-scale biodiversity datasets.
 """
 
-import pandas as pd
 import geopandas as gpd
-from pathlib import Path
 import numpy as np
 import logging
 from tqdm import tqdm
 from shapely.geometry import box
 from scipy.spatial import cKDTree
-
-from muscari.data_processing.utils_eva import EVADataset
 
 def compute_single_square_stats_ckdtree(
     center_coords: np.ndarray,
@@ -208,6 +204,7 @@ def run_SR_compilation_ckdtree(
             "sr": srs,
         },
         geometry=geometries,
+        crs=df.crs,
     )
     
     # Filter out any squares with sr=0
@@ -220,41 +217,3 @@ def run_SR_compilation_ckdtree(
     
     logging.info(f"Generated {len(gdf)} spatial units with SR > 0")
     return gdf
-
-
-
-if __name__ == "__main__":
-    df = EVADataset.from_source()
-    coords = np.column_stack((df.geometry.x, df.geometry.y))
-    obs_areas = df['area_m2'].values
-    species_list = df.attrs['species_list']
-    species_matrix = df[species_list].values
-
-    rng = np.random.default_rng(42)
-    kdtree = cKDTree(coords)
-    
-    test_center_idx = 0
-    test_half_length = 5000.0  # 5km half-length -> 10km x 10km square
-    
-    # Test 1: Single square computation
-    obs_area, sp_unit_area, sr, geom = compute_single_square_stats_ckdtree(
-        coords[test_center_idx],
-        test_half_length,
-        kdtree,
-        coords,
-        obs_areas,
-        species_matrix,
-        rng,
-    )
-    
-    # Test 2: Small-scale compilation (streaming approach)    
-    n_test_sp_units = 100000
-    area_range = (1e4, 1e8)  # Smaller range for quick test
-    
-    test_gdf = run_SR_compilation_ckdtree(
-        df=df,
-        n_sp_units=n_test_sp_units,
-        area_range=area_range,
-        verbose=True,
-        random_state=42,
-    )

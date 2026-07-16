@@ -2,7 +2,7 @@
 Anonymizes species names in EVA and GIFT datasets.
 
 This script performs the following operations:
-1. Generates unique, deterministic 6-character IDs (spid) for each species name.
+1. Generates unique, deterministic 7-character IDs (spid) for each species name.
 2. Replaces original species names with these IDs in both datasets.
 3. Renames columns to standard names (record_id, anonymised_species_name).
 4. Saves the anonymized datasets to parquet files.
@@ -14,7 +14,6 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
-import numpy as np
 import shutil
 
 # Constants

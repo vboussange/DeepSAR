@@ -4,7 +4,6 @@ from pathlib import Path
 import geopandas as gpd
 from muscari.data_processing._cache import MUSCARI_CACHE_DIR
 
-# Default base paths with environment variable support
 EVA_DATA_DIR = Path(__file__).parents[2] / "data/processed/EVA/"
 HF_DATASET_REPO = "vboussange/muscari-data"
 EVA_CACHE_DIR = MUSCARI_CACHE_DIR / "EVA"
@@ -181,7 +180,7 @@ class EVADataset:
             'area_m2': obs_areas,
         })
         df['geometry'] = gpd.points_from_xy(coords[:, 0], coords[:, 1])
-        df = gpd.GeoDataFrame(df, geometry='geometry')
+        df = gpd.GeoDataFrame(df, geometry='geometry', crs=plot_gdf.crs)
 
         species_df = pd.DataFrame(species_matrix, columns=all_species)
         df = pd.concat([df, species_df], axis=1)
@@ -244,30 +243,3 @@ class EVADataset:
             return cls._set_species_list_attr(gpd.read_parquet(dest))
 
         return cls._set_species_list_attr(gpd.read_parquet(downloaded))
-
-if __name__ == "__main__":
-    # test `extract_habitat_lev1`
-    
-    examples = [
-        'R5',       # → 'R'
-        'Sa',       # → None
-        'T',        # → None
-        'S21',      # → 'S'
-        'S21, R23', # → 'S' (both valid, returns first)
-        'Sa, T5',   # → 'T' (only T5 is valid)
-        'ab, Cd',   # → 'C' (Cd is valid)
-        'a',        # → None
-    ]
-    result = [extract_habitat_lev1(x) for x in examples]
-    assert result == ['R', None, "T", 'S', 'S', 'T', None, None], f"Unexpected result: {result}"
-    
-    # test EvaDataset
-    dataset = EVADataset()
-    df_sp = dataset.read_species_data()
-    plot_data = dataset.read_plot_data()
-    df = EVADataset.from_source(use_cache=True)
-    coords = np.column_stack((df.geometry.x, df.geometry.y))
-    obs_areas = df['area_m2'].values
-    species_list = df.attrs['species_list']
-    species_matrix = df[species_list].values
-    print(f"Loaded {len(df)} plots with {len(species_list)} species")

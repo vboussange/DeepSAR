@@ -10,14 +10,9 @@ import xarray as xr
 import geopandas as gpd
 import logging
 import warnings
+from ast import literal_eval
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from shapely.geometry import box
-
-# Initialize logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 def compute_polygon_env_feature_stats(
     bounds: tuple,
@@ -25,7 +20,7 @@ def compute_polygon_env_feature_stats(
     env_var_names: list,
 ) -> np.ndarray:
     """
-    Compute mean and std of environmental variables for a single polygon.
+    Compute raster mean and std within one axis-aligned bounding box.
     
     Args:
         bounds: Tuple (minx, miny, maxx, maxy)
@@ -70,7 +65,7 @@ def compute_polygon_landcover_stats(
     num_lc_classes: int,
 ) -> np.ndarray:
     """
-    Compute one-hot encoded landcover statistics for a single polygon.
+    Compute land-cover fractions within one axis-aligned bounding box.
     
     Uses memory-efficient incremental counting instead of full one-hot matrix.
     
@@ -120,10 +115,12 @@ def run_environmental_features_compilation_parallel(
     """
     Compute environmental feature statistics for each spatial unit using parallel processing.
     
-    Leverages Dask for chunked raster access and ThreadPoolExecutor for I/O-bound parallelism.
+    Uses a thread pool to process spatial units concurrently.
     
     Args:
-        sp_unit_data: GeoDataFrame with polygon geometries
+        sp_unit_data: GeoDataFrame with polygon geometries. Statistics are
+            calculated over each geometry's axis-aligned bounding box, so they
+            represent the geometry exactly only for axis-aligned rectangles.
         env_raster: xarray Dataset with environmental feature variables
         lc_raster: xarray Dataset with landcover data
         env_var_names: List of environmental feature variable names. If "landcover" is present, landcover fractions are computed.
@@ -143,10 +140,15 @@ def run_environmental_features_compilation_parallel(
     num_lc_classes = 0
     lc_cols = []
     if compute_landcover:
+        if lc_raster is None or "landcover" not in lc_raster:
+            raise ValueError("lc_raster must contain 'landcover' when requested")
         lc_attrs = lc_raster['landcover'].attrs
-        if 'original_classes' in lc_attrs:
-            lc_classes = eval(lc_attrs['original_classes'])
-            num_lc_classes = len(lc_classes)
+        if 'original_classes' not in lc_attrs:
+            raise ValueError("landcover raster is missing the 'original_classes' attribute")
+        lc_classes = literal_eval(lc_attrs['original_classes'])
+        num_lc_classes = len(lc_classes)
+        if num_lc_classes == 0:
+            raise ValueError("landcover raster contains no valid classes")
         lc_cols = [f"lc_frac_{i}" for i in range(num_lc_classes)]
     
     # Generate column names
@@ -194,48 +196,3 @@ def run_environmental_features_compilation_parallel(
             sp_unit_data[col] = lc_results[:, i]
     
     return sp_unit_data
-
-
-if __name__ == "__main__":
-    from muscari.data_processing.utils_eva import EVADataset
-    from muscari.data_processing.utils_features import EnvironmentalFeatureDataset
-    from muscari.data_processing.SR_compilation_ckdtree import run_SR_compilation_ckdtree
-    
-    logging.info("Running tests for env_feat_compilation module...")
-    df = EVADataset.from_source()
-
-    n_test_sp_units = 1000
-    area_range = (100**2, 8e5**2)
-    
-    test_gdf = run_SR_compilation_ckdtree(
-        df=df,
-        n_sp_units=n_test_sp_units,
-        area_range=area_range,
-        verbose=True,
-        random_state=42,
-    )
-    
-    
-    env_features = EnvironmentalFeatureDataset()
-    env_ds, lc_ds = EnvironmentalFeatureDataset.from_hub(
-        chelsa_path=env_features.chelsa_path,
-        dem_path=env_features.dem_path,
-        lc_path=env_features.lc_path,
-        cache_dir=env_features.cache_dir,
-        use_cache=True,
-    )
-
-    # Test single polygon stats
-    bounds = test_gdf.geometry.iloc[1].bounds
-    env_stats = compute_polygon_env_feature_stats(bounds, env_ds, list(env_ds.data_vars))
-
-    
-    num_classes = len(eval(lc_ds["landcover"].attrs["class_mapping"]))
-    lc_stats = compute_polygon_landcover_stats(bounds, lc_ds, num_classes)
-    
-    # Test parallel compilation
-    env_features = list(env_ds.data_vars) #+ ["landcover"]
-    logging.info("Testing parallel compilation...")
-    result_gdf = run_environmental_features_compilation_parallel(
-        test_gdf, env_ds, lc_ds, env_features, num_workers=100
-    )

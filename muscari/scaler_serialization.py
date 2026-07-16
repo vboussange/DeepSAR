@@ -38,9 +38,13 @@ SUPPORTED_SCALER_TYPES = (MinMaxScaler, MaxAbsScaler, StandardScaler, Log1pMaxSc
 
 def scaler_to_dict(scaler) -> dict:
     """Serialize a fitted sklearn scaler to a JSON-compatible dict."""
+    if not isinstance(scaler, SUPPORTED_SCALER_TYPES):
+        raise TypeError(f"Unsupported scaler type: {type(scaler).__name__}")
     cls_name = type(scaler).__name__
     data = {"cls": cls_name, "n_features_in_": int(scaler.n_features_in_)}
     if cls_name == "MinMaxScaler":
+        data["feature_range"] = list(scaler.feature_range)
+        data["clip"] = scaler.clip
         data["min_"] = scaler.min_.tolist()
         data["scale_"] = scaler.scale_.tolist()
         data["data_min_"] = scaler.data_min_.tolist()
@@ -50,8 +54,10 @@ def scaler_to_dict(scaler) -> dict:
         data["scale_"] = scaler.scale_.tolist()
         data["max_abs_"] = scaler.max_abs_.tolist()
     elif cls_name == "StandardScaler":
-        data["mean_"] = scaler.mean_.tolist()
-        data["scale_"] = scaler.scale_.tolist()
+        data["with_mean"] = scaler.with_mean
+        data["with_std"] = scaler.with_std
+        data["mean_"] = scaler.mean_.tolist() if scaler.mean_ is not None else None
+        data["scale_"] = scaler.scale_.tolist() if scaler.scale_ is not None else None
     elif cls_name == "Log1pMaxScaler":
         data["scale_"] = scaler.scale_.tolist()
     else:
@@ -63,7 +69,10 @@ def dict_to_scaler(data: dict):
     """Reconstruct a scaler from a serialized dict."""
     cls_name = data["cls"]
     if cls_name == "MinMaxScaler":
-        scaler = MinMaxScaler()
+        scaler = MinMaxScaler(
+            feature_range=tuple(data.get("feature_range", (0, 1))),
+            clip=data.get("clip", False),
+        )
         scaler.min_ = np.array(data["min_"])
         scaler.scale_ = np.array(data["scale_"])
         scaler.data_min_ = np.array(data["data_min_"])
@@ -74,9 +83,12 @@ def dict_to_scaler(data: dict):
         scaler.scale_ = np.array(data["scale_"])
         scaler.max_abs_ = np.array(data["max_abs_"])
     elif cls_name == "StandardScaler":
-        scaler = StandardScaler()
-        scaler.mean_ = np.array(data["mean_"])
-        scaler.scale_ = np.array(data["scale_"])
+        scaler = StandardScaler(
+            with_mean=data.get("with_mean", True),
+            with_std=data.get("with_std", True),
+        )
+        scaler.mean_ = np.array(data["mean_"]) if data["mean_"] is not None else None
+        scaler.scale_ = np.array(data["scale_"]) if data["scale_"] is not None else None
     elif cls_name == "Log1pMaxScaler":
         scaler = Log1pMaxScaler()
         scaler.scale_ = np.array(data["scale_"])

@@ -4,6 +4,7 @@ Interpolation (on SBCV test set) and Extrapolation (on GIFT dataset).
 """
 
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -29,12 +30,9 @@ from muscari.utils import (
 from muscari.trainer import TrainConfig, Trainer
 from muscari.muscari import MuScaRi
 from muscari.ffnn import FFNNExp
-import warnings
-from dataclasses import dataclass, field
-
-warnings.filterwarnings("ignore")
 
 ROOT = Path(__file__).parents[1]
+BENCHMARK_RESULTS_DIR = ROOT / "scripts/results/benchmark"
 
 
 def env_flag(name, default):
@@ -70,7 +68,7 @@ LAYER_LABEL = "l32"
 LAYER_SIZE_BASE = 32
 SELECTED_LAYER_SIZES = symmetric_arch(6, base=LAYER_SIZE_BASE, factor=4)
 
-USE_WANDB = env_flag("MUSCARI_USE_WANDB", True)
+USE_WANDB = env_flag("MUSCARI_USE_WANDB", False)
 WANDB_PROJECT = "muscari-third-revision"
 WANDB_TAGS = ["benchmark", "third-revision"]
 
@@ -78,6 +76,8 @@ SMOKE_TEST = os.environ.get("MUSCARI_SMOKE_TEST", "0") == "1"
 FOLD_IDS = [0] if SMOKE_TEST else list(range(5))
 N_EPOCHS = 1 if SMOKE_TEST else 100
 TRAIN_FRAC = 0.002 if SMOKE_TEST else 1.0
+BATCH_SIZE = 1024
+LEARNING_RATE = 1e-3
 RIDGE_ALPHAS = np.logspace(-6, 6, 13)
 logger = setup_logger("benchmark")
 
@@ -149,9 +149,14 @@ def log_linear_wandb(metrics, dataset_id, fold_id, feature_names):
             "gift_dataset_id": GIFT_DATASET_ID,
             "fold": fold_id,
             "feature_names": feature_names,
+            "feature_set": "climate_dem_area",
             "model_family": "linear",
             **selected_architecture_metadata(),
             "ridge_alphas": RIDGE_ALPHAS.tolist(),
+            "batch_size": "not_applicable",
+            "learning_rate": "not_applicable",
+            "epoch_limit": "not_applicable",
+            "output_path": str(BENCHMARK_RESULTS_DIR),
         },
     )
     log_wandb_metrics(wandb_logger, metrics)
@@ -322,7 +327,7 @@ def build_experiments(climate_dem_feats, landcover_feats, all_env_feats):
 
 
 if __name__ == "__main__":
-    root_folder = Path(__file__).parent / Path("results", "benchmark")
+    root_folder = BENCHMARK_RESULTS_DIR
     root_folder.mkdir(parents=True, exist_ok=True)
     artifact_root = root_folder / "artifacts"
 
@@ -332,6 +337,8 @@ if __name__ == "__main__":
         path_gift_data=GIFT_SAMPLES_PATH,
         path_sbcv_data=SBCV_SAMPLES_PATH,
         n_epochs=N_EPOCHS,
+        batch_size=BATCH_SIZE,
+        lr=LEARNING_RATE,
         effort_transform=EFFORT_TRANSFORM,
         target_transform=TARGET_TRANSFORM,
         layer_sizes=SELECTED_LAYER_SIZES.copy(),
@@ -350,6 +357,10 @@ if __name__ == "__main__":
             "layer_label": LAYER_LABEL,
             "layer_size_base": LAYER_SIZE_BASE,
             "layer_sizes": SELECTED_LAYER_SIZES.copy(),
+            "batch_size": BATCH_SIZE,
+            "learning_rate": LEARNING_RATE,
+            "epoch_limit": N_EPOCHS,
+            "output_path": str(artifact_root),
         },
         fold_ids=FOLD_IDS,
         architecture_variant=SELECTED_ARCHITECTURE_NAME,
@@ -386,6 +397,8 @@ if __name__ == "__main__":
         logger.info("Running experiment: %s", exp["name"])
         model_family = "FFNN" if exp["name"].startswith("FFNN") else "MuScaRi"
         config.run_root = artifact_root / exp["name"]
+        config.feature_set = exp["name"]
+        config.wandb_config["feature_set"] = exp["name"]
         exp_results = trainer.run(
             exp["name"],
             exp["model_init"],
