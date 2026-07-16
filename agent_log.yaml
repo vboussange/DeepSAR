@@ -78,7 +78,11 @@ active_experiments:
         target_branch: "master"
         tag: "v0.1.0"
         description: "final release code associated with the revised manuscript"
-      next_action: "commit dev_3rd_rev, merge into master, and create annotated tag v0.1.0"
+        dev_3rd_rev_commit: "d22529ed27ede1afb5d1453dfe5631de4724b55e"
+        merge_commit: "5bece079af54e927ca8ad325b0ff268fd424d6d1"
+        merge_status: "completed"
+        tag_status: "completed"
+      next_action: "none; revised-manuscript release completed"
   - name: "huggingface_best_model_publication"
     important_params:
       task: "publish the selected third-revision MuScaRi_ClimateDEM ensemble and version-comparison scores to vboussange/muscari"
