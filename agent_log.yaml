@@ -1,4 +1,36 @@
 active_experiments:
+  - name: "manuscript_rebuttal_final_audit"
+    important_params:
+      task: "comprehensive final audit of the Nature Communications manuscript and third-revision rebuttal letter before resubmission"
+      status: "completed"
+      started: "2026-07-16"
+      completed_on: "2026-07-16"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "77ed4206f3a2f6ca3d34b6af38b4ec6b8facdc1a"
+      paper_commit: "5f85ffbcdec74bed09d5280a5e3f3b197b902d22"
+      scope:
+        - "paper/main.tex"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "paper/mybib.bib"
+      audit_priorities:
+        - "wording, flow, syntax, and journal tone"
+        - "terminology consistency across manuscript and rebuttal"
+        - "appropriateness and completeness of references"
+        - "cross-check numerical values against manuscript tables, response text, and repository result logs"
+      placeholder_policy: "leave LXXX placeholders unchanged for the final line-number pass"
+      outcome: "completed manuscript/rebuttal audit and applied focused wording, numerical, citation, and bibliography fixes while preserving all LXXX placeholders"
+      key_finding: "corrected stale Chao2 extrapolation values from 68.239 +/- 1.393% to 64.976 +/- 0.666% NRMSE and rounded the corresponding NRMSE reduction to 55%; updated the rebuttal Figure 5/Table S7 richness and ensemble-SD ranges to match the current manuscript table"
+      checks:
+        - "Three subagent audits completed for wording/flow, numerical consistency, and citation/reference hygiene."
+        - "env UV_CACHE_DIR=/private/tmp/uv-cache uv run python citation-key check: 73 active citation keys, 97 bibliography entries, 0 missing keys; sandbox run panicked, escalated read-only uv run succeeded."
+        - "git -C paper diff --check: passed."
+        - "pdflatex -> biber -> pdflatex -> pdflatex for paper/main.tex: built /private/tmp/muscari-main-latex-build-biber/main.pdf with no unresolved references or citation warnings in the final log."
+        - "pandoc response_to_reviewers_3rd_rev.md -o /private/tmp/muscari-response-3rd-rev.pdf: passed."
+        - "Cleanup grep found no targeted stale percentage claims, TODO markers, bare \\cite commands, or corrected typo forms in paper/main.tex or response_to_reviewers_3rd_rev.md."
+      residual_notes:
+        - "Full-library biber --tool --validate-datamodel still reports legacy Zotero-style warnings across many .bib entries, mostly unused fields such as copyright, article publisher, and ISSN formatting; active manuscript Biber compilation has no warnings."
+        - "Leave LXXX placeholders for the final line-number pass, as requested."
+      next_action: "user review of paper repository edits before committing; final pass should replace LXXX placeholders only after line numbers are frozen"
   - name: "muscari_v0.1.1_release"
     important_params:
       task: "release MuScaRi v0.1.1 after detaching the independent paper and widget repositories"
