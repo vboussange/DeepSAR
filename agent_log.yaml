@@ -1,4 +1,135 @@
 active_experiments:
+  - name: "third_revision_results_section_audit"
+    important_params:
+      task: "execute RESULTS_3RD_SEC_AUDIT_PLAN.md step by step for the 100 km benchmark comparison and Figure 5 Results section"
+      status: "completed"
+      started: "2026-07-19"
+      completed_on: "2026-07-19"
+      hostname: "gpunode04"
+      git_hash: "e91ffa1dccae28b19e83e66d5cd27b171bc5b8fe"
+      branch: "master"
+      paper_commit: "d10a4244d88f258b25f97a70264571334b456d2f"
+      dataset_id: "ceacce0"
+      gift_dataset_id: "418c563"
+      model_family: "MuScaRi_ClimateDEM"
+      model_hash: "dae0789a3c87"
+      model_path: "scripts/results/benchmark/artifacts/MuScaRi_ClimateDEM/dae0789a3c87"
+      ensemble_members: 5
+      ensemble_aggregation: "uniform arithmetic mean"
+      published_model_commit: "674c3a01e4e37fb502f9d00d4eacd2f3b7a1a83c"
+      published_model_url: "https://huggingface.co/vboussange/muscari/commit/674c3a01e4e37fb502f9d00d4eacd2f3b7a1a83c"
+      baseline_figure_5_sha256:
+        SR_5000m_tif: "3e156bc37c02466ca679e055371c4dfb5ab57f8767d931f8387a7f569fb3d59f"
+        SR_50000m_tif: "f712df842191b4180629380984c3648ed09e4d4027601d538cc9597344788aa8"
+        std_SR_5000m_tif: "7b34fbf05e22fce230d892ff6ee77b21e07c1b4e1d7b52e83dad00308486c048"
+        std_SR_50000m_tif: "1f81f43a7e8b8af492783a216e459c47d4215c1ef86278ebf07b24513c9dd5ee"
+        dS_dA_5000m_tif: "01a7d5f52743fc6ca08c239fa07dc91a4305c8bce41ea5a46c325af9fe0a3993"
+        dS_dA_50000m_tif: "028e91a5e7e592ab7d02feb231c750a26de5bfb4c140286bd62ac658575903f7"
+        std_dS_dA_5000m_tif: "5ebd2164ec344d2373d2c4988f7a161391725620566870859c0fc97727567926"
+        std_dS_dA_50000m_tif: "073c3c9da35403d3f93dcac560a61e79b05a7d09645b52c5d947bd50cdd424e2"
+        SARs_pkl: "a0763498424b6b6e4e68a847ff12b669b5e15d35ef929ec6c99f59f37c771f1b"
+        figure_5_panels_pdf: "cdaacf039a7dc2be124b0766a8583f8999b9f8d7d24da265a274b05dfb805862"
+        figure_5_panels_png: "0556535c23e447714dec6219a3f69126a91d7926afdf800a9d6d9f1b211c6e16"
+        figure_5_panels_svg: "f936d6468c72d7e7153407d80678217b9c58f53f2cd5ab7047b0c0671b3edcae"
+        paper_figure_5_png: "9bd676ac7dedd10c8b6d3fde85ef0dda4d089db9e3f54e471214beb6bbf2d9a8"
+      audit_decisions:
+        display_smoothing: "retain without manuscript discussion"
+        derivative_terminology: "retain finite-difference estimates of dS_T/dA"
+        map_harmonization: "run a focused feasibility check and regenerate only if exact harmonization is a low-effort local projection"
+        site_agreement: "report ensemble-mean patterns and positive endpoint increases for 5/5, 3/5, and 2/5 members"
+        czech_flora_comparison: "retain with klimova2025 citation"
+        ecological_interpretation: "use non-causal consistent-with wording"
+        scale_binned_comparison: "describe finite-effort interpolation performance rather than validation of mapped S_T"
+        gift_100km_statistics: "use fold-paired NRMSE and absolute median-relative-bias analyses with Holm adjustment and exact sign-flip sensitivity checks"
+      focal_location_reproduction:
+        status: "completed"
+        source: "figures/figure_5/SARs/SARs.pkl"
+        target_areas_km2: [26.298421974114373, 2414.443046857619]
+        positive_endpoint_increase_members:
+          "Žďárské vrchy": "3/5"
+          "Parc Naziunal Svizzer": "5/5"
+          "Nationaal Park Veluwezoom": "2/5"
+        check: "clean rerun reproduced every memberwise monotone-adjusted SAR value within absolute tolerance 1e-5"
+        output: "scripts/results/figure_5_audit/dae0789a3c87/focal_location_member_diagnostics.csv"
+      map_harmonization_gate:
+        status: "completed"
+        decision: "retain current maps"
+        reason: "exact agreement with the location-SAR post-processing requires all lower-scale centered predictions through each displayed grain; this is not a small two-scale map modification"
+        smoke_test:
+          focal_comparisons: 6
+          grid_tile_comparisons: 18
+          center_scale_evaluations: 1116
+          elapsed_seconds: 8.5
+          finite_5km_pixels: 213569
+          finite_50km_pixels: 2656
+          estimated_full_center_scale_rows: 6152572
+          estimated_float64_feature_memory_gib: 0.46
+          estimated_float64_member_prediction_memory_gib: 0.23
+          naive_pointwise_runtime_hours: 13.0
+        outputs:
+          - "scripts/results/figure_5_audit/dae0789a3c87/harmonization_smoke_test.csv"
+          - "scripts/results/figure_5_audit/dae0789a3c87/harmonization_summary.md"
+        consequence: "skip conditional Figure 5 regeneration and revise Results so direct maps are not presented as numerically identical to memberwise monotone-adjusted focal SARs"
+      gift_100km_statistics:
+        status: "completed"
+        source: "scripts/results/gift_asymptote_evaluation/d0848f6/gift_asymptote_evaluation_results.csv"
+        rows: "asymptotic_total fold_member rows for the three MuScaRi feature variants"
+        folds: [0, 1, 2, 3, 4]
+        n_gift_samples: 178
+        source_gift_dataset_id: "da569da"
+        canonical_gift_dataset_id: "418c563"
+        gift_equivalence: "compiled datasets have exactly matching columns, non-geometry values, CRS, and geometries"
+        nrmse_target_contrast:
+          difference_definition: "environment and area minus environment only"
+          environment_only_fold_mean_percent: 38.016006321236226
+          environment_and_area_fold_mean_percent: 32.900320395712335
+          mean_paired_difference_percentage_points: -5.115685925523892
+          ci_95_percentage_points: [-17.337142517892556, 7.10577066684477]
+          paired_t_p_raw: 0.30978168979279275
+          paired_t_p_holm: 0.30978168979279275
+          exact_sign_flip_p: 0.3125
+          conclusion: "lower aggregate NRMSE for the combined model but no clear fold-level difference"
+        absolute_median_relative_bias_target_contrast:
+          environment_only_fold_mean: 0.2671631821787521
+          environment_and_area_fold_mean: 0.07165019643727369
+          mean_paired_difference: -0.19551298574147843
+          ci_95: [-0.3416178990751042, -0.04940807240785264]
+          paired_t_p_raw: 0.02055774184558873
+          paired_t_p_holm: 0.0616732255367661
+          exact_sign_flip_p: 0.0625
+          conclusion: "comparative bias-calibration claim removed because the prespecified Holm-adjusted test did not meet alpha=0.05"
+        sensitivity_conclusion: "Holm-adjusted paired tests and exact sign-flip tests agree qualitatively for both targeted contrasts"
+        outputs:
+          - "scripts/experiments_3rd_rev/gift_100km_pairwise_statistics.py"
+          - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_100km_pairwise_statistics.csv"
+          - "scripts/results/gift_asymptote_evaluation/d0848f6/gift_100km_pairwise_statistics.md"
+      manuscript_changes:
+        - "removed the 100 km GIFT significance TODO and reported the NRMSE paired effect, confidence interval, and Holm-adjusted P value"
+        - "removed the unsupported better-bias-calibration comparison"
+        - "described the 5 km map as resolving finer within-region variation"
+        - "qualified focal SAR descriptions as ensemble-mean patterns and reported 5/5, 3/5, and 2/5 endpoint agreement"
+        - "retained the klimova2025 comparison and used non-causal consistent-with wording for the Swiss interpretation"
+        - "described scale-binned results as finite-effort interpolation performance and standardized five-model dispersion terminology"
+        - "synchronized Results, Methods, Figure 5 caption, Table S7 caption, supplementary caption, and the Table S7 generator"
+      unchanged_outputs:
+        decision: "no Figure 5 or supplementary raster/figure regeneration"
+        verification: "all frozen Figure 5 raster, SAR pickle, panel, and manuscript PNG SHA-256 checksums remain identical to the recorded baseline"
+      checks:
+        - "uv run python -m py_compile figures/figure_5/calculate_sar.py scripts/experiments_3rd_rev/figure_5_harmonization_audit.py scripts/experiments_3rd_rev/gift_100km_pairwise_statistics.py: passed"
+        - "clean uv reruns of both audit scripts reproduced all CSV and Markdown outputs"
+        - "uvx ruff check on the two audit scripts and calculate_sar.py: passed"
+        - "5 km rasters are 960 x 901 and 50 km rasters are 96 x 90; all four rasters within each grain share CRS EPSG:3035, transform, and dimensions, and all valid values are finite and non-negative"
+        - "all five memberwise SARs at all three sites have no decreasing steps; focal means, between-model standard deviations, endpoint differences, and member-agreement counts match the frozen artifact"
+        - "100 km fold pairing, aggregate NRMSE, absolute median-relative-bias values, confidence intervals, raw and Holm-adjusted paired tests, and exact sign-flip P values verified from generated CSV"
+        - "visually inspected the retained 2400 x 3000 Figure 5 PNG at original resolution and a 180 dpi PNG rendering of the supplementary dispersion figure"
+        - "uvx codespell passed for changed source, manuscript, plan, log, and summaries with pre-existing strenghtened and the MAPE acronym allowlisted"
+        - "citation/label/reference audit: 41 labels, 31 referenced labels, 72 citation keys, no missing or duplicate labels/citations"
+        - "agent_log.yaml parsing, targeted wording audit, git diff --check, and git -C paper diff --check: passed"
+        - "no files are staged; ignored generated diagnostic/statistics CSVs remain unstaged"
+      unavailable_checks:
+        - "uv run latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex: unavailable because latexmk and all checked TeX/bibliography executables are absent on gpunode04"
+      outcome: "completed the third-revision Results audit; retained the direct Figure 5 maps, added reproducible harmonization and paired-statistics audits, and aligned the manuscript claims with ensemble-member and fold-level evidence"
+      next_action: "user verification before any narrow commits in the parent and independent paper repositories; run the full LaTeX build on Overleaf or a TeX-enabled host"
   - name: "manuscript_rebuttal_final_audit"
     important_params:
       task: "comprehensive final audit of the Nature Communications manuscript and third-revision rebuttal letter before resubmission"
