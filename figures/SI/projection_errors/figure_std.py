@@ -109,7 +109,7 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Std. of\npredicted $S_T$',
+            'label': 'Std. of\npredicted $S_\\mathrm{T}$',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }
@@ -117,7 +117,7 @@ if __name__ == '__main__':
             'orientation': 'vertical',
             'shrink': 0.45,
             'aspect': 35,
-            'label': 'Std. of species\nacc. rate $\\frac{dS_T}{dA}$\n(species km$^{-2}$)',
+            'label': 'Std. of species\nacc. rate $\\frac{dS_\\mathrm{T}}{dA}$\n(species km$^{-2}$)',
             'pad': 0.04,
             'location': 'left' if idx == 0 else 'right',
         }

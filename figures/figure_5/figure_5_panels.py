@@ -54,7 +54,7 @@ CONFIG = {
             "letter": "a",
             "title": "5 $\\times$ 5 km$^2$",
             "cbar_loc": "left",
-            "cbar_label": "Predicted species\nrichness ($S_T$)",
+            "cbar_label": "Predicted species\nrichness ($S_\\mathrm{T}$)",
             "cmap": CMAP_BR,
             "show_callouts": True,
         },
@@ -65,7 +65,7 @@ CONFIG = {
             "letter": "b",
             "title": "50 $\\times$ 50 km$^2$",
             "cbar_loc": "right",
-            "cbar_label": "Predicted species\nrichness ($S_T$)",
+            "cbar_label": "Predicted species\nrichness ($S_\\mathrm{T}$)",
             "cmap": CMAP_BR,
             "show_callouts": True,
         },
@@ -76,7 +76,7 @@ CONFIG = {
             "letter": "c",
             "title": "",
             "cbar_loc": "left",
-            "cbar_label": "Species accumulation\nrate ($dS_T/dA$)\n(species km$^{-2}$)",
+            "cbar_label": "Species accumulation\nrate ($dS_\\mathrm{T}/dA$)\n(species km$^{-2}$)",
             "cmap": CMAP_DSR,
             "show_callouts": False,
         },
@@ -87,7 +87,7 @@ CONFIG = {
             "letter": "d",
             "title": "",
             "cbar_loc": "right",
-            "cbar_label": "Species accumulation\nrate ($dS_T/dA$)\n(species km$^{-2}$)",
+            "cbar_label": "Species accumulation\nrate ($dS_\\mathrm{T}/dA$)\n(species km$^{-2}$)",
             "cmap": CMAP_DSR,
             "show_callouts": False,
         },
@@ -275,7 +275,7 @@ def plot_sar_panel(ax, loc, dict_sar, show_ylabel=False):
     ax.grid(True, which="major", linestyle="--", linewidth=0.5, color="0.6", alpha=0.7)
     ax.set_title(cfg["title"], fontsize=10, pad=34)
     if show_ylabel:
-        ax.set_ylabel("Predicted species\nrichness ($S_T$)", fontsize=11)
+        ax.set_ylabel("Predicted species\nrichness ($S_\\mathrm{T}$)", fontsize=11)
     else:
         ax.tick_params(labelleft=False)
     ax.tick_params(axis="both", labelsize=8, width=1.0, length=3)

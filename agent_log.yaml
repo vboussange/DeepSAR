@@ -1,4 +1,103 @@
 active_experiments:
+  - name: "final_manuscript_consistency_syntax_check_2026_07_20"
+    important_params:
+      task: "read-only final consistency and LaTeX syntax check of paper/main.tex before submission"
+      status: "completed"
+      started: "2026-07-20"
+      completed_on: "2026-07-20"
+      hostname: "tsf-444-wpa-6-111.epfl.ch"
+      git_hash: "b502cf36d8ded45f99485e3014528b5b19352a9d"
+      branch: "master"
+      paper_commit: "0caaf80466bd9fccac3e2ac480459fa97057ca18"
+      paper_branch: "main"
+      scope:
+        - "paper/main.tex and paper/mybib.bib"
+        - "clean TeX Live/Biber compilation and log diagnostics"
+        - "labels, references, citations, terminology, numerical claims, captions, and submission markers"
+      checks:
+        - "clean pdflatex -> biber -> pdflatex -> pdflatex build completed with no fatal errors, undefined citations/references, duplicate labels, or rerun requests"
+        - "all 41 labels, 79 reference targets, 73 cited bibliography keys, and 12 referenced graphics resolved"
+        - "all braces, inline-math delimiters, and 28 environments balanced; no TODO, placeholder, unresolved ??, or active colored edit marker found"
+        - "45-page PDF parsed successfully; Figure 5 and the overfull landscape Table S1 were rendered and visually inspected"
+        - "manuscript numerical claims were cross-checked against tables and stored benchmark artifacts"
+      audited_source_sha256: "30c801d0c317e09086846e0c443356e4bd37abc1780f8325acdd6c414290a17e"
+      clean_pdf_sha256: "82a5adeeb36505bd21750445aa0e19a59a83206369278d2a3745f7763d34c9ae"
+      key_finding: "Compilation and reference integrity pass, but submission should wait for definite copy errors and substantive consistency fixes involving the accumulation-rate definition, finite-difference convention, GIFT evaluation n, author-order note, Weibull positivity constraints, and sample-generation support."
+      outcome: "Completed a read-only manuscript audit and reported prioritized corrections; no tracked paper files were modified. Restored ignored main.bbl/main.blg from the successful clean build after the compile helper's failed BibTeX fallback touched them."
+      next_action: "User to review or authorize the proposed manuscript, bibliography, embedded-figure, and cover-letter corrections before rebuilding the submission PDF."
+  - name: "final_resubmission_manuscript_rebuttal_audit_2026_07_19"
+    important_params:
+      task: "conservative final audit of the complete manuscript, third-revision rebuttal, cover letter, PDF line references, and revision diff before resubmission"
+      status: "completed"
+      started: "2026-07-19"
+      completed_on: "2026-07-19"
+      hostname: "MacBook-Pro-33.local"
+      git_hash: "b502cf36d8ded45f99485e3014528b5b19352a9d"
+      branch: "master"
+      paper_commit: "ae5110fc1ac6cd6cfa61a82768c43b8f40f4c98b"
+      paper_branch: "main"
+      scope:
+        - "paper/main.tex, including inline Supplementary Information"
+        - "paper/cover_letter.md"
+        - "paper/response_to_reviewers_3rd_rev.md"
+        - "final manuscript, letter, response, and latexdiff PDFs"
+      constraints:
+        - "preserve manuscript structure, scientific claims, and established terminology"
+        - "avoid em-dash punctuation in author-written prose"
+        - "preserve reviewer quotations verbatim"
+        - "resolve unsupported rebuttal promises in the rebuttal rather than adding manuscript content"
+        - "compare the final manuscript with submission commit d4b8ad5669f08a9107084211b05671bc286ce974"
+      source_sha256_at_start:
+        main_tex: "8144c6a282e6f59459026a795dcecd06d8414dc2056b01fdb056f761ad67838d"
+        cover_letter_md: "6f1b047c03357f41517d6d0b7e53ea4faa65a214288b05f6ac8bbcee351c6c2f"
+        response_to_reviewers_3rd_rev_md: "d5808dd28407b19418fa8e57e2a8d24cc25285e44f6ec5d770f97445f060b650"
+      source_sha256_final:
+        main_tex: "41aef86c13994b8784ecd01a0b9b00c50258d7b131e0ec925ddbfe7ea8e84e22"
+        cover_letter_md: "570fb41e4328b9df14da47ba370913a4f27f9a365d74109275feeeb3c0951207"
+        response_to_reviewers_3rd_rev_md: "d15bda7d36cb8bd69fa7ce6e8ad87716036351a1daab3f8c020d6dcacca56961"
+      deliverable_sha256:
+        main_pdf: "36b2232251bbeb98fcd529bd11ec611b2b47047e229deaba1a6f8b74795e9c5e"
+        cover_letter_pdf: "d34b481bcdf2b031bfddbbbad0130bf699d7be8d35d4e97d473f3f78008d781b"
+        response_to_reviewers_3rd_rev_pdf: "63b607f5f4cc12485b522e8391465f55ac50aa6b61bbe2ba28dfd98869386b17"
+        revision_diff_tex: "0770ac093118f08462762af2c3db130198ffb0033f7f7f3875875252f9f89ef0"
+        revision_diff_pdf: "02ae7748d3842899f2c0f20e68e55342040cac590d1074b74d4d1b939d6ae7ae"
+      line_reference_audit:
+        policy: "manuscript frozen before rebuttal citation replacement"
+        replaced_tokens: 37
+        citation_slots: 34
+        remaining_LXXX_tokens: 0
+        style: "visible final-PDF line numbers in L123-126 form; unnumbered tables and captions paired with named items and nearest supporting numbered passage"
+      builds:
+        main_pdf_pages: 45
+        cover_letter_pdf_pages: 1
+        response_to_reviewers_3rd_rev_pdf_pages: 8
+        revision_diff_pdf_pages: 50
+        latex_workflow: "TeX Live latexmk/pdflatex with Biber under uv"
+        latexdiff_baseline: "d4b8ad5669f08a9107084211b05671bc286ce974"
+        latexdiff_style: "UNDERLINE"
+        latexdiff_repairs:
+          - "removed diff markers from the preamble-level author-email href while retaining the final email text"
+          - "rendered the deleted Shapley figure cross-reference as literal Fig. 4 because its deleted label is intentionally absent"
+      checks:
+        - "three parallel read-only language audits covered core text, Methods, Supplementary Information, captions, and letters; edits were consolidated centrally"
+        - "reviewer quotation SHA-256 remained 508483b30cd0f3a2b646fc9aff766f4f969f8e9e56ce1ed7c7f6e63a34cf8212"
+        - "main and revision-diff TeX Live/Biber builds passed with no undefined citations, undefined references, fatal errors, or rerun requests"
+        - "Pandoc builds under uv passed for the cover letter and third-revision response"
+        - "all 45 manuscript pages, 1 cover-letter page, 8 rebuttal pages, and 50 revision-diff pages were rendered and visually inspected; the latexdiff-heavy tables and reported overfull boxes were inspected at full resolution"
+        - "a two-line page-boundary adjustment prevents supplementary Table S5 from crowding the page edge without changing table content or manuscript structure"
+        - "duplicate-word, placeholder, TODO, author-edit-marker, and British/American modeling-spelling scans passed; codespell findings were limited to the MAPE acronym"
+        - "em-dash scan passed for all author-written manuscript and letter prose; Markdown/YAML delimiters were retained"
+        - "ChkTeX and lacheck findings were reviewed as package, mathematical-interval, acronym, address, or established-format false positives"
+        - "final numerical-token review found no changed scientific result; differences were comment cleanup, notation consistency, or 50 km typography"
+        - "all four PDFs were parsed successfully with pdfinfo and pdftotext; qpdf was unavailable"
+        - "git diff --check passed in the paper repository and parent repository"
+      residual_scientific_consistency_flags:
+        - "architecture prose may not exactly match the implemented hidden-layer/output-layer count"
+        - "direct FFNN wording may not clearly distinguish raw from log-transformed sampling effort"
+        - "the stated generated-sample support {2,...,M_k} may differ from code paths that include one plot"
+        - "the Supplementary Information describes a Poisson capture law where the implementation/theory may rely on a small-plot approximation"
+      outcome: "completed a conservative submission-wide copyedit, synchronized rebuttal promises with the frozen manuscript, replaced every LXXX line placeholder, rebuilt and visually verified all submission PDFs, and regenerated the final UNDERLINE latexdiff"
+      next_action: "user verification of the audited paper-repository changes and four PDFs before any commit"
   - name: "third_revision_results_section_audit"
     important_params:
       task: "execute RESULTS_3RD_SEC_AUDIT_PLAN.md step by step for the 100 km benchmark comparison and Figure 5 Results section"

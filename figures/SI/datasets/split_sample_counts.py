@@ -56,7 +56,7 @@ def render_latex_table(df: pd.DataFrame) -> str:
     footer = (
         "    \\bottomrule\n"
         "    \\end{tabularx}\n"
-        "    \\caption{Sample counts in the training, validation, and test partitions of each cross-validation fold.}\n"
+        "    \\caption{Sample counts in the training, validation, and test partitions of each cross-validation fold for the 1\\,km spatial-block analysis.}\n"
         "    \\label{tab:fold_sample_counts}\n"
         "\\end{table}\n"
     )

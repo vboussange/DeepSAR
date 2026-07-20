@@ -640,8 +640,8 @@ if __name__ == "__main__":
     # Add 1:1 line through plot corners
     ax4.plot([gift_min, gift_max], [gift_min, gift_max], linestyle='--', color="black", linewidth=1)
     
-    ax4.set_xlabel(r'Empirical total species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
-    ax4.set_ylabel(r'Predicted total species richness, $S_T$', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_xlabel(r'Empirical total species richness, $S_\mathrm{T}$', fontsize=PLOT_STYLE["axis_label"])
+    ax4.set_ylabel(r'Predicted total species richness, $S_\mathrm{T}$', fontsize=PLOT_STYLE["axis_label"])
     ax4.set_yscale('log')
     ax4.set_xscale('log')
     
